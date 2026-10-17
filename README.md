@@ -112,11 +112,11 @@ fields:
 ```
 
 - **Page fields** (`fude: true` or `fude: {description: …}`). All marked page fields of one page form one collection of `kind: page`, named by the page id with `/` replaced by `-`, labelled with the page title, described as `Page "<title>"`. Only `description` is a marker option here.
-- **Structure fields** (`fude: true` or `fude: {…}`). One collection per structure, named `<page-id>-<field>` in lower case, unless the marker says `name`. Options: `name`, `label`, `description`, `key`, `actions` (default `create`, `update`, `delete`), `insert`, `maxEntries`. The label and the description default to the field's label and help text.
+- **Structure fields** (`fude: true` or `fude: {…}`). One collection per structure, named `<page-id>-<field>` in lower case, unless the marker says `name`. Options: `name`, `label`, `description`, `key`, `actions` (default `create`, `update`, `delete`), `insert`, `maxEntries`, `touch` (`{field: stand, value: today}`). The label and the description default to the field's label and help text.
 - **Sub-fields** of a marked structure: every sub-field of a type Fude knows is included; `fude: false` leaves one out, and an unmarked sub-field of another type is skipped. A sub-field may carry `fude: {description, maxWidth, alt, formats, template}`; the last four are for `files` only.
 - **Types**: `text`, `slug`, `tel`, `email`, `url` → `text` (the last three keep their format); `textarea`, `writer` → `textarea`; `select`, `radio`, `toggles` → `select`; `files` → `image` (inside a structure only); `date`, `number`, `time`, `toggle` → the same type. Any other type is skipped in a structure and refused when marked.
 - **Descriptions**: the marker's `description`, otherwise the field's `help` text with the HTML tags removed.
-- Fields that a blueprint pulls in with `extends:` count like the others.
+- Fields that a blueprint pulls in with `extends:` count like the others, also when the blueprint comes from a plugin. A plugin can ship its fields, tabs or sections with markers; every site that extends them gets the collection. A site that does not install Fude is not affected: Kirby ignores the key.
 - Names must be unique. Two structures that would both become `x` are refused: give one of them `fude: {name: …}`.
 - Refused with a 500 that names the page and the field: a marker on a **site field** (the site has no page the bot could change through it), a marked unsupported type, `files` on a page field, an unknown option.
 - Never reachable through markers: site fields, users, and drafts (pages in `content/_drafts`). Listed and unlisted pages are scanned.

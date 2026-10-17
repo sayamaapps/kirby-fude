@@ -13,6 +13,18 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## [Unreleased]
+
+### Added
+
+- **`touch` as a marker option of a structure.** `fude: {touch: {field: stand,
+  value: today}}` does what `touch` does in `site/config/fude.php`: every draft
+  of the collection sets that page field to today. Until now the option was
+  refused as unknown, so a module could not stamp its date field without a
+  `fude.php` entry on every site.
+- Markers in blueprints that a plugin registers (tabs, fields, sections pulled
+  in with `extends`) are covered by a test and documented; they already worked.
+
 ## [1.1.1] — 2026-10-17
 
 ### Fixed

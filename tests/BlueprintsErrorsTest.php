@@ -1,8 +1,8 @@
 <?php
 /**
  * Markers that cannot be honoured are loud: a site field marker, an unsupported
- * type, files on a page, a name collision, an unknown option, too many
- * collections. Kirby caches blueprints once per PHP process, so every case
+ * type, files on a page, a name collision, an unknown option, a touch field
+ * the page does not have, too many collections. Kirby caches blueprints once per PHP process, so every case
  * runs in a child process of its own (this file, with the case name as argument).
  */
 require __DIR__ . '/support.php';
@@ -37,6 +37,11 @@ const CASES = [
         'files' => ['pages/standort.yml' => "title: Standort\nfields:\n  team:\n    type: structure\n    fude: {foo: 1}\n    fields:\n      n:\n        type: text\n"],
         'options' => [],
         'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: page "standort", field "team": unknown fude option "foo"',
+    ],
+    'touch-missing-field' => [
+        'files' => ['pages/standort.yml' => "title: Standort\nfields:\n  team:\n    type: structure\n    fude: {touch: {field: stand, value: today}}\n    fields:\n      n:\n        type: text\n"],
+        'options' => [],
+        'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: collection "standort-team": touch field "stand" is not in the blueprint of "standort"',
     ],
     'limit' => [
         'files' => ['pages/standort.yml' => "title: Standort\nfields:\n  kurzname:\n    type: text\n    fude: true\n  team:\n    type: structure\n    fude: true\n    fields:\n      n:\n        type: text\n"],
