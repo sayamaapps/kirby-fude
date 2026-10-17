@@ -18,8 +18,9 @@ publishes only after an explicit confirmation from the same person.
 
 - **The proposed content** — the text fields and the resized photo — as a
   Kirby content version or draft page, until it is published or discarded.
-  A discarded draft and its photo are deleted; a published one becomes part
-  of the website like any Panel edit.
+  A discarded draft and its photo are deleted, unless somebody has edited or
+  published it in the Panel meanwhile: that stays, as the editor's work. A
+  published draft becomes part of the website like any Panel edit.
 - **A draft record** (`storage/fude/drafts/`): draft id, collection, action,
   the submitted field values, the uploaded file name, the account that made
   it, the channel actor tag the bot passes along (for example

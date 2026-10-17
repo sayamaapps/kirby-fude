@@ -18,8 +18,10 @@ Bestätigung derselben Person.
 
 - **Der vorgeschlagene Inhalt** — die Textfelder und das verkleinerte Foto —
   als Kirby-Inhaltsversion oder Entwurfsseite, bis er veröffentlicht oder
-  verworfen wird. Ein verworfener Entwurf samt Foto wird gelöscht; ein
-  veröffentlichter wird Teil der Website wie jede Panel-Änderung.
+  verworfen wird. Ein verworfener Entwurf samt Foto wird gelöscht, es sei
+  denn, jemand hat ihn inzwischen im Panel bearbeitet oder veröffentlicht:
+  Das bleibt als Arbeit der Redaktion stehen. Ein veröffentlichter Entwurf
+  wird Teil der Website wie jede Panel-Änderung.
 - **Ein Entwurfsdatensatz** (`storage/fude/drafts/`): Entwurfs-ID, Sammlung,
   Aktion, die übermittelten Feldwerte, der Dateiname des Fotos, das Konto,
   die Kanal-Kennung, die der Bot mitgibt (zum Beispiel `telegram:<Chat-ID>`
