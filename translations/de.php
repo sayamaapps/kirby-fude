@@ -1,0 +1,78 @@
+<?php
+
+/**
+ * Deutsche Texte der Routen-Antworten. Schlüssel und Platzhalter wie in
+ * en.php; tests/I18nTest.php prüft, dass beide Dateien dieselben Schlüssel
+ * und Platzhalter haben.
+ */
+return [
+    'auth.https' => 'Nur über HTTPS: Diese Anfrage kam per einfachem HTTP an.',
+    'auth.httpsProxy' => 'Nur über HTTPS: Die Anfrage kam über einen Proxy, der HTTPS meldet (X-Forwarded-Proto), und dieser Proxy steht nicht in fude.trustedProxies. Ist es der eigene TLS-Proxy, dessen Adresse dort eintragen (siehe README).',
+    'auth.required' => 'Anmeldung erforderlich.',
+    'auth.failed' => 'Anmeldung fehlgeschlagen.',
+    'auth.role' => 'Dieses Konto darf diesen Weg nicht benutzen.',
+    'auth.publish' => 'Dieses Konto darf diese Sammlung nicht veröffentlichen.',
+
+    'request.json' => 'Erwarte ein JSON-Objekt (Content-Type: application/json) oder ein Multipart-Formular.',
+    'request.fieldsJson' => '„fields“ muss ein JSON-Objekt sein.',
+    'request.actor' => '„actor“ muss ein kurzer Text sein.',
+
+    'config.missing' => 'Diese Seite hat keine site/config/fude.php.',
+    'config.invalid' => 'Die Fude-Konfiguration (Markierungen in den Blueprints, site/config/fude.php) ist ungültig: {reason}',
+    'config.timezone' => 'Die Option fude.timezone ist keine Zeitzone: {value}',
+    'config.trustedProxies' => 'Die Option fude.trustedProxies muss eine Liste von IP-Adressen oder CIDR-Bereichen sein, nicht: {value}',
+
+    'collection.unknown' => 'Unbekannte Sammlung „{name}“.',
+    'collection.action' => 'Die Sammlung „{name}“ erlaubt die Aktion „{action}“ nicht.',
+    'collection.page' => 'Die Seite der Sammlung „{name}“ gibt es nicht.',
+    'collection.key' => 'Zum Ändern fehlt „key“: {field} des Eintrags, der geändert werden soll.',
+    'collection.notFound' => 'Kein Eintrag mit {field} „{key}“.',
+    'collection.ambiguous' => 'Mehrere Einträge mit {field} „{key}“ — diesen bitte im Panel ändern.',
+    'collection.exists' => 'Es gibt schon einen Eintrag mit {field} „{key}“. Bitte Aktion „update“ verwenden.',
+    'collection.deleteKey' => 'Zum Löschen fehlt „key“: {field} des Eintrags, der gelöscht werden soll.',
+    'collection.deleteFields' => 'Die Aktion „delete“ braucht nur den Schlüssel: keine Felder, kein Bild.',
+    'collection.hasChildren' => 'Die Seite „{name}“ hat Unterseiten und kann hier nicht gelöscht werden.',
+    'collection.replaceFields' => 'Die Aktion „replace“ nimmt nur „entries“, keine Felder.',
+    'collection.replaceImage' => 'Die Aktion „replace“ nimmt kein Bild.',
+    'collection.maxEntries' => 'Die Liste hat höchstens {max} Einträge.',
+    'collection.entries' => 'Die Aktion „replace“ braucht „entries“: eine JSON-Liste von Einträgen.',
+    'collection.duplicate' => 'Zwei Einträge haben denselben {field} „{key}“.',
+
+    'fields.object' => '„fields“ muss ein Objekt sein.',
+    'fields.unknown' => 'Das Feld „{field}“ ist hier nicht erlaubt. Erlaubt: {allowed}.',
+    'fields.required' => 'Das Feld „{field}“ ist Pflicht.',
+    'fields.type' => 'Das Feld „{field}“ muss ein Text sein.',
+    'fields.maxlength' => 'Das Feld „{field}“ darf höchstens {max} Zeichen haben.',
+    'fields.option' => 'Das Feld „{field}“ muss eines davon sein: {options}.',
+    'fields.image' => 'Das Feld „{field}“ nimmt ein hochgeladenes Bild, keinen Text.',
+    'fields.empty' => 'Nichts zu ändern.',
+    'fields.date' => 'Feld „{field}“ muss ein Datum im Format JJJJ-MM-TT sein.',
+    'fields.dateMin' => 'Feld „{field}“ darf nicht vor heute liegen.',
+    'fields.number' => 'Feld „{field}“ muss eine Zahl sein, z. B. 7,50.',
+    'fields.numberMin' => 'Feld „{field}“ muss mindestens {min} sein.',
+    'fields.numberMax' => 'Feld „{field}“ darf höchstens {max} sein.',
+    'fields.time' => 'Feld „{field}“ muss eine Uhrzeit im Format HH:MM (24 h) sein, z. B. 08:30.',
+    'fields.toggle' => 'Feld „{field}“ muss wahr (true) oder falsch (false) sein.',
+    'fields.html' => 'Feld „{field}“ nimmt Klartext oder Markdown, kein HTML und keine Skript-Links.',
+    'fields.url' => 'Feld „{field}“ muss eine Web-Adresse sein, die mit https:// beginnt.',
+    'fields.email' => 'Feld „{field}“ muss eine E-Mail-Adresse sein.',
+    'fields.tel' => 'Feld „{field}“ muss eine Telefonnummer sein: Ziffern, Leerzeichen, +, -, / und Klammern, mindestens drei Ziffern.',
+    'fields.blueprint' => 'Der Blueprint der Seite lehnt den Eintrag ab: {errors}',
+
+    'image.upload' => 'Der Bild-Upload ist fehlgeschlagen (Code {code}).',
+    'image.size' => 'Das Bild ist größer als {max} MB.',
+    'image.format' => 'Das Bildformat „{format}“ ist nicht erlaubt. Erlaubt: {allowed}.',
+    'image.unreadable' => 'Die Datei ist kein lesbares Bild.',
+    'image.pixels' => 'Das Bild hat mehr als {max} Pixel.',
+    'image.unexpected' => 'Diese Sammlung nimmt kein Bild.',
+
+    'draft.locked' => 'Die Seite ist gerade im Panel geöffnet. Dort speichern oder verwerfen, dann noch einmal versuchen.',
+    'draft.pending' => 'Die Seite hat ungespeicherte Panel-Änderungen. Erst im Panel speichern oder verwerfen.',
+    'draft.notFound' => 'Unbekannter Entwurf „{id}“.',
+    'draft.token' => 'Das Bestätigungs-Token passt nicht zu diesem Entwurf.',
+    'draft.expired' => 'Dieser Entwurf ist älter als {hours} Stunden und kann nicht mehr veröffentlicht werden. Bitte neu anlegen.',
+    'draft.conflict' => 'Der veröffentlichte Inhalt hat sich seit diesem Entwurf geändert. Bitte einen neuen Entwurf anlegen.',
+    'draft.changed' => 'Der Entwurf wurde inzwischen im Panel geändert. Dort veröffentlichen, oder verwerfen und neu beginnen.',
+    'draft.gone' => 'Der Entwurf existiert auf der Seite nicht mehr.',
+    'draft.internal' => 'Interner Fehler, nichts geändert.',
+];

@@ -1,0 +1,24 @@
+title: Fude (bot)
+description: Technical account for content changes by chat message. Cannot log in to the Panel; it only reaches the routes under /fude/, which check password and role themselves.
+
+# Account for the chat bot profile fude-<site> (README.md). Every permission is
+# off: no Panel, no Kirby API, no pages, files or users. The only way in is
+# /fude/* (src/Service.php), and what those routes may touch is declared in
+# site/config/fude.php — nothing else is reachable.
+#
+# The role only exists while fude.active is switched on.
+
+permissions:
+  access:
+    panel: false
+    site: false
+    account: false
+    users: false
+    system: false
+    languages: false
+  pages: false
+  files: false
+  site: false
+  users: false
+  user: false
+  languages: false

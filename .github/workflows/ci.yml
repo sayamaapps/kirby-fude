@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  # Feature-Branches prüft der PR, main nach dem Merge. Reine Doku-Änderungen
+  # laufen mit.
+  push:
+    branches: [main]
+  pull_request:
+
+# Ein neuer Push auf denselben PR bricht den veralteten Lauf ab.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: gd, mbstring
+          coverage: none
+
+      - name: Install dev dependencies (Kirby as fixture)
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Tests
+        run: sh tests/run.sh

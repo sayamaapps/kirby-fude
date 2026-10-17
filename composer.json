@@ -1,0 +1,41 @@
+{
+    "name": "sayamaapps/kirby-fude",
+    "description": "Change declared website content by chat message: drafts as Kirby 5 content versions, preview link, explicit publish. Kirby side of the Fude module.",
+    "type": "kirby-plugin",
+    "license": "MIT",
+    "keywords": ["kirby", "kirby-plugin", "kirby-5", "content", "bot", "chat", "drafts"],
+    "homepage": "https://github.com/simsimmal/kirby-fude",
+    "authors": [
+        {
+            "name": "Simon Räder",
+            "homepage": "https://sayamaapps.de"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/simsimmal/kirby-fude/issues",
+        "source": "https://github.com/simsimmal/kirby-fude"
+    },
+    "require": {
+        "php": "^8.2",
+        "getkirby/composer-installer": "^1.2"
+    },
+    "require-dev": {
+        "getkirby/cms": "^5.0"
+    },
+    "scripts": {
+        "test": "sh tests/run.sh"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "allow-plugins": {
+            "getkirby/composer-installer": true
+        },
+        "platform": {
+            "php": "8.2.0"
+        }
+    },
+    "extra": {
+        "installer-name": "fude",
+        "kirby-cms-path": false
+    }
+}

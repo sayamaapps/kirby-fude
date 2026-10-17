@@ -1,0 +1,79 @@
+<?php
+
+/**
+ * English strings of the route responses — the default and the fallback for
+ * missing keys. `{name}` placeholders are filled in by Fude\I18n::t().
+ * tests/I18nTest.php checks that every language file has the same keys and
+ * placeholders as this one.
+ */
+return [
+    'auth.https' => 'HTTPS only: this request reached the site over plain HTTP.',
+    'auth.httpsProxy' => 'HTTPS only: the request came through a proxy that announces HTTPS (X-Forwarded-Proto), and that proxy is not in fude.trustedProxies. If it is your proxy, list its address there (see README).',
+    'auth.required' => 'Authentication required.',
+    'auth.failed' => 'Authentication failed.',
+    'auth.role' => 'This account may not use this route.',
+    'auth.publish' => 'This account may not publish this collection.',
+
+    'request.json' => 'Expected a JSON object (Content-Type: application/json) or a multipart form.',
+    'request.fieldsJson' => '"fields" must be a JSON object.',
+    'request.actor' => '"actor" must be a short text.',
+
+    'config.missing' => 'This site has no site/config/fude.php.',
+    'config.invalid' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: {reason}',
+    'config.timezone' => 'The option fude.timezone is not a time zone: {value}',
+    'config.trustedProxies' => 'The option fude.trustedProxies must be a list of IP addresses or CIDR ranges, not: {value}',
+
+    'collection.unknown' => 'Unknown collection "{name}".',
+    'collection.action' => 'Collection "{name}" does not allow the action "{action}".',
+    'collection.page' => 'The page of collection "{name}" does not exist.',
+    'collection.key' => 'An update needs "key": the {field} of the entry to change.',
+    'collection.notFound' => 'No entry with {field} "{key}".',
+    'collection.ambiguous' => 'Several entries with {field} "{key}" — change this one in the Panel.',
+    'collection.exists' => 'There is already an entry with {field} "{key}". Use action "update".',
+    'collection.deleteKey' => 'A delete needs "key": the {field} of the entry to delete.',
+    'collection.deleteFields' => 'Action "delete" takes only the key: no fields, no image.',
+    'collection.hasChildren' => 'The page "{name}" has child pages and cannot be deleted here.',
+    'collection.replaceFields' => 'Action "replace" takes "entries" only, not fields.',
+    'collection.replaceImage' => 'Action "replace" takes no image.',
+    'collection.maxEntries' => 'The list holds at most {max} entries.',
+    'collection.entries' => 'Action "replace" needs "entries": a JSON array of entries.',
+    'collection.duplicate' => 'Two entries have the same {field} "{key}".',
+
+    'fields.object' => '"fields" must be an object.',
+    'fields.unknown' => 'Field "{field}" is not allowed here. Allowed: {allowed}.',
+    'fields.required' => 'Field "{field}" is required.',
+    'fields.type' => 'Field "{field}" must be a text.',
+    'fields.maxlength' => 'Field "{field}" may have at most {max} characters.',
+    'fields.option' => 'Field "{field}" must be one of: {options}.',
+    'fields.image' => 'Field "{field}" takes an image upload, not a text.',
+    'fields.empty' => 'Nothing to change.',
+    'fields.date' => 'Field "{field}" must be a date in the form YYYY-MM-DD.',
+    'fields.dateMin' => 'Field "{field}" must not be before today.',
+    'fields.number' => 'Field "{field}" must be a number, e.g. 7.50.',
+    'fields.numberMin' => 'Field "{field}" must be at least {min}.',
+    'fields.numberMax' => 'Field "{field}" must be at most {max}.',
+    'fields.time' => 'Field "{field}" must be a time in the form HH:MM (24 h), e.g. 08:30.',
+    'fields.toggle' => 'Field "{field}" must be true or false.',
+    'fields.html' => 'Field "{field}" takes plain text or Markdown, no HTML and no script links.',
+    'fields.url' => 'Field "{field}" must be a web address starting with https://.',
+    'fields.email' => 'Field "{field}" must be an e-mail address.',
+    'fields.tel' => 'Field "{field}" must be a phone number: digits, spaces, +, -, / and brackets, at least three digits.',
+    'fields.blueprint' => 'The page blueprint rejects the entry: {errors}',
+
+    'image.upload' => 'The image upload failed (code {code}).',
+    'image.size' => 'The image is larger than {max} MB.',
+    'image.format' => 'Image format "{format}" is not allowed. Allowed: {allowed}.',
+    'image.unreadable' => 'The file is not a readable image.',
+    'image.pixels' => 'The image has more than {max} pixels.',
+    'image.unexpected' => 'This collection takes no image.',
+
+    'draft.locked' => 'The page is open in the Panel right now. Save or discard there, then try again.',
+    'draft.pending' => 'The page has unsaved Panel changes. Save or discard them in the Panel first.',
+    'draft.notFound' => 'Unknown draft "{id}".',
+    'draft.token' => 'The confirmation token does not match this draft.',
+    'draft.expired' => 'This draft is older than {hours} hours and can no longer be published. Create a new one.',
+    'draft.conflict' => 'The published content changed since this draft was made. Create a new draft.',
+    'draft.changed' => 'The draft was changed in the Panel meanwhile. Publish it there, or discard it and start again.',
+    'draft.gone' => 'The draft no longer exists on the page.',
+    'draft.internal' => 'Internal error, nothing changed.',
+];
