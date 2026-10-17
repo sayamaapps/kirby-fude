@@ -2,7 +2,8 @@
 /**
  * POST /fude/discard: removes the changes version and the uploaded file,
  * deletes the record, needs the token, is idempotent per record (second
- * call 404). A changes version edited in the Panel meanwhile is kept.
+ * call 404). A changes version edited in the Panel meanwhile is kept, and so
+ * is a created page the Panel has worked on since.
  */
 require __DIR__ . '/support.php';
 [$tmp, $app] = fude_fixture();
@@ -81,6 +82,63 @@ try {
     [$code, $j] = fude_call($app, 'discard', ['id' => $json['draft']['id'], 'token' => $json['token']]);
     same([200, false], [$code, $j['kept']], 'Pages update discarded after the Panel published it');
     same(true, $app()->page($child)->file($pageFile) !== null, 'Pages update: published image stays');
+
+    // Pages create: the discard deletes the draft page only while it is
+    // still what the draft left. isDraft() alone is no licence.
+    $create = function (string $title, bool $image = false) use ($app, $tmp): array {
+        [$code, $json] = fude_call($app, 'draft', ['collection' => 'news', 'fields' => ['title' => $title, 'text' => 'Erster Text']], files: $image ? ['image' => fude_upload($tmp, 900, 600, 'jpg')] : []);
+        same(200, $code, 'Create draft ' . $title, $json);
+        return [$json['draft']['page'], ['id' => $json['draft']['id'], 'token' => $json['token']]];
+    };
+    $panel = function () use ($app) {
+        $kirby = $app();
+        $kirby->impersonate('kirby');
+        return $kirby;
+    };
+
+    [$page, $draft] = $create('Unberuehrt', image: true);
+    same(1, $app()->page($page)->files()->count(), 'Untouched draft page holds its image');
+    [$code, $j] = fude_call($app, 'discard', $draft);
+    same([200, false, null], [$code, $j['kept'], $app()->page($page)], 'Untouched draft page (with its image) is deleted');
+
+    [$page, $draft] = $create('Panel Text');
+    $panel()->page($page)->update(['text' => 'Redaktion hat weitergeschrieben']);
+    [$code, $j] = fude_call($app, 'discard', $draft);
+    same([200, true], [$code, $j['kept']], 'Discard of a draft page edited in the Panel keeps it');
+    same('Redaktion hat weitergeschrieben', $app()->page($page)?->text()->value(), 'Panel text of the created page stays');
+    same(false, is_file($tmp . '/storage/fude/drafts/' . $draft['id'] . '.json'), 'Record removed although the page stays');
+    same(404, fude_call($app, 'discard', $draft)[0], 'Second discard: 404');
+
+    [$page, $draft] = $create('Panel Ungespeichert');
+    $kirby = $app();
+    $kirby->impersonate(FUDE_ADMIN);
+    $kirby->page($page)->version('changes')->save([...$kirby->page($page)->version('latest')->read(), 'text' => 'Admin tippt noch']);
+    [$code, $j] = fude_call($app, 'discard', $draft, options: ['content.locking' => false]);
+    same([200, true], [$code, $j['kept']], 'Unsaved Panel changes keep the created page');
+    same('Admin tippt noch', $app()->page($page)?->version('changes')->read()['text'] ?? null, 'Unsaved Panel changes stay');
+
+    [$page, $draft] = $create('Panel Sperre');
+    $lock = $panel()->page($page);
+    \Kirby\Data\Data::write($lock->root() . '/.lock', ['/' . $lock->id() => ['lock' => ['user' => $lock->kirby()->user(FUDE_ADMIN)->id(), 'time' => time()]]], 'yml');
+    [$code, $j] = fude_call($app, 'discard', $draft);
+    same([200, true, true], [$code, $j['kept'], $app()->page($page) !== null], 'An active Panel lock keeps the created page');
+
+    [$page, $draft] = $create('Mit Unterseite');
+    $kirby = $panel();
+    Kirby\Cms\Page::create(['parent' => $kirby->page($page), 'slug' => 'unterseite', 'template' => 'note', 'content' => ['title' => 'Unterseite'], 'isDraft' => true]);
+    [$code, $j] = fude_call($app, 'discard', $draft);
+    same([200, true, true], [$code, $j['kept'], $app()->page($page . '/unterseite') !== null], 'A subpage keeps the created page and itself');
+
+    [$page, $draft] = $create('Mit Datei', image: true);
+    $kirby = $panel();
+    $kirby->page($page)->createFile(['source' => fude_upload($tmp, 200, 100, 'jpg')['tmp_name'], 'filename' => 'aus-dem-panel.jpg', 'template' => 'bild', 'content' => ['alt' => 'Panel']]);
+    [$code, $j] = fude_call($app, 'discard', $draft);
+    same([200, true, 2], [$code, $j['kept'], $app()->page($page)?->files()->count()], 'A file added in the Panel keeps the created page');
+
+    [$page, $draft] = $create('Im Panel veroeffentlicht');
+    $panel()->page($page)->changeStatus('listed');
+    [$code, $j] = fude_call($app, 'discard', $draft);
+    same([200, true, 'listed'], [$code, $j['kept'], $app()->page($page)?->status()], 'A page published in the Panel stays');
 
     $log = fude_log($tmp);
     $discards = array_values(array_filter($log, fn ($l) => $l['route'] === 'discard' && $l['status'] === 200));

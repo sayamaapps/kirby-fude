@@ -535,7 +535,9 @@ final class Service
             $child = $kirby->page($record['page']);
             if ($child instanceof Page) {
                 if ($record['action'] === 'create') {
-                    if ($child->isDraft()) {
+                    // Draft status alone is no licence to delete: a Panel editor
+                    // may have worked on the page since. Then it stays.
+                    if ($child->isDraft() && self::isUntouched($child, $record)) {
                         $child->delete(true);
                     } else {
                         $kept = true;
@@ -729,6 +731,32 @@ final class Service
         if ($page->lock()->isLocked()) {
             throw FudeError::t('draft.locked', [], 423);
         }
+    }
+
+    /**
+     * Whether a draft page Fude created is still exactly what the draft left:
+     * the content matches the fingerprint taken at draft time (as publish
+     * demands), nobody holds a Panel lock or has unsaved Panel changes on it,
+     * and it has no subpages, subpage drafts or files besides Fude's own image.
+     * Only then may a discard delete it, recursively.
+     */
+    private static function isUntouched(Page $page, array $record): bool
+    {
+        if (!hash_equals((string) ($record['changesHash'] ?? ''), self::changesHash($page->version('latest')))) {
+            return false;
+        }
+        if ($page->lock()->isLocked() || $page->version('changes')->exists()) {
+            return false;
+        }
+        if ($page->hasChildren() || $page->hasDrafts()) {
+            return false;
+        }
+        foreach ($page->files() as $file) {
+            if ($file->filename() !== ($record['file'] ?? null)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static function checkHash(App $kirby, array $collection, array $record, ?Page $target): void

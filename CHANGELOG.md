@@ -13,6 +13,19 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## [Unreleased]
+
+### Fixed
+
+- **Discarding a created page no longer deletes a Panel editor's work.**
+  A page Fude created as a draft was deleted recursively as soon as it was
+  still a draft. It is now deleted only while it is as the draft left it:
+  same content as at draft time, no Panel lock or unsaved Panel changes, no
+  subpages or subpage drafts, no files besides Fude's own image. Otherwise
+  the page stays, the draft record goes, and the reply says `kept: true`.
+  **[privacy text]** A discarded draft is deleted unless it was edited or
+  published in the Panel meanwhile (`PRIVACY.md`, `DATENSCHUTZ.md`).
+
 ## [1.1.0] — 2026-10-17
 
 Kirby 5 side of Fude: a site declares which content a chat bot may change,
