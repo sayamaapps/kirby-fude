@@ -50,7 +50,7 @@ try {
     $kirby->impersonate('kirby');
     $kirby->page('standort')->version('changes')->publish();
     [$code, $j] = fude_call($app, 'discard', ['id' => $json['draft']['id'], 'token' => $json['token']]);
-    same([200, false], [$code, $j['kept']], 'Discard after the Panel published the draft');
+    same([200, true], [$code, $j['kept']], 'Discard after the Panel published the draft: consumed, kept');
     same(true, is_file($tmp . '/content/standort/' . $liveFile), 'Image of a published structure draft stays');
     same(3, $app()->page('standort')->team()->toStructure()->count(), 'Published row still there');
 
@@ -80,8 +80,33 @@ try {
     $kirby->impersonate('kirby');
     $kirby->page($child)->version('changes')->publish();
     [$code, $j] = fude_call($app, 'discard', ['id' => $json['draft']['id'], 'token' => $json['token']]);
-    same([200, false], [$code, $j['kept']], 'Pages update discarded after the Panel published it');
+    same([200, true], [$code, $j['kept']], 'Pages update discarded after the Panel published it: consumed, kept');
     same(true, $app()->page($child)->file($pageFile) !== null, 'Pages update: published image stays');
+
+    // The draft's changes version is still exactly ours, but the published
+    // version already uses the image (written there by something other than the
+    // Panel's publish): the image belongs to the live page now. The draft's
+    // own changes version goes, the image stays, the reply says kept.
+    [, $json] = fude_call($app, 'draft', ['collection' => 'team', 'fields' => ['name' => 'Schon Live']], files: ['image' => fude_upload($tmp, 900, 600)]);
+    $usedFile = $json['draft']['file'];
+    $kirby = $app();
+    $kirby->impersonate('kirby');
+    $uuid = $kirby->page('standort')->file($usedFile)->uuid()->toString();
+    $kirby->page('standort')->version('latest')->save([...$kirby->page('standort')->version('latest')->read(), 'einleitung' => 'Mit Foto: ' . $uuid]);
+    [$code, $j] = fude_call($app, 'discard', ['id' => $json['draft']['id'], 'token' => $json['token']]);
+    same([200, true], [$code, $j['kept']], 'Discard of a draft whose image the published page references');
+    same(true, is_file($tmp . '/content/standort/' . $usedFile), 'Image referenced by the published page stays');
+    same(false, $app()->page('standort')->version('changes')->exists(), 'The draft\'s own changes version still goes');
+
+    // Same for a page update, referenced by file name (Kirbytext).
+    [, $json] = fude_call($app, 'draft', ['collection' => 'news', 'action' => 'update', 'key' => 'Foto Fall', 'fields' => ['text' => 'Neu 3']], files: ['image' => fude_upload($tmp, 1800, 1200, 'jpg')]);
+    $usedPageFile = $json['draft']['file'];
+    $kirby = $app();
+    $kirby->impersonate('kirby');
+    $kirby->page($child)->version('latest')->save([...$kirby->page($child)->version('latest')->read(), 'text' => '(image: ' . $usedPageFile . ')']);
+    [$code, $j] = fude_call($app, 'discard', ['id' => $json['draft']['id'], 'token' => $json['token']]);
+    same([200, true], [$code, $j['kept']], 'Pages update: discard with an image the published page references');
+    same(true, $app()->page($child)->file($usedPageFile) !== null, 'Pages update: referenced image stays');
 
     // Pages create: the discard deletes the draft page only while it is
     // still what the draft left. isDraft() alone is no licence.

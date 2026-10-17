@@ -502,8 +502,8 @@ final class Service
         $entry += ['draft' => $record['id'], 'collection' => $record['collection'], 'action' => $record['action'], 'key' => $record['key']];
         Drafts::checkToken($record, $input['token'] ?? null);
         $collection = self::collection($collections, $record['collection']);
-        $kept = false;   // a Panel editor's work on top of the draft stays
-        $removed = false; // our draft's changes version went: its file goes with it
+        $kept = false;   // a Panel editor's work on top of the draft stays, so does a draft the Panel used
+        $removed = false; // our draft's changes version went: its file may go with it
 
         if ($record['kind'] === 'structure') {
             $page = Content::page($kirby, $collection);
@@ -519,7 +519,7 @@ final class Service
             }
             // No changes version: the draft was published in the Panel, and
             // its image is live now. It stays.
-            self::removeFile($page, $record, $removed);
+            $kept = self::removeFile($page, $record, $removed) || $kept;
         } elseif ($record['kind'] === 'page') {
             $page = Content::page($kirby, $collection);
             $changes = $page->version('changes');
@@ -552,7 +552,7 @@ final class Service
                             $kept = true;
                         }
                     }
-                    self::removeFile($child, $record, $removed);
+                    $kept = self::removeFile($child, $record, $removed) || $kept;
                 }
             }
         }
@@ -819,19 +819,52 @@ final class Service
     }
 
     /**
-     * Removes the file a discarded draft uploaded, once its changes version
-     * is gone. Without that version the draft was published (or dropped in
-     * the Panel) and the file may be live: it stays.
+     * Removes the file a discarded draft uploaded — but only when the draft
+     * owned it alone: its changes version just went ($removed) and the
+     * published content doesn't use the file. A file the published version
+     * uses means the draft was consumed (published in the Panel, or the
+     * reference written there otherwise): it stays. So it does without our
+     * changes version: the file may be live, or an editor dropped the draft.
+     *
+     * @return bool true when the file stays because the published page uses it
      */
-    private static function removeFile(Page $page, array $record, bool $removed): void
+    private static function removeFile(Page $page, array $record, bool $removed): bool
     {
-        if (!$removed || empty($record['file'])) {
-            return;
+        if (empty($record['file'])) {
+            return false;
         }
         $file = $page->file($record['file']);
-        if ($file instanceof File) {
+        if (!$file instanceof File) {
+            return false;
+        }
+        if (self::isReferenced($page, $file)) {
+            return true;
+        }
+        if ($removed) {
             $file->delete();
         }
+        return false;
+    }
+
+    /**
+     * Whether the page's published (latest) content refers to the file: by its
+     * UUID (a files field) or by its file name (also covers the file id and
+     * Kirbytext). Unreadable content counts as referenced: when in doubt, the
+     * file stays.
+     */
+    private static function isReferenced(Page $page, File $file): bool
+    {
+        $content = json_encode($page->version('latest')->read() ?? [], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if (!is_string($content)) {
+            return true;
+        }
+        $uuid = $file->content()->get('uuid')->value();
+        foreach ([$file->filename(), is_string($uuid) && $uuid !== '' ? 'file://' . $uuid : null] as $needle) {
+            if ($needle !== null && str_contains($content, $needle)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The upload named "image", or null when none was sent. */

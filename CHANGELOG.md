@@ -25,6 +25,13 @@ All notable changes to this project are documented here. Versions follow
   the page stays, the draft record goes, and the reply says `kept: true`.
   **[privacy text]** A discarded draft is deleted unless it was edited or
   published in the Panel meanwhile (`PRIVACY.md`, `DATENSCHUTZ.md`).
+- **Discarding a draft no longer removes an image the published page uses.**
+  The image of a discarded structure or page-update draft goes only when the
+  draft's own changes version goes with it and the published content does not
+  reference the file (UUID or file name); before, only the changes version
+  was looked at. A discard that leaves such an image replies `kept: true`,
+  and so does a discard after the Panel published the draft (the reply said
+  `false` there, though nothing was discarded).
 
 ## [1.1.0] — 2026-10-17
 
