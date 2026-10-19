@@ -13,6 +13,23 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## [Unreleased]
+
+### Fixed
+
+- **Select fields with options from a Kirby query are resolved.** A field
+  whose blueprint options are a query (`options: {type: query, query: …}` or
+  `options: page.x.toStructure`) had no options in Fude and every route
+  answered 500 ("has no options"). Fude now runs the query as the Panel does,
+  against the collection's page (for a `pages` collection, the parent page),
+  and takes its values as the allowed set. Static options are unchanged.
+
+### Reach
+
+- Declarations may now use `select` fields whose options come from a query.
+  Before, such a configuration was refused; check `fude.php` only if it
+  relied on a 500 there.
+
 ## [1.2.0] — 2026-10-17
 
 ### Added

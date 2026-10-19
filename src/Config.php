@@ -3,8 +3,11 @@
 namespace Fude;
 
 use Kirby\Cms\App;
+use Kirby\Cms\ModelWithContent;
 use Kirby\Cms\Page;
+use Kirby\Field\FieldOptions;
 use Kirby\Form\Form;
+use Kirby\Option\OptionsQuery;
 
 /**
  * The declaration of what the bot may change: `site/config/fude.php`.
@@ -346,7 +349,7 @@ final class Config
         }
 
         // Cross-check with the blueprint and complete options/maxlength/labels.
-        $collection['fields'] = self::mergeBlueprint($collection, self::blueprintFields($kirby, $collection));
+        $collection['fields'] = self::mergeBlueprint($kirby, $collection, self::blueprintFields($kirby, $collection));
         if (isset($entry['touch'])) {
             if (!in_array($kind, ['structure', 'page'], true)) {
                 throw self::invalid("collection \"$name\": touch is only for structure and page collections");
@@ -435,8 +438,9 @@ final class Config
     }
 
     /** @param array<string, array> $blueprint */
-    private static function mergeBlueprint(array $collection, array $blueprint): array
+    private static function mergeBlueprint(App $kirby, array $collection, array $blueprint): array
     {
+        $model = self::queryModel($kirby, $collection);
         $fields = [];
         foreach ($collection['fields'] as $name => $field) {
             $definition = $blueprint[$name] ?? null;
@@ -459,7 +463,7 @@ final class Config
                 $field['maxlength'] = isset($field['maxlength']) ? min($field['maxlength'], $definition['maxlength']) : $definition['maxlength'];
             }
             if ($field['type'] === 'select') {
-                $blueprintOptions = self::selectOptions($definition);
+                $blueprintOptions = self::selectOptions($definition, $model);
                 if ($field['options'] === []) {
                     $field['options'] = $blueprintOptions;
                 } elseif ($blueprintOptions !== [] && array_diff($field['options'], $blueprintOptions) !== []) {
@@ -493,13 +497,39 @@ final class Config
         return $fields;
     }
 
-    /** Static option values of a select/radio/toggles blueprint field. */
-    private static function selectOptions(array $definition): array
+    /**
+     * The model a query runs against, as the Panel runs it on the page being
+     * edited: the page of a page or structure collection, the parent of a
+     * pages collection (the page its entries live under). Null when the page
+     * is missing; the collection checks report that.
+     */
+    private static function queryModel(App $kirby, array $collection): ?ModelWithContent
     {
-        $options = $definition['options'] ?? [];
+        $page = $kirby->site()->find($collection['kind'] === 'pages' ? $collection['parent'] : $collection['page']);
+        return $page instanceof Page ? $page : null;
+    }
+
+    /**
+     * Values of a select/radio/toggles blueprint field. Static options are
+     * read as they are. A Kirby query (`options: {type: query, …}` or the
+     * `options: query` shorthand) runs against $model, as the Panel resolves
+     * it. Other dynamic options (api) are not resolved: values declared in
+     * fude.php are the allowed set then.
+     */
+    private static function selectOptions(array $definition, ?ModelWithContent $model): array
+    {
+        $options = FieldOptions::polyfill($definition)['options'] ?? [];
+        if (is_array($options) && ($options['type'] ?? null) === 'query') {
+            if ($model === null || !is_string($options['query'] ?? $options['fetch'] ?? null)) {
+                return [];
+            }
+            $values = [];
+            foreach (OptionsQuery::factory($options)->resolve($model) as $option) {
+                $values[] = (string) $option->value;
+            }
+            return $values;
+        }
         if (is_array($options) && isset($options['type'])) {
-            // Dynamic options (query, api) are not resolved here: values
-            // declared in fude.php are the allowed set then.
             $options = $options['type'] === 'array' ? ($options['options'] ?? []) : [];
         }
         if (!is_array($options)) {
