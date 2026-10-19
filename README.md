@@ -29,7 +29,7 @@ Composer installs the plugin into `site/plugins/fude/` (via `getkirby/composer-i
 Until the package is on Packagist, add the repository first:
 
 ```json
-"repositories": [{ "type": "vcs", "url": "https://github.com/simsimmal/kirby-fude" }]
+"repositories": [{ "type": "vcs", "url": "https://github.com/sayamaapps/kirby-fude" }]
 ```
 
 ## Configuration
