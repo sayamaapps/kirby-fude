@@ -8,7 +8,7 @@ jeder Betreiber für seine Seite selbst fest. Englische Kurzfassung:
 ## Was das Plugin tut
 
 Eine vom Betreiber berechtigte Person schickt über einen Chat-Kanal
-(Telegram, E-Mail) eine Nachricht, wahlweise mit Foto. Ein Bot standortßerhalb der
+(Telegram, E-Mail) eine Nachricht, wahlweise mit Foto. Ein Bot außerhalb der
 Website macht daraus einen Änderungsvorschlag und ruft dieses Plugin auf. Das
 Plugin legt den Vorschlag als unveröffentlichte Kirby-Inhaltsversion ab,
 liefert einen Vorschaulink und veröffentlicht erst nach ausdrücklicher

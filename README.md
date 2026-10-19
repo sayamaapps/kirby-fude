@@ -85,6 +85,8 @@ return [
 
 Field types: `text` (one line; `format` `url`, `email` or `tel` when the blueprint field is one of those; see below), `textarea`, `select` (options from the declaration or the blueprint), `date` (`YYYY-MM-DD`, a real calendar day; `min: 'today'` refuses earlier days, and the only accepted value of `min`; today is the day in `fude.timezone`), `number` (decimal comma or point, stored with a point; optional `min` and `max` as numbers, merged with the blueprint's — the tighter bound wins), `time` (`H:MM` or `HH:MM`, 24 h, optional `:SS`; stored as Kirby's time field saves it, `HH:MM:SS`), `toggle` (JSON `true`/`false` or the strings `true`/`false`; stored as `true` or `false`, as Kirby's toggle field saves it), `image` (an upload; `maxWidth` default 1600, `formats` default jpg/png/webp, `template` default from the blueprint's `uploads`, `alt` names the text field whose value becomes the alt text, default the key). `required` and `maxlength` are merged with the blueprint; the stricter one wins. The key field is always required, whether or not `required` is set for it. Each collection may have one image field.
 
+**Select options from a query.** A blueprint select with `options: {type: query, …}` takes its values from that query, as Kirby's own select field does: a structure of the same page, for example `page.bereiche.toStructure` with `value: "{{ structureItem.schluessel }}"`. The query is resolved against the collection's page at every request. For a `pages` collection it runs against an unsaved probe page, so the query must name its page explicitly, for example `site.find('filiale').bereiche.toStructure`. The values are the `value`s as text, and a declared option must be one of them. A query that yields nothing leaves the field out of the collection: it does not appear in `/fude/schema` and cannot be written. A key or a `required` field without options is a 500, as an empty list is. A query that fails is a 500 that names the collection and the field. A misspelled name in a query gives an empty result, not an error, so the schema is the place to check it. `options: {type: api}` is not resolved: the values declared in `fude.php` are the allowed set.
+
 Text values are plain text or Markdown. A value with an HTML tag, an HTML comment, a `javascript:`, `vbscript:` or `data:` scheme or an HTML entity (`&#`) is refused, because sites render textareas with KirbyText, which passes raw HTML through. A `<` in prose ("Kinder < 6 Jahre") and KirbyTags with https links are fine. A `url` field takes `https://` or `http://` addresses, an `email` field an address, a `tel` field digits with `+ - / ( )` and spaces, a `+` only at the start, at least three digits.
 
 The key of a collection (`key`) is a `text`, `select` or `date` field. The default is the first text field.
@@ -112,7 +114,7 @@ fields:
 ```
 
 - **Page fields** (`fude: true` or `fude: {description: …}`). All marked page fields of one page form one collection of `kind: page`, named by the page id with `/` replaced by `-`, labelled with the page title, described as `Page "<title>"`. Only `description` is a marker option here.
-- **Structure fields** (`fude: true` or `fude: {…}`). One collection per structure, named `<page-id>-<field>` in lower case, unless the marker says `name`. Options: `name`, `label`, `description`, `key`, `actions` (default `create`, `update`, `delete`), `insert`, `maxEntries`, `touch` (`{field: stand, value: today}`). The label and the description default to the field's label and help text.
+- **Structure fields** (`fude: true` or `fude: {…}`). One collection per structure, named `<page-id>-<field>` in lower case, unless the marker says `name`. Options: `name`, `label`, `description`, `key`, `actions` (default `create`, `update`, `delete`), `insert`, `maxEntries`, `touch` (`{field: stand, value: today}`), `readImages`. The label and the description default to the field's label and help text.
 - **Sub-fields** of a marked structure: every sub-field of a type Fude knows is included; `fude: false` leaves one out, and an unmarked sub-field of another type is skipped. A sub-field may carry `fude: {description, maxWidth, alt, formats, template}`; the last four are for `files` only.
 - **Types**: `text`, `slug`, `tel`, `email`, `url` → `text` (the last three keep their format); `textarea`, `writer` → `textarea`; `select`, `radio`, `toggles` → `select`; `files` → `image` (inside a structure only); `date`, `number`, `time`, `toggle` → the same type. Any other type is skipped in a structure and refused when marked.
 - **Descriptions**: the marker's `description`, otherwise the field's `help` text with the HTML tags removed.
@@ -140,11 +142,12 @@ Options per collection (all optional):
 - `maxEntries` (`structure`, 1–100): the list holds at most this many rows. Checked for `create` and `replace`. A `replace` is capped at 100 rows even without `maxEntries`.
 - `insert` (`structure`): `'top'` puts a created row first, `'bottom'` (the default) appends it.
 - `touch` (`structure` and `page`): `['field' => 'stand', 'value' => 'today']` — every draft of the collection also sets that page field to today's date (`Y-m-d`, in `fude.timezone`). Only `today` is accepted; the field must be a date or text field of the page blueprint.
+- `readImages` (every kind, default `false`): `true` declares that the model may read the content of an attached photo as input for the fields. The plugin does nothing else with it. Without it the chat side never shows a photo to the model, because text in an image could be an instruction. The schema lists `readImages: true` only when it is set.
 - `publishRoles` (see below).
 
 ### Example: a daily menu
 
-The kitchen sends the whole list each morning. `replace` swaps it in one draft, `maxEntries` keeps a typo from adding a sixth dish, and `touch` stamps the page with the day the list was made:
+The kitchen sends the whole list each morning. `replace` swaps it in one draft, `maxEntries` keeps a typo from adding a sixth dish, and `touch` stamps the page with the day the list was made. `readImages` declares that the chat side may read the photo of the blackboard: the dishes on it become the list, and the draft shows them before anything is published:
 
 ```php
 'menue' => [
@@ -157,6 +160,7 @@ The kitchen sends the whole list each morning. `replace` swaps it in one draft, 
     'maxEntries' => 5,
     'insert'     => 'bottom',
     'touch'      => ['field' => 'stand', 'value' => 'today'],  // a date field of the page blueprint
+    'readImages' => true,                                       // the model may read the photo of the blackboard
     'fields'     => [
         'name'    => ['type' => 'text', 'required' => true],
         'preis'   => ['type' => 'number', 'min' => 0],          // a number field in the blueprint
@@ -221,7 +225,7 @@ All routes need Basic Auth with an allowed account, answer JSON with `ok`, `form
 
 | Route | Body | Reply |
 |---|---|---|
-| `GET /fude/schema` | — | `site`, `language`, `collections`: per collection `kind`, `label`, `description`, `actions`, `key` (null for `kind: page`), `maxEntries`, `touch` (the name of the touched field) and `insert` (each only when declared), `fields` (type, label, required, description, maxlength, options, maxWidth, formats, min, max) and `entries` (for `kind: page`: exactly one) — the published entries reduced to the declared text fields; images appear as `true`/`false`. |
+| `GET /fude/schema` | — | `site`, `language`, `collections`: per collection `kind`, `label`, `description`, `actions`, `key` (null for `kind: page`), `maxEntries`, `touch` (the name of the touched field), `insert` and `readImages` (each only when declared; `readImages` only when `true`), `fields` (type, label, required, description, maxlength, options, maxWidth, formats, min, max) and `entries` (for `kind: page`: exactly one) — the published entries reduced to the declared text fields; images appear as `true`/`false`. |
 | `POST /fude/draft` | `collection`, `action` (`create`, `update`, `delete` or `replace`), `fields` (object; as a JSON string in a multipart form; none for `delete` and `replace`), `key` (for `update` and `delete`: the key value of the entry; none for `kind: page` and `replace`), `entries` (for `replace`: a JSON list of entries; as a JSON string in a multipart form), `actor` (optional tag for the log, e.g. `telegram:123`), upload `image` (optional) | `draft` (the record: id, collection, action, page, key, index, fields, file, hash, createdAt, user, actor; for `replace` also `replace` = `kept`, `added`, `removed`, `withoutImage`, each a list of key values; for `update` and `delete` of a child page also `uuid`), `token`, `preview` (URL with Kirby's preview token). |
 | `POST /fude/publish` | `id`, `token`, `actor` | `id`, `url` (the page), `hash` (the new published state). |
 | `POST /fude/discard` | `id`, `token`, `actor` | `id`, `kept` (`true` if the discard left something in place because somebody worked on it in the Panel: changes edited there, a created page that was edited, locked, extended or published there, or an image the published page already uses). |

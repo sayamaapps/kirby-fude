@@ -39,7 +39,7 @@ final class Blueprints
         'date' => 'date', 'number' => 'number', 'time' => 'time', 'toggle' => 'toggle',
     ];
     private const PAGE_OPTIONS = ['description'];
-    private const STRUCTURE_OPTIONS = ['name', 'label', 'description', 'key', 'actions', 'insert', 'maxEntries', 'touch'];
+    private const STRUCTURE_OPTIONS = ['name', 'label', 'description', 'key', 'actions', 'insert', 'maxEntries', 'touch', 'readImages'];
     private const FIELD_OPTIONS = ['description', 'maxWidth', 'alt', 'formats', 'template'];
     private const IMAGE_OPTIONS = ['maxWidth', 'alt', 'formats', 'template'];
     private const DEFAULT_ACTIONS = ['create', 'update', 'delete'];
@@ -186,7 +186,7 @@ final class Blueprints
             'fields'      => $fields,
         ];
         // Checked by Config like the same options in site/config/fude.php.
-        foreach (['insert', 'maxEntries', 'touch'] as $option) {
+        foreach (['insert', 'maxEntries', 'touch', 'readImages'] as $option) {
             if (array_key_exists($option, $marker)) {
                 $collection[$option] = $marker[$option];
             }

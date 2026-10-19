@@ -4,6 +4,7 @@ namespace Fude;
 
 use Kirby\Cms\App;
 use Kirby\Cms\Page;
+use Kirby\Field\FieldOptions;
 use Kirby\Form\Form;
 
 /**
@@ -207,6 +208,13 @@ final class Config
             }
             $collection['insert'] = $entry['insert'];
         }
+        // A declaration for the chat side: the content of an attached photo may
+        // be read by the model. The plugin itself does nothing else with it.
+        $readImages = $entry['readImages'] ?? false;
+        if (!is_bool($readImages)) {
+            throw self::invalid("collection \"$name\": readImages must be true or false");
+        }
+        $collection['readImages'] = $readImages;
 
         if ($kind === 'page') {
             // The collection is one page; the page id is all it needs.
@@ -346,7 +354,7 @@ final class Config
         }
 
         // Cross-check with the blueprint and complete options/maxlength/labels.
-        $collection['fields'] = self::mergeBlueprint($collection, self::blueprintFields($kirby, $collection));
+        $collection['fields'] = self::mergeBlueprint($kirby, $collection, self::blueprintFields($kirby, $collection));
         if (isset($entry['touch'])) {
             if (!in_array($kind, ['structure', 'page'], true)) {
                 throw self::invalid("collection \"$name\": touch is only for structure and page collections");
@@ -387,29 +395,37 @@ final class Config
     }
 
     /**
+     * The page a collection's blueprint and queries belong to: the page of a
+     * page or structure collection. For a pages collection, an unsaved probe
+     * page of the template: only its blueprint is read from it, and its
+     * content is empty, so a query over it finds nothing.
+     */
+    private static function model(App $kirby, array $collection): Page
+    {
+        if ($collection['kind'] === 'pages') {
+            $parent = $kirby->site()->find($collection['parent']);
+            if (!$parent instanceof Page) {
+                throw self::invalid("collection \"{$collection['name']}\": parent \"{$collection['parent']}\" does not exist");
+            }
+            return Page::factory(['slug' => 'fude-probe', 'template' => $collection['template'], 'parent' => $parent, 'isDraft' => true]);
+        }
+        $page = $kirby->site()->find($collection['page']);
+        if (!$page instanceof Page) {
+            throw self::invalid("collection \"{$collection['name']}\": page \"{$collection['page']}\" does not exist");
+        }
+        return $page;
+    }
+
+    /**
      * The blueprint fields behind a collection: the structure field's
-     * sub-fields, or the page blueprint's fields for a pages collection.
+     * sub-fields, or the page blueprint's fields for a page or pages collection.
      *
      * @return array<string, array> field name => blueprint definition
      */
     public static function blueprintFields(App $kirby, array $collection): array
     {
-        if ($collection['kind'] === 'page') {
-            $page = $kirby->site()->find($collection['page']);
-            if (!$page instanceof Page) {
-                throw self::invalid("collection \"{$collection['name']}\": page \"{$collection['page']}\" does not exist");
-            }
-            $fields = [];
-            foreach ($page->blueprint()->fields() as $fieldName => $definition) {
-                $fields[strtolower((string) $fieldName)] = (array) $definition;
-            }
-            return $fields;
-        }
+        $page = self::model($kirby, $collection);
         if ($collection['kind'] === 'structure') {
-            $page = $kirby->site()->find($collection['page']);
-            if (!$page instanceof Page) {
-                throw self::invalid("collection \"{$collection['name']}\": page \"{$collection['page']}\" does not exist");
-            }
             $field = $page->blueprint()->field($collection['field']);
             if (($field['type'] ?? null) !== 'structure') {
                 throw self::invalid("collection \"{$collection['name']}\": \"{$collection['field']}\" is not a structure field of \"{$collection['page']}\"");
@@ -420,22 +436,18 @@ final class Config
             }
             return $fields;
         }
-        $parent = $kirby->site()->find($collection['parent']);
-        if (!$parent instanceof Page) {
-            throw self::invalid("collection \"{$collection['name']}\": parent \"{$collection['parent']}\" does not exist");
-        }
-        // An unsaved page of that template, only to read its blueprint.
-        $probe = Page::factory(['slug' => 'fude-probe', 'template' => $collection['template'], 'parent' => $parent, 'isDraft' => true]);
         $fields = [];
-        foreach ($probe->blueprint()->fields() as $fieldName => $definition) {
+        foreach ($page->blueprint()->fields() as $fieldName => $definition) {
             $fields[strtolower((string) $fieldName)] = (array) $definition;
         }
-        $fields['title'] ??= ['type' => 'text', 'required' => true, 'label' => 'Title'];
+        if ($collection['kind'] === 'pages') {
+            $fields['title'] ??= ['type' => 'text', 'required' => true, 'label' => 'Title'];
+        }
         return $fields;
     }
 
     /** @param array<string, array> $blueprint */
-    private static function mergeBlueprint(array $collection, array $blueprint): array
+    private static function mergeBlueprint(App $kirby, array $collection, array $blueprint): array
     {
         $fields = [];
         foreach ($collection['fields'] as $name => $field) {
@@ -459,7 +471,22 @@ final class Config
                 $field['maxlength'] = isset($field['maxlength']) ? min($field['maxlength'], $definition['maxlength']) : $definition['maxlength'];
             }
             if ($field['type'] === 'select') {
-                $blueprintOptions = self::selectOptions($definition);
+                if (self::isQuery($definition)) {
+                    $blueprintOptions = self::queryValues($kirby, $collection, $name, $definition);
+                    if ($blueprintOptions === []) {
+                        // A query that yields nothing (a site without separate areas): the field is
+                        // left out, so the schema does not list it. A field that cannot be left out fails.
+                        if ($field['required'] || $name === $collection['key']) {
+                            throw self::invalid("collection \"{$collection['name']}\": field \"$name\" has no options");
+                        }
+                        if ($field['options'] !== []) {
+                            throw self::invalid("collection \"{$collection['name']}\": field \"$name\" declares options the blueprint does not have");
+                        }
+                        continue;
+                    }
+                } else {
+                    $blueprintOptions = self::selectOptions($definition);
+                }
                 if ($field['options'] === []) {
                     $field['options'] = $blueprintOptions;
                 } elseif ($blueprintOptions !== [] && array_diff($field['options'], $blueprintOptions) !== []) {
@@ -493,13 +520,41 @@ final class Config
         return $fields;
     }
 
-    /** Static option values of a select/radio/toggles blueprint field. */
+    /** Whether a select's options come from a query, read the way Kirby reads them. */
+    private static function isQuery(array $definition): bool
+    {
+        return (FieldOptions::polyfill($definition)['options']['type'] ?? null) === 'query';
+    }
+
+    /**
+     * The values of a `type: query` select, resolved with Kirby's options API
+     * against the collection's model, as Kirby's own select field does it
+     * (config/fields/select.php). Resolved here at config load, so on every
+     * request. Kirby's query() returns null when a query throws; Kirby then
+     * reports "Invalid query result data: NULL", which is what the error shows.
+     *
+     * @return list<string>
+     */
+    private static function queryValues(App $kirby, array $collection, string $name, array $definition): array
+    {
+        $model = self::model($kirby, $collection);
+        try {
+            $options = FieldOptions::factory(FieldOptions::polyfill($definition)['options'], false)->render($model);
+        } catch (\Throwable $e) {
+            throw self::invalid("collection \"{$collection['name']}\": field \"$name\" query failed: " . $e->getMessage());
+        }
+        return array_map(fn (array $option) => (string) $option['value'], $options);
+    }
+
+    /**
+     * Static option values of a select/radio/toggles blueprint field. Options of
+     * type api are not resolved (values declared in fude.php are the allowed
+     * set then); queries are resolved by queryValues().
+     */
     private static function selectOptions(array $definition): array
     {
         $options = $definition['options'] ?? [];
         if (is_array($options) && isset($options['type'])) {
-            // Dynamic options (query, api) are not resolved here: values
-            // declared in fude.php are the allowed set then.
             $options = $options['type'] === 'array' ? ($options['options'] ?? []) : [];
         }
         if (!is_array($options)) {
@@ -573,6 +628,10 @@ final class Config
             }
             if (isset($collection['insert'])) {
                 $entry['insert'] = $collection['insert'];
+            }
+            // Declares that the model may read the content of attached photos (see README).
+            if ($collection['readImages']) {
+                $entry['readImages'] = true;
             }
             $out[$name] = $entry;
         }
