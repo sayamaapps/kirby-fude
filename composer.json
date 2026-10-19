@@ -4,7 +4,7 @@
     "type": "kirby-plugin",
     "license": "MIT",
     "keywords": ["kirby", "kirby-plugin", "kirby-5", "content", "bot", "chat", "drafts"],
-    "homepage": "https://github.com/simsimmal/kirby-fude",
+    "homepage": "https://github.com/sayamaapps/kirby-fude",
     "authors": [
         {
             "name": "Simon Räder",
@@ -12,8 +12,8 @@
         }
     ],
     "support": {
-        "issues": "https://github.com/simsimmal/kirby-fude/issues",
-        "source": "https://github.com/simsimmal/kirby-fude"
+        "issues": "https://github.com/sayamaapps/kirby-fude/issues",
+        "source": "https://github.com/sayamaapps/kirby-fude"
     },
     "require": {
         "php": "^8.2",
