@@ -112,6 +112,8 @@ final class Service
         if (!is_array($fields) || ($fields !== [] && array_is_list($fields))) {
             throw FudeError::t('fields.object');
         }
+        // The date a touch sets: today, or the day the draft names (editable touch only).
+        $touch = self::touch($kirby, $collection, $input['touch'] ?? null, $now);
         $upload = self::upload($kirby);
         $entries = null;
         if ($action === 'delete') {
@@ -176,14 +178,14 @@ final class Service
         }
 
         if ($collection['kind'] === 'page') {
-            return self::draftSinglePage($kirby, $collection, $clean, $now, $entry);
+            return self::draftSinglePage($kirby, $collection, $clean, $touch, $now, $entry);
         }
         return $collection['kind'] === 'structure'
-            ? self::draftStructure($kirby, $collection, $page, $rows, $index, $clean, $upload, $format, $imageField, $action, $entries, $now, $entry)
+            ? self::draftStructure($kirby, $collection, $page, $rows, $index, $clean, $upload, $format, $imageField, $action, $entries, $touch, $now, $entry)
             : self::draftPage($kirby, $collection, $page, $rows, $index, $clean, $upload, $format, $imageField, $action, $now, $entry);
     }
 
-    private static function draftStructure(App $kirby, array $collection, Page $page, array $rows, ?int $index, array $clean, ?array $upload, ?string $format, ?string $imageField, string $action, ?array $entries, DateTimeImmutable $now, array &$entry): array
+    private static function draftStructure(App $kirby, array $collection, Page $page, array $rows, ?int $index, array $clean, ?array $upload, ?string $format, ?string $imageField, string $action, ?array $entries, array $touched, DateTimeImmutable $now, array &$entry): array
     {
         $field = $collection['field'];
         self::checkEditable($page);
@@ -228,7 +230,6 @@ final class Service
             }
         }
 
-        $touched = self::touched($kirby, $collection, $now);
         try {
             self::checkBlueprint($page, [$field => $rows, ...$touched]);
             $changes = $page->version('changes');
@@ -251,6 +252,7 @@ final class Service
             'index'       => $action === 'replace' ? null : ($position ?? count($rows) - 1),
             'fields'      => $clean,
             'replace'     => $replace,
+            'touch'       => self::touchRecord($touched),
             'file'        => $file?->filename(),
             'hash'        => $hash,
             'changesHash' => self::changesHash($page->version('changes')),
@@ -267,7 +269,7 @@ final class Service
      * into the page's changes version, which carries the WHOLE page — like a
      * structure draft, with no key and no rows.
      */
-    private static function draftSinglePage(App $kirby, array $collection, array $clean, DateTimeImmutable $now, array &$entry): array
+    private static function draftSinglePage(App $kirby, array $collection, array $clean, array $touched, DateTimeImmutable $now, array &$entry): array
     {
         $page = Content::page($kirby, $collection);
         self::checkEditable($page);
@@ -275,7 +277,7 @@ final class Service
 
         $changes = $page->version('changes');
         $base = $changes->exists() ? [] : ($page->version('latest')->read() ?? []);
-        $full = [...$base, ...$clean, ...self::touched($kirby, $collection, $now)];
+        $full = [...$base, ...$clean, ...$touched];
         self::checkBlueprint($page, $full);
         $changes->save($full);
 
@@ -287,6 +289,7 @@ final class Service
             'key'         => null,
             'index'       => null,
             'fields'      => $clean,
+            'touch'       => self::touchRecord($touched),
             'file'        => null,
             'hash'        => $hash,
             'changesHash' => self::changesHash($changes),
@@ -584,16 +587,47 @@ final class Service
 
     /**
      * The page field a collection's `touch` sets on every draft: today's
-     * date in the time zone of `fude.timezone`, as Y-m-d.
+     * date in the time zone of `fude.timezone`, as Y-m-d. With `editable`
+     * the draft may name another day (`touch` in the request), not before
+     * today; without one it is today as well.
      *
      * @return array<string, string> empty when the collection declares no touch
+     * @throws FudeError 422 for a date the collection does not let the draft choose
      */
-    private static function touched(App $kirby, array $collection, DateTimeImmutable $now): array
+    private static function touch(App $kirby, array $collection, mixed $value, DateTimeImmutable $now): array
     {
+        $given = $value !== null && $value !== '';
         if (!isset($collection['touch'])) {
+            if ($given) {
+                throw FudeError::t('touch.none', ['name' => $collection['name']]);
+            }
             return [];
         }
-        return [$collection['touch']['field'] => self::today($kirby, $now)];
+        $today = self::today($kirby, $now);
+        if (!$given) {
+            return [$collection['touch']['field'] => $today];
+        }
+        if (($collection['touch']['editable'] ?? false) !== true) {
+            throw FudeError::t('touch.fixed', ['name' => $collection['name']]);
+        }
+        // A real calendar day in the form YYYY-MM-DD, as for a date field.
+        $valid = is_string($value) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/D', $value, $parts) === 1
+            && checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1]);
+        if (!$valid) {
+            throw FudeError::t('touch.date');
+        }
+        // Zero-padded Y-m-d strings compare in date order.
+        if ($value < $today) {
+            throw FudeError::t('touch.dateMin');
+        }
+        return [$collection['touch']['field'] => $value];
+    }
+
+    /** The touch of a draft for its record: field and date, or null without touch. */
+    private static function touchRecord(array $touched): ?array
+    {
+        $field = array_key_first($touched);
+        return $field === null ? null : ['field' => $field, 'value' => $touched[$field]];
     }
 
     /** The draft's day as Y-m-d, in the time zone of `fude.timezone`. */

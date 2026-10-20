@@ -38,6 +38,11 @@ return [
     'collection.entries' => 'Die Aktion „replace“ braucht „entries“: eine JSON-Liste von Einträgen.',
     'collection.duplicate' => 'Zwei Einträge haben denselben {field} „{key}“.',
 
+    'touch.none' => 'Die Sammlung „{name}“ setzt kein Datum: „touch“ ist hier nicht erlaubt.',
+    'touch.fixed' => 'Die Sammlung „{name}“ setzt ihr Datum auf heute; ein Entwurf kann kein anderes wählen.',
+    'touch.date' => '„touch“ muss ein Datum im Format JJJJ-MM-TT sein.',
+    'touch.dateMin' => '„touch“ darf nicht vor heute liegen.',
+
     'fields.object' => '„fields“ muss ein Objekt sein.',
     'fields.unknown' => 'Das Feld „{field}“ ist hier nicht erlaubt. Erlaubt: {allowed}.',
     'fields.required' => 'Das Feld „{field}“ ist Pflicht.',
