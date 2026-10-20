@@ -254,9 +254,15 @@ curl -u fude@example.com:… -H 'Content-Type: application/json' \
 - **Images** become Kirby files on the page that holds the structure (or on the child page), referenced from the row by UUID. Discard removes the file of the discarded draft, but only when the draft owned it alone: its changes version goes with the discard and the published content does not use the file (UUID or file name). A file the published page uses — the Panel published the draft — stays, and so does the file when the changes version is already gone. An update does not delete the previous image — that is the editor's decision in the Panel.
 - The preview URL uses Kirby's preview token (`_token`, `_version=changes`). A site behind its own password protection still asks for that password first.
 
-## Privacy
+## Stored data
 
-See [DATENSCHUTZ.md](DATENSCHUTZ.md) (German, authoritative) and [PRIVACY.md](PRIVACY.md).
+Fude is a tool for the people who maintain the site. It processes no visitor data, so there is nothing to add to the site's privacy policy. On the server it keeps:
+
+- **The proposed content** as a Kirby changes version or draft page until it is published or discarded. A discarded draft and its image are deleted unless somebody edited or published it in the Panel meanwhile.
+- **A draft record** in `storage/fude/drafts/` (id, collection, action, field values, image file name, account, channel tag such as `telegram:<chat id>`, timestamps), deleted on publish or discard.
+- **A log** in `storage/fude/log.jsonl`: one line per call with time, route, account, channel tag, collection, action, key, draft id and outcome. No field values, no images. It starts over at 4 MB.
+
+No IP addresses, no user agents, no full-size originals of uploaded photos.
 
 ## Tests
 
