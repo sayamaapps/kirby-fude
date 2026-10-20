@@ -7,11 +7,17 @@ All notable changes to this project are documented here. Versions follow
   of collections, a route that writes something new) is at least a **minor**
   version and is described under "Reach" so a site operator can re-check
   their `fude.php`.
-- A change to the privacy text (`DATENSCHUTZ.md` / `PRIVACY.md`) is marked
-  **[privacy text]**. Every site using the plugin must then review its
-  privacy policy.
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
+
+## [Unreleased]
+
+### Removed
+
+- **`DATENSCHUTZ.md` and `PRIVACY.md`.** Fude is a tool for the site's
+  editors and processes no visitor data, so it has no place in a site's
+  privacy policy. What Fude stores on the server is now described in the
+  README ("Stored data").
 
 ## [1.3.0] — 2026-10-20
 
