@@ -369,7 +369,12 @@ final class Config
      * is a page field (not one of the structure's rows), so the page
      * blueprint decides whether it can take a date.
      *
-     * @return array{field: string, value: string}
+     * With `editable: true` a draft may name another day instead (not
+     * before today), for a date such as "show until". `label` and
+     * `description` tell the bot what the date means; they default to the
+     * field's label and help text.
+     *
+     * @return array{field: string, value: string, editable?: true, label?: string, description?: string}
      */
     private static function touch(App $kirby, string $name, mixed $touch, array $collection): array
     {
@@ -391,7 +396,26 @@ final class Config
         if (!in_array($definition['type'] ?? null, ['date', 'text'], true)) {
             throw self::invalid("collection \"$name\": touch field \"$field\" must be a date or text field");
         }
-        return ['field' => $field, 'value' => 'today'];
+        $editable = $touch['editable'] ?? false;
+        if (!is_bool($editable)) {
+            throw self::invalid("collection \"$name\": touch editable must be true or false");
+        }
+        foreach (['label', 'description'] as $option) {
+            if (isset($touch[$option]) && !is_string($touch[$option])) {
+                throw self::invalid("collection \"$name\": touch $option must be a text");
+            }
+        }
+        if (!$editable) {
+            return ['field' => $field, 'value' => 'today'];
+        }
+        $help = $definition['help'] ?? '';
+        return [
+            'field'       => $field,
+            'value'       => 'today',
+            'editable'    => true,
+            'label'       => $touch['label'] ?? self::label($definition) ?? $field,
+            'description' => $touch['description'] ?? (is_string($help) ? trim((string) preg_replace('/\s+/u', ' ', strip_tags($help))) : ''),
+        ];
     }
 
     /**
@@ -626,6 +650,16 @@ final class Config
             if (isset($collection['touch'])) {
                 $entry['touch'] = $collection['touch']['field'];
             }
+            // A date the bot may choose (draft parameter `touch`), with its published value.
+            if (($collection['touch']['editable'] ?? false) === true) {
+                $entry['touchDate'] = [
+                    'label'       => $collection['touch']['label'],
+                    'description' => $collection['touch']['description'],
+                    'min'         => 'today',
+                    'default'     => 'today',
+                    'current'     => self::touchCurrent($kirby, $collection),
+                ];
+            }
             if (isset($collection['insert'])) {
                 $entry['insert'] = $collection['insert'];
             }
@@ -636,6 +670,16 @@ final class Config
             $out[$name] = $entry;
         }
         return $out;
+    }
+
+    /** The published value of a collection's touch field, as text ('' when empty). */
+    private static function touchCurrent(App $kirby, array $collection): string
+    {
+        $page = $kirby->site()->find($collection['page']);
+        $content = $page instanceof Page ? ($page->version('latest')->read() ?? []) : [];
+        // Content keys are lower case: a field giltAm is stored as giltam.
+        $value = $content[strtolower($collection['touch']['field'])] ?? null;
+        return is_scalar($value) ? trim((string) $value) : '';
     }
 
     /**

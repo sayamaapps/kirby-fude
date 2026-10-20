@@ -39,6 +39,11 @@ return [
     'collection.entries' => 'Action "replace" needs "entries": a JSON array of entries.',
     'collection.duplicate' => 'Two entries have the same {field} "{key}".',
 
+    'touch.none' => 'Collection "{name}" sets no date: "touch" is not allowed here.',
+    'touch.fixed' => 'Collection "{name}" sets its date to today; a draft cannot choose another one.',
+    'touch.date' => '"touch" must be a date in the form YYYY-MM-DD.',
+    'touch.dateMin' => '"touch" must not be before today.',
+
     'fields.object' => '"fields" must be an object.',
     'fields.unknown' => 'Field "{field}" is not allowed here. Allowed: {allowed}.',
     'fields.required' => 'Field "{field}" is required.',

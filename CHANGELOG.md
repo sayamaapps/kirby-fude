@@ -10,7 +10,26 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
-## [Unreleased]
+## [1.4.0] — 2026-10-20
+
+### Reach
+
+- **A draft can choose the date of an editable `touch`.** With
+  `touch: {field: …, value: today, editable: true}` the draft route takes a
+  `touch` parameter: a day `YYYY-MM-DD`, not before today in
+  `fude.timezone`, written to the touch field instead of today. Without it
+  the draft sets today, as before. Meant for a date such as "show until" on
+  a daily menu. Collections without `editable` are unchanged and refuse the
+  parameter (422), as do collections without `touch`.
+
+### Added
+
+- **`touchDate` in `/fude/schema`** for an editable touch: `label` and
+  `description` (from the marker or the declaration, otherwise the field's
+  label and help text), `min` and `default` (both `today`) and `current`,
+  the published value of the field.
+- **`touch` in the draft record** of structure and page collections:
+  `{field, value}`, the date the draft sets, or null without `touch`.
 
 ### Removed
 
