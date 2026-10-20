@@ -13,6 +13,35 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## [1.3.0] — 2026-10-20
+
+### Reach
+
+- **Select fields with query options are reachable.** A blueprint select with
+  `options: {type: query, …}` used to make the configuration invalid (500 on
+  every route). Its values now come from the query, resolved against the
+  collection's page at every request. A query that yields nothing leaves the
+  field out of the collection, so it is not in `/fude/schema` and cannot be
+  written; a key or a required field without options stays a 500. Operators
+  who put `fude: false` on such a field as a workaround for the 500 should
+  re-check their blueprints: the field is now reachable, with the values the
+  query yields.
+
+### Added
+
+- **`readImages` collection option.** `true` declares that the chat side may
+  read the content of an attached photo as input for the fields, for example
+  a photo of a blackboard with today's dishes. The plugin does nothing else
+  with it; the schema lists `readImages: true` only when it is set. Allowed in
+  `site/config/fude.php` for every kind, and as a marker option of a structure
+  field (`fude: {readImages: true}`).
+
+### Fixed
+
+- **Typo in the German privacy text.** `DATENSCHUTZ.md` read "standortßerhalb"
+  where it means "außerhalb". The meaning did not change, so this is not
+  marked **[privacy text]**.
+
 ## [1.2.0] — 2026-10-17
 
 ### Added
