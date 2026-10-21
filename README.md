@@ -274,6 +274,10 @@ composer test             # or: sh tests/run.sh
 
 Every test file is a standalone PHP script (exit code 0 = pass), so the suite also runs on a hoster's PHP without a test framework. CI runs it on PHP 8.2–8.4.
 
+## Maintenance
+
+This module is open source under the MIT license and is maintained for the author's own projects. Issues and pull requests are welcome, but there is no support promise and no release schedule. Report security problems privately through GitHub's private vulnerability reporting (the "Report a vulnerability" button on the Security tab).
+
 ## License
 
 MIT, see [LICENSE](LICENSE).
