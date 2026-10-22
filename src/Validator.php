@@ -110,6 +110,21 @@ final class Validator
             if ($rule['type'] === 'select' && $value !== '' && !in_array($value, $rule['options'], true)) {
                 throw FudeError::t('fields.option', ['field' => $name, 'options' => implode(', ', $rule['options'])]);
             }
+            if ($rule['type'] === 'page' && $value !== '') {
+                // A page by its option value (the title), in any case; stored as the
+                // option's own spelling. Service turns it into the page reference.
+                $match = null;
+                foreach ($rule['options'] as $option) {
+                    if (mb_strtolower($option) === mb_strtolower($value)) {
+                        $match = $option;
+                        break;
+                    }
+                }
+                if ($match === null) {
+                    throw FudeError::t('fields.option', ['field' => $name, 'options' => implode(', ', $rule['options'])]);
+                }
+                $value = $match;
+            }
             if ($value === '' && $rule['required']) {
                 throw FudeError::t('fields.required', ['field' => $name]);
             }

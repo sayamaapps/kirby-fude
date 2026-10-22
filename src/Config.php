@@ -4,6 +4,9 @@ namespace Fude;
 
 use Kirby\Cms\App;
 use Kirby\Cms\Page;
+use Kirby\Cms\Pages;
+use Kirby\Cms\Site;
+use Kirby\Data\Data;
 use Kirby\Field\FieldOptions;
 use Kirby\Form\Form;
 
@@ -47,7 +50,7 @@ use Kirby\Form\Form;
 final class Config
 {
     public const KINDS = ['structure', 'pages', 'page'];
-    public const TYPES = ['text', 'textarea', 'select', 'image', 'date', 'number', 'time', 'toggle'];
+    public const TYPES = ['text', 'textarea', 'select', 'image', 'date', 'number', 'time', 'toggle', 'page'];
     /** Field types that may identify a row (the key). */
     public const KEY_TYPES = ['text', 'select', 'date'];
     /** Blueprint types that give a text field a format, checked by the Validator. */
@@ -68,6 +71,7 @@ final class Config
         'number'   => ['number'],
         'time'     => ['time'],
         'toggle'   => ['toggle'],
+        'page'     => ['pages'],
     ];
 
     /**
@@ -520,6 +524,18 @@ final class Config
                     throw self::invalid("collection \"{$collection['name']}\": field \"$name\" has no options");
                 }
             }
+            if ($field['type'] === 'page') {
+                $targets = self::pageTargets($kirby, $collection, $name, $definition);
+                if ($targets === []) {
+                    // No page to choose yet (no venue created so far): the field is left
+                    // out, required or not, so content never breaks the configuration.
+                    // Kirby's own check still refuses a draft that needs the field.
+                    continue;
+                }
+                $field['options'] = array_keys($targets);
+                $field['pages'] = $targets;
+                $field['store'] = strtolower((string) ($definition['store'] ?? 'uuid')) === 'id' ? 'id' : 'uuid';
+            }
             if ($field['type'] === 'number') {
                 // The tighter bound of declaration and blueprint wins, as with maxlength.
                 $min = $definition['min'] ?? null;
@@ -571,6 +587,51 @@ final class Config
     }
 
     /**
+     * The pages a `pages` blueprint field may point to, as option value =>
+     * page id. Only a field that holds one page (`multiple: false` or
+     * `max: 1`) and names its pages with a `query` qualifies: the query runs
+     * against the collection's model as in Kirby's page picker (a site or a
+     * page stands for its children). The value is the page title, made
+     * unique with the page id where two titles are the same; that is what the
+     * bot shows and sends, never a UUID.
+     *
+     * @return array<string, string>
+     */
+    private static function pageTargets(App $kirby, array $collection, string $name, array $definition): array
+    {
+        $where = "collection \"{$collection['name']}\": field \"$name\"";
+        if (($definition['multiple'] ?? true) !== false && ($definition['max'] ?? null) !== 1) {
+            throw self::invalid("$where holds several pages; Fude sets one (multiple: false or max: 1 in the blueprint)");
+        }
+        $query = $definition['query'] ?? null;
+        if (!is_string($query) || trim($query) === '') {
+            throw self::invalid("$where needs a query in the blueprint that names the pages to choose from");
+        }
+        try {
+            $result = self::model($kirby, $collection)->query($query);
+        } catch (\Throwable $e) {
+            throw self::invalid("$where query failed: " . $e->getMessage());
+        }
+        $pages = match (true) {
+            $result instanceof Site, $result instanceof Page => $result->children(),
+            $result instanceof Pages => $result,
+            default => throw self::invalid("$where query must return pages, not " . get_debug_type($result)),
+        };
+        $titles = [];
+        foreach ($pages as $page) {
+            $title = trim((string) preg_replace('/\s+/u', ' ', (string) $page->title()->value()));
+            $titles[$page->id()] = $title !== '' ? $title : $page->id();
+        }
+        $counts = array_count_values(array_map('mb_strtolower', $titles));
+        $targets = [];
+        foreach ($titles as $id => $title) {
+            $value = $counts[mb_strtolower($title)] > 1 ? "$title ($id)" : $title;
+            $targets[$value] = $id;
+        }
+        return $targets;
+    }
+
+    /**
      * Static option values of a select/radio/toggles blueprint field. Options of
      * type api are not resolved (values declared in fude.php are the allowed
      * set then); queries are resolved by queryValues().
@@ -616,7 +677,7 @@ final class Config
                 if (isset($field['maxlength'])) {
                     $public['maxlength'] = $field['maxlength'];
                 }
-                if ($field['type'] === 'select') {
+                if (in_array($field['type'], ['select', 'page'], true)) {
                     $public['options'] = $field['options'];
                 }
                 if (isset($field['format'])) {
@@ -695,6 +756,8 @@ final class Config
                 $value = $row[$fieldName] ?? null;
                 if ($field['type'] === 'image') {
                     $entry[$fieldName] = $value !== null && $value !== '' && $value !== [];
+                } elseif ($field['type'] === 'page') {
+                    $entry[$fieldName] = self::pageValue($kirby, $field, $value);
                 } elseif (is_bool($value)) {
                     // A toggle as Kirby saves it: "true" or "false".
                     $entry[$fieldName] = $value ? 'true' : 'false';
@@ -705,5 +768,25 @@ final class Config
             $entries[] = $entry;
         }
         return $entries;
+    }
+
+    /**
+     * A stored page reference (`- page://…` or the page id, as a list in a
+     * structure row) as the option value the bot knows: the title. A page
+     * outside the options shows its title too; a reference to nothing is ''.
+     */
+    private static function pageValue(App $kirby, array $field, mixed $value): string
+    {
+        $list = is_array($value) ? $value : Data::decode((string) $value, 'yaml', false);
+        $reference = $list[0] ?? null;
+        if (!is_string($reference) || trim($reference) === '') {
+            return '';
+        }
+        $page = $kirby->page(trim($reference));
+        if (!$page instanceof Page) {
+            return '';
+        }
+        $option = array_search($page->id(), $field['pages'], true);
+        return is_string($option) ? $option : trim((string) $page->title()->value());
     }
 }
