@@ -492,7 +492,10 @@ final class Config
                 // The blueprint's own format: Validator checks it before the Panel rules do.
                 $field['format'] = $blueprintType;
             }
-            if (($definition['required'] ?? false) === true) {
+            // A new child page gets the blueprint's defaults (Page::create), so a
+            // required field with a default needs no value from the bot there.
+            $defaulted = $collection['kind'] === 'pages' && ($definition['default'] ?? '') !== '' && ($definition['default'] ?? []) !== [];
+            if (($definition['required'] ?? false) === true && !$defaulted) {
                 $field['required'] = true;
             }
             if (is_int($definition['maxlength'] ?? null) && $definition['maxlength'] > 0) {

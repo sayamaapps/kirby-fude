@@ -29,6 +29,16 @@ All notable changes to this project are documented here. Versions follow
 - **Page fields in `/fude/schema`:** `type: page` with `options` (the
   titles); entries show the title of the referenced page.
 
+### Changed
+
+- **Required fields with a default, in a `pages` collection,** are no
+  longer required from the bot: Kirby fills the default when it creates
+  the child page (an event's status "scheduled", say). The schema says
+  `required: false` for them. Emptying one on an existing page is still
+  refused by Kirby's blueprint check. A field declared `required: true`
+  in `fude.php`, and every field of a structure row (rows get no
+  defaults), stays required.
+
 ### Notes
 
 - A page field whose query yields no page is left out of its collection,
