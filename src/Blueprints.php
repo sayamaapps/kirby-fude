@@ -35,7 +35,7 @@ final class Blueprints
         'text' => 'text', 'slug' => 'text', 'tel' => 'text', 'email' => 'text', 'url' => 'text',
         'textarea' => 'textarea', 'writer' => 'textarea',
         'select' => 'select', 'radio' => 'select', 'toggles' => 'select',
-        'files' => 'image',
+        'files' => 'image', 'pages' => 'page',
         'date' => 'date', 'number' => 'number', 'time' => 'time', 'toggle' => 'toggle',
     ];
     private const PAGE_OPTIONS = ['description'];
@@ -138,6 +138,11 @@ final class Blueprints
                     throw self::invalid("$subWhere: type \"$subType\" is not supported by fude");
                 }
                 continue; // unmapped and unmarked: not part of the declaration
+            }
+            if ($subType === 'pages' && $subMarker === null) {
+                // Only when marked: Fude sets one page out of a query, which an
+                // unmarked pages field need not be.
+                continue;
             }
             $type = self::fudeType($subWhere, $subType, true);
             $subMarker ??= [];

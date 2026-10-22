@@ -24,9 +24,9 @@ const CASES = [
         'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: page "standort", field "bild": files fields are only supported inside a structure',
     ],
     'unsupported-sub-field' => [
-        'files' => ['pages/standort.yml' => "title: Standort\nfields:\n  team:\n    type: structure\n    fude: true\n    fields:\n      seite:\n        type: pages\n        fude: true\n"],
+        'files' => ['pages/standort.yml' => "title: Standort\nfields:\n  team:\n    type: structure\n    fude: true\n    fields:\n      stichworte:\n        type: tags\n        fude: true\n"],
         'options' => [],
-        'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: page "standort", field "team", sub-field "seite": type "pages" is not supported by fude',
+        'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: page "standort", field "team", sub-field "stichworte": type "tags" is not supported by fude',
     ],
     'collision' => [
         'files' => ['pages/standort.yml' => "title: Standort\nfields:\n  team:\n    type: structure\n    fude: {name: x}\n    fields:\n      n:\n        type: text\n  zeiten:\n    type: structure\n    fude: {name: x}\n    fields:\n      n:\n        type: text\n"],

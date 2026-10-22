@@ -208,12 +208,13 @@ final class Service
             unset($rows[$index]);
             $rows = array_values($rows);
         } elseif ($action === 'replace') {
-            $merged = self::replaced($rows, $entries, $collection['key'], $imageField, $collection['fields']);
+            $stored = array_map(fn (array $row) => self::stored($kirby, $collection, $row), $entries);
+            $merged = self::replaced($rows, $stored, $collection['key'], $imageField, $collection['fields']);
             $rows = $merged['rows'];
             $replace = $merged['summary'];
         } else {
             $row = $index === null ? [] : $rows[$index];
-            foreach ($clean as $name => $value) {
+            foreach (self::stored($kirby, $collection, $clean) as $name => $value) {
                 $row[$name] = $value;
             }
             if ($upload !== null) {
@@ -277,7 +278,7 @@ final class Service
 
         $changes = $page->version('changes');
         $base = $changes->exists() ? [] : ($page->version('latest')->read() ?? []);
-        $full = [...$base, ...$clean, ...$touched];
+        $full = [...$base, ...self::stored($kirby, $collection, $clean), ...$touched];
         self::checkBlueprint($page, $full);
         $changes->save($full);
 
@@ -306,7 +307,7 @@ final class Service
         $file = null;
         if ($action === 'create') {
             $hash = Content::hash($kirby, $collection);
-            $content = $clean;
+            $content = self::stored($kirby, $collection, $clean);
             $child = null;
             try {
                 $child = Page::create([
@@ -373,7 +374,7 @@ final class Service
             $entry['draft'] = $record['id'];
             return ['draft' => Drafts::public($record), 'token' => $record['token'], 'preview' => $record['preview']];
         }
-        $content = $clean;
+        $content = self::stored($kirby, $collection, $clean);
         if ($upload !== null) {
             $file = self::storeImage($kirby, $child, $collection, $upload, $format, $imageField, $rows[$index] + $clean);
             $content[$imageField] = [self::fileReference($file)];
@@ -844,6 +845,32 @@ final class Service
         $alt = trim((string) ($row[$altField] ?? $row[$collection['key']] ?? ''));
         $base = trim((string) ($row[$collection['key']] ?? $alt));
         return Images::store($kirby, $page, $upload, $rule, $format, $base !== '' ? $base : $imageField, $alt);
+    }
+
+    /**
+     * The values as the page stores them. A page field's option value (the
+     * title) becomes a one-item list with the page reference, as the Panel
+     * saves it: the UUID, or the page id with `store: id` in the blueprint or
+     * UUIDs switched off. An emptied page field stays ''. Everything else is
+     * unchanged; the draft record keeps the titles.
+     *
+     * @param array<string, string> $values validated values
+     * @return array<string, string|list<string>>
+     */
+    private static function stored(App $kirby, array $collection, array $values): array
+    {
+        foreach ($values as $name => $value) {
+            $rule = $collection['fields'][$name] ?? [];
+            if (($rule['type'] ?? null) !== 'page' || $value === '') {
+                continue;
+            }
+            $page = $kirby->page($rule['pages'][$value]);
+            if (!$page instanceof Page) {
+                throw FudeError::t('collection.page', ['name' => $collection['name']], 500);
+            }
+            $values[$name] = [$rule['store'] === 'id' || !Uuids::enabled() ? $page->id() : $page->uuid()->toString()];
+        }
+        return $values;
     }
 
     /** How a files field stores a reference: UUID when enabled, else the file id. */

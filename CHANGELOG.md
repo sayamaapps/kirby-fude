@@ -10,6 +10,41 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## [1.5.0] — 2026-10-22
+
+### Reach
+
+- **New field type `page`: a reference to one page.** It sets a blueprint
+  `pages` field that holds one page (`multiple: false` or `max: 1`) to one
+  of the pages the field's `query` names, for example the venue of an
+  event. The options are the page titles (`Title (page/id)` where two
+  titles are the same); a draft sends a title and the page stores the
+  reference as the Panel does, `- page://<uuid>` (or the id with
+  `store: id`). Works in all three kinds of collection, in `fude.php` and
+  as a blueprint marker. A `pages` sub-field of a marked structure joins
+  only when marked itself, so existing marked structures reach nothing new.
+
+### Added
+
+- **Page fields in `/fude/schema`:** `type: page` with `options` (the
+  titles); entries show the title of the referenced page.
+
+### Changed
+
+- **Required fields with a default, in a `pages` collection,** are no
+  longer required from the bot: Kirby fills the default when it creates
+  the child page (an event's status "scheduled", say). The schema says
+  `required: false` for them. Emptying one on an existing page is still
+  refused by Kirby's blueprint check. A field declared `required: true`
+  in `fude.php`, and every field of a structure row (rows get no
+  defaults), stays required.
+
+### Notes
+
+- A page field whose query yields no page is left out of its collection,
+  also when it is required: content never makes the configuration
+  invalid. Kirby's own check still refuses a draft that needs the field.
+
 ## [1.4.0] — 2026-10-20
 
 ### Reach
