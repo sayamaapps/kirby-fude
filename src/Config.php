@@ -264,9 +264,13 @@ final class Config
             if ($type === 'image' && $kind === 'page') {
                 throw self::invalid("collection \"$name\": image fields are not supported for kind page");
             }
+            if (isset($rule['ask']) && !is_bool($rule['ask'])) {
+                throw self::invalid("collection \"$name\": field \"$fieldName\" ask must be true or false");
+            }
             $field = [
                 'type'        => $type,
                 'required'    => ($rule['required'] ?? false) === true,
+                'ask'         => ($rule['ask'] ?? false) === true,
                 'description' => is_string($rule['description'] ?? null) ? $rule['description'] : '',
             ];
             if ($type === 'select') {
@@ -495,8 +499,24 @@ final class Config
             // A new child page gets the blueprint's defaults (Page::create), so a
             // required field with a default needs no value from the bot there.
             $defaulted = $collection['kind'] === 'pages' && ($definition['default'] ?? '') !== '' && ($definition['default'] ?? []) !== [];
-            if (($definition['required'] ?? false) === true && !$defaulted) {
-                $field['required'] = true;
+            // A blueprint `when` makes a required field required only while it is shown.
+            $condition = self::condition($collection, $blueprint, $definition);
+            if (($definition['required'] ?? false) === true && !$defaulted && !$field['required']) {
+                if ($condition === true) {
+                    $field['required'] = true;
+                } elseif (is_array($condition)) {
+                    $field['requiredWhen'] = $condition;
+                }
+            }
+            // `fudeAsk: true` at a blueprint field: the bot asks for it before the
+            // first draft and takes "don't know". A required field needs no asking.
+            if (isset($definition['fudeAsk']) && !is_bool($definition['fudeAsk'])) {
+                throw self::invalid("collection \"{$collection['name']}\": field \"$name\" fudeAsk must be true or false");
+            }
+            $ask = $field['ask'] || ($definition['fudeAsk'] ?? false) === true;
+            $field['ask'] = $ask && $condition !== false && !$field['required'] && !isset($field['requiredWhen']);
+            if ($field['ask'] && is_array($condition)) {
+                $field['askWhen'] = $condition;
             }
             if (is_int($definition['maxlength'] ?? null) && $definition['maxlength'] > 0) {
                 $field['maxlength'] = isset($field['maxlength']) ? min($field['maxlength'], $definition['maxlength']) : $definition['maxlength'];
@@ -561,6 +581,48 @@ final class Config
             $fields[$name] = $field;
         }
         return $fields;
+    }
+
+    /**
+     * A blueprint field's `when`, from the bot's side: true when the field is
+     * always shown, false when never, otherwise the conditions on fields of
+     * the collection, as stored values (`{"online": "true"}`). A condition on
+     * a field the collection does not declare is read from that field's
+     * blueprint default: the bot cannot change it, and a new child page gets
+     * it. Kirby skips its own check of a hidden field (Form\Mixin\When).
+     *
+     * @param array<string, array> $blueprint
+     * @return bool|array<string, string>
+     */
+    private static function condition(array $collection, array $blueprint, array $definition): bool|array
+    {
+        $when = $definition['when'] ?? null;
+        if (!is_array($when) || $when === []) {
+            return true;
+        }
+        $depends = [];
+        foreach ($when as $other => $expected) {
+            $other = strtolower((string) $other);
+            $expected = self::stored($expected);
+            if (isset($collection['fields'][$other])) {
+                $depends[$other] = $expected;
+                continue;
+            }
+            $default = self::stored($blueprint[$other]['default'] ?? '');
+            if ($default === '' && ($blueprint[$other]['type'] ?? null) === 'toggle') {
+                $default = 'false'; // a toggle without a default is off
+            }
+            if ($default !== $expected) {
+                return false;
+            }
+        }
+        return $depends === [] ? true : $depends;
+    }
+
+    /** A blueprint value as the content stores it: toggles as "true"/"false". */
+    private static function stored(mixed $value): string
+    {
+        return is_bool($value) ? ($value ? 'true' : 'false') : (is_scalar($value) ? (string) $value : '');
     }
 
     /** Whether a select's options come from a query, read the way Kirby reads them. */
@@ -677,6 +739,15 @@ final class Config
                     'required'    => $field['required'],
                     'description' => $field['description'],
                 ];
+                // Only when set, so a schema without them reads as before.
+                foreach (['requiredWhen', 'askWhen'] as $condition) {
+                    if (isset($field[$condition])) {
+                        $public[$condition] = $field[$condition];
+                    }
+                }
+                if ($field['ask']) {
+                    $public['ask'] = true;
+                }
                 if (isset($field['maxlength'])) {
                     $public['maxlength'] = $field['maxlength'];
                 }

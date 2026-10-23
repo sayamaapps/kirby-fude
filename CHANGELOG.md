@@ -10,6 +10,32 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## [1.6.0] — 2026-10-23
+
+### Added
+
+- **Asked fields.** `ask: true` in `fude.php` or `fudeAsk: true` at a
+  blueprint field: `/fude/schema` says `ask: true`, and the bot asks for
+  the field before the first draft and takes "don't know". For what a
+  visitor would miss but an entry is not wrong without (the end of an
+  event, its price). `fudeAsk` is no marker and reaches nothing. A
+  required field is never asked.
+- **`requiredWhen` and `askWhen` in `/fude/schema`** for a field with a
+  blueprint `when` on a field of the collection, with the values as
+  stored (`{"online": "true"}`). Each key only when set: a schema without
+  them reads as before.
+
+### Changed
+
+- **A required blueprint field with `when` is required only while it is
+  shown,** as in the Panel, where Kirby skips the check of a hidden
+  field. A condition on a field the collection does not declare is
+  decided by that field's blueprint default: a field that would never be
+  shown is no longer required from the bot (before, Fude asked for it
+  anyway), one that is always shown stays required. A condition on a
+  declared field moves the check to Kirby, which refuses a draft that
+  meets it and leaves the field empty.
+
 ## [1.5.0] — 2026-10-22
 
 ### Reach
