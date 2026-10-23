@@ -22,12 +22,6 @@ A chat bot proposes a change, for example a new team member with a photo. Fude s
 composer require sayamaapps/kirby-fude
 ```
 
-Until the package is on Packagist, add the repository to `composer.json` first:
-
-```json
-"repositories": [{ "type": "vcs", "url": "https://github.com/sayamaapps/kirby-fude" }]
-```
-
 Composer installs to `site/plugins/fude/`. Add that path to `.gitignore` and deploy it like `vendor/`.
 
 ## Usage
