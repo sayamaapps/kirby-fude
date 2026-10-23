@@ -1,6 +1,6 @@
 {
     "name": "sayamaapps/kirby-fude",
-    "description": "Change declared website content by chat message: drafts as Kirby 5 content versions, preview link, explicit publish. Kirby side of the Fude module.",
+    "description": "Change declared Kirby site content by chat message: drafts, preview links, explicit publish.",
     "type": "kirby-plugin",
     "license": "MIT",
     "keywords": ["kirby", "kirby-plugin", "kirby-5", "content", "bot", "chat", "drafts"],
@@ -36,6 +36,9 @@
     },
     "extra": {
         "installer-name": "fude",
-        "kirby-cms-path": false
+        "kirby-cms-path": false,
+        "kirby": {
+            "compatible": "^5.0"
+        }
     }
 }

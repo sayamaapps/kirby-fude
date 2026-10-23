@@ -1,22 +1,20 @@
 # Fude
 
-Change declared website content by chat message — the [Kirby CMS](https://getkirby.com) 5 side of the Fude module.
+Change declared website content by chat message, for [Kirby CMS](https://getkirby.com) 5.
 
-*Fude* (筆) is Japanese for the writing brush: whoever writes, changes the page. A client sends "New colleague: Anna Neu, medical assistant" plus a photo to a bot; the bot proposes a change, this plugin stores it as an unpublished Kirby content version, hands back a preview link, and publishes only after an explicit confirmation. The chat side (Telegram, e-mail, the model call) is a separate set of scripts; this plugin is the only thing that touches the site, and it can only touch what the site declares.
+A chat bot proposes a change, for example a new team member with a photo. Fude stores it as an unpublished Kirby content version with a preview link, and publishes only after an explicit confirmation, with the draft's token. Anything the site does not declare stays unreachable.
 
-- **Declarative.** `site/config/fude.php` lists the collections a bot may change (rows of a structure field, or child pages of a parent) and, per collection, the allowed fields with their types. Everything else is unreachable, whatever a message says.
-- **Validated twice.** Against the declaration (unknown field, wrong type, select outside its options) and against the page blueprint (required, maxlength, nested rules) — the same checks the Panel applies. Declared fields that the blueprint does not know make the configuration invalid, loudly.
-- **Never live directly.** A draft is a Kirby 5 `changes` version (or a draft page). Publishing needs the draft's confirmation token and an unchanged published state: if somebody edited the page in the Panel meanwhile, the publish is refused (409) and the bot starts over.
-- **Photos the way the blueprint wants them.** Resized to the declared width, stored with the declared file template and an alt text; no full-size original on the server.
-- **Traceable.** One log line per call: who (account and channel actor), when, what, outcome. The content itself is in Git or in the nightly backup.
-- **Own role, own routes.** A Kirby account with the bundled role `fude` has no Panel access and no permissions; it can only call `/fude/*` over HTTPS.
-- **English and German** replies, following the site's language.
+## Features
+
+- Declarative and validated: only declared collections and fields are reachable, checked against the blueprint too.
+- Drafts are Kirby `changes` versions; publishing needs a token and an unchanged page.
+- Photos are resized to the declared width and get alt text.
+- One log line per call: account, channel tag, route, outcome.
+- Own bot role without Panel access; HTTPS only; English and German replies.
 
 ## Requirements
 
-- PHP 8.2–8.4 with `gd` (or ImageMagick, whatever Kirby's thumb driver uses) and `mbstring`
-- Kirby 5
-- A writable Kirby `storage` root, ideally outside the web root. Drafts and the log live in `<storage>/fude/`.
+- PHP 8.2–8.4 with `gd` (or ImageMagick) and `mbstring`; Kirby 5; a writable `storage` root (drafts and the log live in `<storage>/fude/`)
 
 ## Installation
 
@@ -24,265 +22,127 @@ Change declared website content by chat message — the [Kirby CMS](https://getk
 composer require sayamaapps/kirby-fude
 ```
 
-Composer installs the plugin into `site/plugins/fude/` (via `getkirby/composer-installer`, which ships with `getkirby/cms`). Add `/site/plugins/fude/` to `.gitignore` and make sure your deploy ships it, just as it ships `kirby/` and `vendor/`.
-
-Until the package is on Packagist, add the repository first:
+Until the package is on Packagist, add the repository to `composer.json` first:
 
 ```json
 "repositories": [{ "type": "vcs", "url": "https://github.com/sayamaapps/kirby-fude" }]
 ```
 
-## Configuration
+Composer installs to `site/plugins/fude/`. Add that path to `.gitignore` and deploy it like `vendor/`.
 
-Everything is off by default. Switch it on in `site/config/config.php`:
+## Usage
 
-```php
-return [
-    'fude.active' => true,
-];
-```
-
-Then declare what a bot may change in `site/config/fude.php`:
+Declare what the bot may change in `site/config/fude.php`:
 
 ```php
 <?php
 
 return [
     'collections' => [
-        // Rows of a structure field on one page — for example the team list
-        // of a location page.
         'team' => [
-            'kind'        => 'structure',
-            'page'        => 'standort',          // page id
-            'field'       => 'team',        // structure field in that page's blueprint
-            'key'         => 'name',        // the text field that identifies a row
-            'label'       => 'Team',
-            'description' => 'Who works at Praxis Beispiel.',
-            'actions'     => ['create', 'update'],
-            'fields'      => [
-                'name'  => ['type' => 'text', 'required' => true, 'description' => 'Full name as it should appear'],
-                'rolle' => ['type' => 'text', 'description' => 'Role, e.g. Medizinische Fachangestellte'],
-                'foto'  => ['type' => 'image', 'maxWidth' => 1200, 'formats' => ['jpg', 'png'], 'alt' => 'name'],
-            ],
-        ],
-        // Child pages of one parent — for example news items.
-        'news' => [
-            'kind'     => 'pages',
-            'parent'   => 'aktuelles',
-            'template' => 'note',
-            'status'   => 'listed',          // status after publishing a created page
-            'key'      => 'title',
-            'fields'   => [
-                'title'     => ['type' => 'text', 'required' => true],
-                'text'      => ['type' => 'textarea'],
-                'kategorie' => ['type' => 'select'],   // options from the blueprint
-                'bild'      => ['type' => 'image'],
+            'kind'   => 'structure',   // rows of a structure field on one page
+            'page'   => 'standort',
+            'field'  => 'team',
+            'fields' => [
+                'name' => ['type' => 'text', 'required' => true],
+                'foto' => ['type' => 'image', 'maxWidth' => 1200, 'alt' => 'name'],
             ],
         ],
     ],
 ];
 ```
 
-Field types: `text` (one line; `format` `url`, `email` or `tel` when the blueprint field is one of those; see below), `textarea`, `select` (options from the declaration or the blueprint), `date` (`YYYY-MM-DD`, a real calendar day; `min: 'today'` refuses earlier days, and the only accepted value of `min`; today is the day in `fude.timezone`), `number` (decimal comma or point, stored with a point; optional `min` and `max` as numbers, merged with the blueprint's — the tighter bound wins), `time` (`H:MM` or `HH:MM`, 24 h, optional `:SS`; stored as Kirby's time field saves it, `HH:MM:SS`), `toggle` (JSON `true`/`false` or the strings `true`/`false`; stored as `true` or `false`, as Kirby's toggle field saves it), `image` (an upload; `maxWidth` default 1600, `formats` default jpg/png/webp, `template` default from the blueprint's `uploads`, `alt` names the text field whose value becomes the alt text, default the key), `page` (one page out of a blueprint `pages` field's query, chosen by its title; see below). `required` and `maxlength` are merged with the blueprint; the stricter one wins. In a `pages` collection a blueprint field that is required and has a `default` is not required from the bot: Kirby fills the default when it creates the page, and its own check still refuses emptying it later. The key field is always required, whether or not `required` is set for it. Each collection may have one image field.
+Enable Fude with `'fude.active' => true` in `site/config/config.php`, then create a Panel account with the role **Fude (bot)** and a long random password.
 
-**Select options from a query.** A blueprint select with `options: {type: query, …}` takes its values from that query, as Kirby's own select field does: a structure of the same page, for example `page.bereiche.toStructure` with `value: "{{ structureItem.schluessel }}"`. The query is resolved against the collection's page at every request. For a `pages` collection it runs against an unsaved probe page, so the query must name its page explicitly, for example `site.find('filiale').bereiche.toStructure`. The values are the `value`s as text, and a declared option must be one of them. A query that yields nothing leaves the field out of the collection: it does not appear in `/fude/schema` and cannot be written. A key or a `required` field without options is a 500, as an empty list is. A query that fails is a 500 that names the collection and the field. A misspelled name in a query gives an empty result, not an error, so the schema is the place to check it. `options: {type: api}` is not resolved: the values declared in `fude.php` are the allowed set.
+### Collections
 
-Text values are plain text or Markdown. A value with an HTML tag, an HTML comment, a `javascript:`, `vbscript:` or `data:` scheme or an HTML entity (`&#`) is refused, because sites render textareas with KirbyText, which passes raw HTML through. A `<` in prose ("Kinder < 6 Jahre") and KirbyTags with https links are fine. A `url` field takes `https://` or `http://` addresses, an `email` field an address, a `tel` field digits with `+ - / ( )` and spaces, a `+` only at the start, at least three digits.
+| Option | Meaning |
+|---|---|
+| `kind` | `structure` (default; needs `page`, `field`), `pages` (child pages; needs `parent`, `template`; `status` after publish: `listed` (default) or `unlisted`), or `page` (the page itself; `update` only) |
+| `key` | Identifies an entry: a `text`, `select` or `date` field, always required. Default: the first text field. |
+| `label`, `description`, `fields` | Shown to the bot; `fields` as below (a `pages` collection needs `title`) |
+| `actions` | `create`, `update` (default), `delete`, `replace` (structure only) |
+| `maxEntries` | `structure`: at most 1–100 rows, checked on `create` and `replace` |
+| `insert` | `structure`: `top` or `bottom` (default) for a created row |
+| `touch` | `structure`, `page`: `['field' => 'stand', 'value' => 'today']` sets that page date to today on every draft. With `'editable' => true`, a draft may name another day. |
+| `readImages` | `true`: the model may read attached photos. Fude itself does not use it. |
+| `publishRoles` | Roles that may publish (default `['fude']`) |
 
-**Page fields.** A `page` field sets a blueprint `pages` field that holds one page (`multiple: false` or `max: 1`) to one of the pages its `query` names, for example the venue of an event: `query: site.find('venues').children`. The query runs like a query select (see above): against the collection's page, or for a `pages` collection against the probe page, and a site or a page in the result stands for its children, as in Kirby's page picker. The options are the page **titles**: that is what `/fude/schema` lists, what a draft sends and what the entries show, never a UUID. Two pages with the same title (case ignored) are listed as `Title (page/id)`. A draft may write the title in any case; it is stored as the Panel stores it, a one-item list with the page's UUID (`- page://…`), or its id with `store: id` in the blueprint or UUIDs switched off. An empty value clears the field. A query that yields no page leaves the field out of the collection, also a required one, so the configuration does not depend on content: Kirby's own check then refuses a draft that needs the field. A `pages` field that may hold several pages, one without a `query` and a query that returns no pages are a 500 that names the collection and the field. A page field cannot be the key.
+### Field types
 
-The key of a collection (`key`) is a `text`, `select` or `date` field. The default is the first text field.
+| Type | Notes |
+|---|---|
+| `text` | One line; `url`, `email` or `tel` follow the blueprint |
+| `textarea` | Plain text or Markdown; HTML tags and `javascript:`-style URLs are refused |
+| `select` | Options from the declaration, the blueprint or its `query` |
+| `date`, `time` | `YYYY-MM-DD` (`min: 'today'` refuses earlier days); `H:MM` or `HH:MM`, 24 h |
+| `number` | Decimal comma or point; optional `min` and `max` |
+| `toggle` | `true` or `false` |
+| `image` | Upload. `maxWidth` (default 1600), `formats` (default `jpg`, `png`, `webp`; also `gif`), `template`, `alt` (text field, default the key) |
+| `page` | One page of a blueprint `pages` field's `query`, chosen by title |
 
-Then create a Panel account with the role **Fude (bot)** and a long random password. The role only exists while `fude.active` is true.
+Every field takes `description` (shown to the bot), `required` and `maxlength`; the last two merge with the blueprint, and the stricter one wins. `ask: true` (or `fudeAsk: true` in the blueprint) makes the bot ask for a field once before the first draft. Fields can also be marked in page blueprints (`fude:` keys); Fude then derives the collections, and `fude.php` overrides them by name.
 
-**Asked fields.** Some fields are not required, but a visitor would miss them: the end of an event, its price, the sign-up link. Mark such a field `ask: true` in `fude.php`, or `fudeAsk: true` at the blueprint field. `/fude/schema` then says `ask: true`, and the bot asks for it once before the first draft, together with the missing required fields, and takes "don't know" for an answer. Nothing on the page side checks it. `fudeAsk` is no marker: it never makes a page or a structure reachable, so a plugin can set it on the fields of a page type that sites declare in `fude.php` (the events of a calendar). A required field is never asked. Rule of thumb for a plugin that brings a content type: `required` for what makes an entry wrong without it, `fudeAsk` for what visitors would miss, nothing for the rest; list the three groups in the plugin's README.
-
-**Fields shown only `when`.** A blueprint field with `when` (Kirby shows it only while other fields have certain values) is required or asked only while it is shown, as in the Panel, where Kirby skips the check of a hidden field. A condition on a field of the collection appears in `/fude/schema` as `requiredWhen` or `askWhen`, with the values as stored (`{"online": "true"}`): the bot asks for the field when the draft meets the condition, and Kirby refuses a draft that leaves it empty. A condition on a field the collection does not declare is decided by that field's blueprint default, which the bot cannot change (a toggle without a default is off): the field is then always or never required. Example: the link of an online event, `when: {online: true}` with `required: true`, is required for online events only; a site whose events are always in person need not declare it.
-
-### Marking fields in blueprints
-
-Instead of listing everything in `fude.php`, a site can mark the fields in its page blueprints. Fude derives the collections from the markers; `fude.php` stays for overrides.
-
-**What to mark.** The ordinary content: texts, contact details, opening hours, lists such as services, team or news. When in doubt, mark less; a marker is quickly added later. Leave out legal texts (imprint, privacy policy), safety-relevant data (emergency numbers), the address and map link, design settings, and any component too complex to describe in a chat message.
-
-```yaml
-fields:
-  kurzname:                     # a page field: all marked page fields of one page
-    type: text                  #   form one "kind: page" collection
-    fude: true                  #   description = the field's help text
-  team:
-    type: structure
-    fude: {key: name, actions: [create, update]}   # collection "standort-team" (page standort)
-    fields:
-      name: {type: text, required: true}
-      foto: {type: files, fude: {maxWidth: 800, alt: name}}
-      intern: {type: text, fude: false}            # not reachable
-```
-
-- **Page fields** (`fude: true` or `fude: {description: …}`). All marked page fields of one page form one collection of `kind: page`, named by the page id with `/` replaced by `-`, labelled with the page title, described as `Page "<title>"`. Only `description` is a marker option here.
-- **Structure fields** (`fude: true` or `fude: {…}`). One collection per structure, named `<page-id>-<field>` in lower case, unless the marker says `name`. Options: `name`, `label`, `description`, `key`, `actions` (default `create`, `update`, `delete`), `insert`, `maxEntries`, `touch` (`{field: stand, value: today}`), `readImages`. The label and the description default to the field's label and help text.
-- **Sub-fields** of a marked structure: every sub-field of a type Fude knows is included; `fude: false` leaves one out, and an unmarked sub-field of another type is skipped. A sub-field may carry `fude: {description, maxWidth, alt, formats, template}`; the last four are for `files` only.
-- **Types**: `text`, `slug`, `tel`, `email`, `url` → `text` (the last three keep their format); `textarea`, `writer` → `textarea`; `select`, `radio`, `toggles` → `select`; `files` → `image` (inside a structure only); `pages` → `page` (inside a structure only when marked itself); `date`, `number`, `time`, `toggle` → the same type. Any other type is skipped in a structure and refused when marked.
-- **Descriptions**: the marker's `description`, otherwise the field's `help` text with the HTML tags removed.
-- Fields that a blueprint pulls in with `extends:` count like the others, also when the blueprint comes from a plugin. A plugin can ship its fields, tabs or sections with markers; every site that extends them gets the collection. A site that does not install Fude is not affected: Kirby ignores the key.
-- Names must be unique. Two structures that would both become `x` are refused: give one of them `fude: {name: …}`.
-- Refused with a 500 that names the page and the field: a marker on a **site field** (the site has no page the bot could change through it), a marked unsupported type, `files` on a page field, an unknown option.
-- Never reachable through markers: site fields, users, and drafts (pages in `content/_drafts`). Listed and unlisted pages are scanned.
-
-Derived and declared collections are merged by name in `fude.php`: `'name' => false` removes a derived collection, `'name' => [...]` replaces it completely, a new name adds one. With `fude.blueprints` set to `false`, `fude.php` alone decides.
-
-**Large sites.** The configuration is read on every `/fude/` request, and that reads every page's blueprint. For a few hundred pages this is cheap; for a site with thousands of pages, declare the collections in `fude.php` and set `fude.blueprints` to `false`.
-
-### Kinds, actions and collection options
-
-| Kind | Declares | Actions (default `create`, `update`) |
-|---|---|---|
-| `structure` | rows of a structure field on one page | `create`, `update`, `delete`, `replace` |
-| `pages` | child pages of one parent | `create`, `update`, `delete` |
-| `page` | the page itself: no key, no entries (`page` is the page id) | `update` only |
-
-`delete` and `replace` are allowed only when listed. `replace` is for `structure` only.
-
-Options per collection (all optional):
-
-- `maxEntries` (`structure`, 1–100): the list holds at most this many rows. Checked for `create` and `replace`. A `replace` is capped at 100 rows even without `maxEntries`.
-- `insert` (`structure`): `'top'` puts a created row first, `'bottom'` (the default) appends it.
-- `touch` (`structure` and `page`): `['field' => 'stand', 'value' => 'today']` — every draft of the collection also sets that page field to today's date (`Y-m-d`, in `fude.timezone`). Only `today` is accepted; the field must be a date or text field of the page blueprint.
-  - With `'editable' => true` a draft may name another day in its `touch` parameter, for a date such as "show until": a real day `YYYY-MM-DD`, not before today in `fude.timezone`. Without one the draft sets today, as before. `label` and `description` tell the bot what the date means; they default to the field's label and help text. The schema describes the date as `touchDate`. Without `editable`, a draft that names a day is refused (422), and so is one for a collection without `touch`.
-- `readImages` (every kind, default `false`): `true` declares that the model may read the content of an attached photo as input for the fields. The plugin does nothing else with it. Without it the chat side never shows a photo to the model, because text in an image could be an instruction. The schema lists `readImages: true` only when it is set.
-- `publishRoles` (see below).
-
-### Example: a daily menu
-
-The kitchen sends the whole list each morning. `replace` swaps it in one draft, `maxEntries` keeps a typo from adding a sixth dish, and `touch` stamps the page with the day the list was made. If the field means "show until" instead, add `'editable' => true`: "the same menu until Friday" becomes a draft with `touch` set to Friday. `readImages` declares that the chat side may read the photo of the blackboard: the dishes on it become the list, and the draft shows them before anything is published:
-
-```php
-'menue' => [
-    'kind'       => 'structure',
-    'page'       => 'speisekarte',
-    'field'      => 'gerichte',
-    'key'        => 'name',
-    'label'      => 'Tagesmenü',
-    'actions'    => ['create', 'update', 'delete', 'replace'],
-    'maxEntries' => 5,
-    'insert'     => 'bottom',
-    'touch'      => ['field' => 'stand', 'value' => 'today'],  // a date field of the page blueprint
-    'readImages' => true,                                       // the model may read the photo of the blackboard
-    'fields'     => [
-        'name'    => ['type' => 'text', 'required' => true],
-        'preis'   => ['type' => 'number', 'min' => 0],          // a number field in the blueprint
-        'hinweis' => ['type' => 'textarea'],
-    ],
-],
-```
+### Chat flow
 
 ```sh
-curl -u bot:… -H 'Content-Type: application/json' \
-     -d '{"collection":"menue","action":"replace","entries":[{"name":"Kürbissuppe","preis":"6,50"},{"name":"Gulasch","preis":"9,90"}]}' \
-     https://example.com/fude/draft
-```
-
-A multipart form sends the same list as a JSON string in `entries`.
-
-### Options
-
-All keys are read as `fude.<name>`, flat or nested. `null` counts as "not set".
-
-| Option | Default | Meaning |
-|---|---|---|
-| `active` | `false` | Master switch. Without it the routes answer with the site's real 404 and the role does not exist. |
-| `config` | `site/config/fude.php` | The declaration file, relative to the project root or absolute. |
-| `roles` | `['fude']` | Roles whose accounts may call the routes. An admin account deliberately does not get through: its password belongs in no bot. |
-| `withoutHttps` | `false` | Accept plain HTTP. For local tests only — Basic Auth sends the password with every request. |
-| `trustedProxies` | `[]` | IPv4 or IPv6 addresses and CIDR ranges of the reverse proxies that terminate TLS in front of PHP. Only a request from one of them may pass on `X-Forwarded-Proto: https` (see below). |
-| `draftLifetime` | `172800` | Seconds a draft can still be published (48 h). Older drafts are refused with 410; they can still be discarded. Fude never discards an expired draft on its own (an editor may have changed it in the Panel since), so it keeps the page locked for new drafts (423) until the client discards it with its token or an editor discards it in the Panel. A client should therefore discard expired drafts regularly. |
-| `maxUploadBytes` | `15728640` | Maximum size of an uploaded image (15 MB). |
-| `maxPixels` | `40000000` | Maximum width × height of an uploaded image, read from its header before it is decoded. |
-| `language` | site language | `en` or `de` for the replies. Otherwise the site's default language, then the first two letters of `locale`, then English. |
-| `blueprints` | `true` | Derive collections from the `fude: …` markers of the page blueprints (see below). `false` switches that off: only `fude.php` counts. |
-| `maxCollections` | `30` | Most collections the configuration may have, derived and declared together. More is a 500 on every route: the bot reads them all into its prompt. |
-| `siteId` | hostname | Identifier in the schema, for readers that tell sites apart. |
-| `timezone` | `Europe/Berlin` | The time zone that decides what "today" is for `touch` and `min: 'today'`. Not PHP's default, which on a hoster is often UTC. An unknown zone fails every route with 500. |
-
-Per collection, `publishRoles` (default `['fude']`) lists the roles that may publish that collection — a second gate independent of `roles`.
-
-### HTTPS check
-
-The routes answer 403 unless the request arrived over TLS. The check reads the
-connection, not the `url` option: Kirby takes the scheme from a fixed `url`, so
-a plain request to an https site would pass.
-
-- **Direct:** the server's `HTTPS` flag is on, or `SERVER_PORT` is 443.
-- **Behind a TLS-terminating reverse proxy** (nginx in front of Apache or PHP-FPM, usual on shared hosting): list its address in `fude.trustedProxies`, e.g. `['127.0.0.1', '10.0.0.0/8', '2001:db8::/32']`. The proxy must send `X-Forwarded-Proto: https`. The header counts only from a listed address; from any other one it is ignored, as Kirby ignores it on a fixed `url`.
-- **Local tests:** `fude.withoutHttps` (see above).
-
-A refusal says why in its `error`: "reached the site over plain HTTP", or, when the header says https but the sender is not in `fude.trustedProxies`, a message naming that option.
-
-To check a site, call a route without credentials over its public address:
-
-```bash
-curl -s -o /dev/null -w '%{http_code}\n' https://example.com/fude/schema
-```
-
-401 means the connection passed the HTTPS check (the login is what fails now). 403 with "HTTPS only" means it did not: the `error` text names the cause. Behind a proxy, check that the proxy sends `X-Forwarded-Proto: https` and that its address is in `fude.trustedProxies`.
-
-## Routes
-
-All routes need Basic Auth with an allowed account, answer JSON with `ok`, `format` (currently 1) and either the data or `error` (a sentence in the site's language), and are never cached or indexed.
-
-| Route | Body | Reply |
-|---|---|---|
-| `GET /fude/schema` | — | `site`, `language`, `collections`: per collection `kind`, `label`, `description`, `actions`, `key` (null for `kind: page`), `maxEntries`, `touch` (the name of the touched field), `touchDate` (only for an editable touch: `label`, `description`, `min` and `default` = `today`, `current` = the published value, `''` when empty), `insert` and `readImages` (each only when declared; `readImages` only when `true`), `fields` (type, label, required, description, maxlength, options, maxWidth, formats, min, max; `ask`, `requiredWhen` and `askWhen` only when set, see "Asked fields") and `entries` (for `kind: page`: exactly one) — the published entries reduced to the declared text fields; images appear as `true`/`false`, page fields as the title of the page. |
-| `POST /fude/draft` | `collection`, `action` (`create`, `update`, `delete` or `replace`), `fields` (object; as a JSON string in a multipart form; none for `delete` and `replace`), `key` (for `update` and `delete`: the key value of the entry; none for `kind: page` and `replace`), `entries` (for `replace`: a JSON list of entries; as a JSON string in a multipart form), `touch` (optional, only for an editable touch: the day the touch sets, `YYYY-MM-DD`, not before today; default today), `actor` (optional tag for the log, e.g. `telegram:123`), upload `image` (optional) | `draft` (the record: id, collection, action, page, key, index, fields, file, hash, createdAt, user, actor; for `structure` and `page` collections also `touch` = `{field, value}` or null; for `replace` also `replace` = `kept`, `added`, `removed`, `withoutImage`, each a list of key values; for `update` and `delete` of a child page also `uuid`), `token`, `preview` (URL with Kirby's preview token). |
-| `POST /fude/publish` | `id`, `token`, `actor` | `id`, `url` (the page), `hash` (the new published state). |
-| `POST /fude/discard` | `id`, `token`, `actor` | `id`, `kept` (`true` if the discard left something in place because somebody worked on it in the Panel: changes edited there, a created page that was edited, locked, extended or published there, or an image the published page already uses). |
-
-Status codes: 400 malformed request, 401 login, 403 role, token or HTTPS, 404 unknown collection, entry or draft, 409 conflict (entry exists, published state changed, draft edited in the Panel, ambiguous key), 410 draft expired or gone, 422 validation, 423 the page is locked or has unsaved Panel changes, 500 configuration or internal error (nothing changed).
-
-A draft on a page with unsaved Panel changes is refused: they would be published together with the draft, and nobody confirmed that. Discard them in the Panel or save them first.
-
-```sh
-curl -u fude@example.com:… https://example.com/fude/schema
 curl -u fude@example.com:… -F collection=team -F action=create \
-     -F 'fields={"name":"Anna Neu","rolle":"MFA"}' -F image=@anna.jpg https://example.com/fude/draft
+     -F 'fields={"name":"Max Muster"}' -F image=@photo.jpg https://example.com/fude/draft
 curl -u fude@example.com:… -H 'Content-Type: application/json' \
      -d '{"id":"…","token":"…"}' https://example.com/fude/publish
 ```
 
+## Routes
+
+All routes need Basic Auth. Replies are JSON with `ok`, `format` (currently 1) and the data, or `error`.
+
+| Route | Request | Reply |
+|---|---|---|
+| `GET /fude/schema` | — | `site`, `language`, `collections` (declarations and published entries) |
+| `POST /fude/draft` | `collection`, `action`, `fields`, `key` (update, delete), `entries` (replace), `touch`, `actor` (log tag), upload `image` | `draft`, `token`, `preview` |
+| `POST /fude/publish` | `id`, `token`, `actor` | `id`, `url`, `hash` |
+| `POST /fude/discard` | `id`, `token`, `actor` | `id`, `kept` (`true` if a Panel editor's work stays) |
+
+Errors: 400 malformed request, 401 login, 403 HTTPS, role, token or publish permission, 404 unknown collection, entry or draft, 409 conflict (entry exists, page changed, draft edited in the Panel), 410 draft expired or gone, 422 validation, 423 page locked or with unsaved Panel changes, 500 configuration error.
+
+## Options
+
+All keys are read as `fude.<name>`, flat or nested. `null` counts as not set.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `active` | `false` | Master switch. Off: routes answer 404 and the role does not exist. |
+| `config` | `site/config/fude.php` | Declaration file, relative to the project root or absolute |
+| `roles` | `['fude']` | Roles that may call the routes; admins are not included. |
+| `withoutHttps` | `false` | Accept plain HTTP. Local tests only: Basic Auth sends the password with every request. |
+| `trustedProxies` | `[]` | IP addresses and CIDR ranges of TLS-terminating proxies (see HTTPS) |
+| `draftLifetime` | `172800` | Seconds a draft can still be published (48 h). Older drafts answer 410. |
+| `maxUploadBytes` | `15728640` | Largest uploaded image (15 MB) |
+| `maxPixels` | `40000000` | Largest uploaded image, width × height, checked before decoding |
+| `language` | site language | `en` or `de` for replies |
+| `blueprints` | `true` | Derive collections from `fude:` markers. `false`: `fude.php` alone decides. |
+| `maxCollections` | `30` | Most collections, derived and declared together; more is a 500. |
+| `siteId` | hostname | Identifier in the schema, for readers that tell sites apart |
+| `timezone` | `Europe/Berlin` | Time zone for "today" (`touch`, `min: 'today'`); an unknown zone is a 500. |
+
+## HTTPS
+
+Routes answer 403 unless the connection itself is TLS. Behind a TLS-terminating proxy, list it in `fude.trustedProxies` and have it send `X-Forwarded-Proto: https`; the header counts only from a listed address. Check a site with `curl -s -o /dev/null -w '%{http_code}\n' https://example.com/fude/schema`: 401 means the check passed; a 403 names the cause in `error`.
+
 ## What happens on the page
 
-- **Structure collection.** The draft is written to the page's `changes` version — complete, with all other fields carried over, exactly like the Panel does it. The published version is untouched until `/fude/publish` calls Kirby's `Version::publish()`, which validates against the blueprint once more. A Panel editor sees the draft as "unsaved changes" on the page and can publish or discard it there; Fude notices that and refuses its own publish (409) or keeps the changes on discard.
-- **Structure, delete.** The row leaves the `changes` version; the published row stays until publish. Its image stays on the page, as with an update.
-- **Structure, replace.** The whole list goes into the `changes` version in one draft, every row checked like a create. The new list decides every declared text field: one left out is empty afterwards, so the draft is exactly what the bot showed. A row whose key matches a published row (case and spacing ignored) keeps that row's undeclared columns and its image reference. A new key starts empty. A published key missing from the new list leaves it; its files stay on the page for the Panel to clean up. The reply's `draft.replace` names the kept, added and removed keys, and the rows that will have no image (`withoutImage`), so the bot can warn before publish.
-- **Pages collection, delete.** Nothing changes before publish. Publish deletes the child page (refused with 409 while it has child pages or a Panel changes version); the reply URL is the parent page. The draft names the page by its UUID as well as its path: a page created again in the old one's place is not deleted (410).
-- **Page (`kind: page`).** Like a structure draft: the declared fields and the touch date go into the page's `changes` version, which carries the whole page. The schema lists the published values as the one entry.
-- **Pages collection, create.** A draft page under the parent (invisible until published); publishing sets the declared status. Discard deletes the draft page, but only while it is still as the draft left it: the content matches the fingerprint taken at draft time, nobody holds a Panel lock or has unsaved Panel changes on it, and it has no subpages, subpage drafts or files besides Fude's own image. Otherwise the page stays for the Panel and the reply says `kept: true`.
-- **Pages collection, update.** The child's `changes` version, as above.
-- **Images** become Kirby files on the page that holds the structure (or on the child page), referenced from the row by UUID. Discard removes the file of the discarded draft, but only when the draft owned it alone: its changes version goes with the discard and the published content does not use the file (UUID or file name). A file the published page uses — the Panel published the draft — stays, and so does the file when the changes version is already gone. An update does not delete the previous image — that is the editor's decision in the Panel.
-- The preview URL uses Kirby's preview token (`_token`, `_version=changes`). A site behind its own password protection still asks for that password first.
+- **Structure and page drafts** go into the page's `changes` version; a new child page is a draft page until published. Publish validates against the blueprint again; a Panel editor can publish or discard the draft there.
+- **Images** become Kirby files on the page. Discard removes a file only if the draft owned it alone.
 
 ## Stored data
 
-Fude is a tool for the people who maintain the site. It processes no visitor data, so there is nothing to add to the site's privacy policy. On the server it keeps:
+Fude processes no visitor data and stores no IP addresses, user agents or full-size photo originals. The chat side logs in with Kirby's own password check and its lockout, using an account without Panel access. On the server, Fude keeps:
 
-- **The proposed content** as a Kirby changes version or draft page until it is published or discarded. A discarded draft and its image are deleted unless somebody edited or published it in the Panel meanwhile.
-- **A draft record** in `storage/fude/drafts/` (id, collection, action, field values, image file name, account, channel tag such as `telegram:<chat id>`, timestamps), deleted on publish or discard.
-- **A log** in `storage/fude/log.jsonl`: one line per call with time, route, account, channel tag, collection, action, key, draft id and outcome. No field values, no images. It starts over at 4 MB.
+- Proposed content as a `changes` version or draft page, until published or discarded.
+- Draft records in `storage/fude/drafts/` (field values, account, channel tag), deleted on publish or discard.
+- A log in `storage/fude/log.jsonl`: who, when, route, collection, action, key, outcome. No field values, no images; it restarts at 4 MB.
 
-No IP addresses, no user agents, no full-size originals of uploaded photos.
-
-## Tests
-
-```sh
-composer install          # Kirby as a dev dependency, used as fixture
-composer test             # or: sh tests/run.sh
-```
-
-Every test file is a standalone PHP script (exit code 0 = pass), so the suite also runs on a hoster's PHP without a test framework. CI runs it on PHP 8.2–8.4.
-
-## Maintenance
-
-This module is open source under the MIT license and is maintained for the author's own projects. Issues and pull requests are welcome, but there is no support promise and no release schedule. Report security problems privately through GitHub's private vulnerability reporting (the "Report a vulnerability" button on the Security tab).
+Tests: `composer test`. Issues and pull requests are welcome, without a support promise. Report security problems privately through GitHub's vulnerability reporting. Changes: [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
