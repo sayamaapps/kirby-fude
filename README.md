@@ -75,7 +75,7 @@ Enable Fude with `'fude.active' => true` in `site/config/config.php`, then creat
 | `image` | Upload. `maxWidth` (default 1600), `formats` (default `jpg`, `png`, `webp`; also `gif`), `template`, `alt` (text field, default the key) |
 | `page` | One page of a blueprint `pages` field's `query`, chosen by title |
 
-Every field takes `description` (shown to the bot), `required` and `maxlength`; the last two merge with the blueprint, and the stricter one wins. `ask: true` (or `fudeAsk: true` in the blueprint) makes the bot ask for a field once before the first draft. Fields can also be marked in page blueprints (`fude:` keys); Fude then derives the collections, and `fude.php` overrides them by name. Marker and rule reference: [docs/reference.md](docs/reference.md#blueprint-markers).
+Every field takes `description` (shown to the bot), `required` and `maxlength`; the last two merge with the blueprint, and the stricter one wins. `ask: true` (or `fudeAsk: true` in the blueprint) makes the bot ask for a field once before the first draft. Fields can also be marked in page blueprints (`fude:` keys); Fude then derives the collections, and `fude.php` overrides them by name. A marked `pages` section makes the children with its template one `pages` collection, with the fields marked in their blueprint. Marker and rule reference: [docs/reference.md](docs/reference.md#blueprint-markers).
 
 ### Chat flow
 

@@ -2,7 +2,8 @@
 /**
  * Markers that cannot be honoured are loud: a site field marker, an unsupported
  * type, files on a page, a name collision, an unknown option, a touch field
- * the page does not have, too many collections. Kirby caches blueprints once per PHP process, so every case
+ * the page does not have, too many collections, and a marked section that
+ * is no plain pages section of one template. Kirby caches blueprints once per PHP process, so every case
  * runs in a child process of its own (this file, with the case name as argument).
  */
 require __DIR__ . '/support.php';
@@ -21,7 +22,7 @@ const CASES = [
     'files-on-page' => [
         'files' => ['pages/standort.yml' => "title: Standort\nfields:\n  bild:\n    type: files\n    fude: true\n"],
         'options' => [],
-        'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: page "standort", field "bild": files fields are only supported inside a structure',
+        'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: page "standort", field "bild": files fields are only supported inside a structure or a marked pages section\'s template',
     ],
     'unsupported-sub-field' => [
         'files' => ['pages/standort.yml' => "title: Standort\nfields:\n  team:\n    type: structure\n    fude: true\n    fields:\n      stichworte:\n        type: tags\n        fude: true\n"],
@@ -42,6 +43,59 @@ const CASES = [
         'files' => ['pages/standort.yml' => "title: Standort\nfields:\n  team:\n    type: structure\n    fude: {touch: {field: stand, value: today}}\n    fields:\n      n:\n        type: text\n"],
         'options' => [],
         'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: collection "standort-team": touch field "stand" is not in the blueprint of "standort"',
+    ],
+    'site-section' => [
+        'files' => ['site.yml' => "title: Site\nsections:\n  seiten:\n    type: pages\n    fude: true\n"],
+        'options' => [],
+        'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: site sections are not supported (section "seiten" in site.yml carries a fude marker)',
+    ],
+    'section-type' => [
+        'files' => ['pages/standort.yml' => "title: Standort\nsections:\n  bilder:\n    type: files\n    fude: true\n"],
+        'options' => [],
+        'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: page "standort", section "bilder": the fude marker is only for pages sections and fields',
+    ],
+    'section-no-template' => [
+        'files' => ['pages/standort.yml' => "title: Standort\nsections:\n  seiten:\n    type: pages\n    fude: true\n"],
+        'options' => [],
+        'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: page "standort", section "seiten": the section names no template; set fude: {template: …}',
+    ],
+    'section-templates' => [
+        'files' => ['pages/standort.yml' => "title: Standort\nsections:\n  seiten:\n    type: pages\n    templates: [note, default]\n    fude: true\n"],
+        'options' => [],
+        'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: page "standort", section "seiten": the section names several templates; set fude: {template: …}',
+    ],
+    'section-template-other' => [
+        'files' => ['pages/standort.yml' => "title: Standort\nsections:\n  seiten:\n    type: pages\n    templates: [note]\n    fude: {template: default}\n"],
+        'options' => [],
+        'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: page "standort", section "seiten": template "default" is not one of the section\'s templates',
+    ],
+    'section-parent' => [
+        'files' => ['pages/standort.yml' => "title: Standort\nsections:\n  seiten:\n    type: pages\n    parent: site.find('aktuelles')\n    templates: [note]\n    fude: true\n"],
+        'options' => [],
+        'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: page "standort", section "seiten": a marked pages section lists the page\'s own children, without "parent"',
+    ],
+    'section-option' => [
+        'files' => ['pages/standort.yml' => "title: Standort\nsections:\n  seiten:\n    type: pages\n    templates: [note]\n    fude: {maxEntries: 3}\n"],
+        'options' => [],
+        'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: page "standort", section "seiten": unknown fude option "maxEntries"',
+    ],
+    'section-twice' => [
+        'files' => ['pages/standort.yml' => "title: Standort\nsections:\n  neu:\n    type: pages\n    templates: [note]\n    fude: true\n  alt:\n    type: pages\n    templates: [note]\n    fude: true\n"],
+        'options' => [],
+        'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: page "standort": two marked sections would both reach the template "note"; mark one',
+    ],
+    'section-child-structure' => [
+        'files' => [
+            'pages/standort.yml' => "title: Standort\nsections:\n  kurse:\n    type: pages\n    templates: [kurs]\n    fude: true\n",
+            'pages/kurs.yml' => "title: Kurs\nfields:\n  zeiten:\n    type: structure\n    fude: true\n    fields:\n      n:\n        type: text\n",
+        ],
+        'options' => [],
+        'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: template "kurs", field "zeiten": type "structure" is not supported by fude',
+    ],
+    'section-status' => [
+        'files' => ['pages/standort.yml' => "title: Standort\nsections:\n  seiten:\n    type: pages\n    templates: [note]\n    fude: {status: draft}\n"],
+        'options' => [],
+        'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: collection "standort-seiten": status must be listed or unlisted',
     ],
     'limit' => [
         'files' => ['pages/standort.yml' => "title: Standort\nfields:\n  kurzname:\n    type: text\n    fude: true\n  team:\n    type: structure\n    fude: true\n    fields:\n      n:\n        type: text\n"],
