@@ -67,7 +67,7 @@ Enable Fude with `'fude.active' => true` in `site/config/config.php`, then creat
 | Type | Notes |
 |---|---|
 | `text` | One line; `url`, `email` or `tel` follow the blueprint |
-| `textarea` | Plain text or Markdown; HTML tags and `javascript:`-style URLs are refused |
+| `textarea` | Plain text or Markdown; HTML tags, `javascript:`-style URLs, the `gist` KirbyTag and `style:` attributes are refused |
 | `select` | Options from the declaration, the blueprint or its `query` |
 | `date`, `time` | `YYYY-MM-DD` (`min: 'today'` refuses earlier days); `H:MM` or `HH:MM`, 24 h |
 | `number` | Decimal comma or point; optional `min` and `max` |

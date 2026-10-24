@@ -3,13 +3,16 @@
  * Text is plain text or Markdown, never HTML: sites render textareas with
  * KirbyText, which passes raw HTML through. A tag, a comment, a script scheme
  * or an entity that could hide one is refused, while Markdown, KirbyTags with
- * https links and a plain "<" in prose pass. Blueprint url, email and tel
- * fields are checked by their format before the Panel's own rules see them.
+ * https links and a plain "<" in prose pass. KirbyText renders KirbyTags too:
+ * the gist tag (a script) and a style attribute (inline CSS) are refused.
+ * Blueprint url, email and tel fields are checked by their format before the
+ * Panel's own rules see them.
  */
 require __DIR__ . '/support.php';
 
 use Fude\FudeError;
 use Fude\Validator;
+use Kirby\Text\KirbyTag;
 
 $failed = false;
 try {
@@ -50,9 +53,71 @@ try {
     foreach (['java&#x73;cript:alert(1)', '&#60;b&#62;', 'x&colon;y', 'Text &#x3C;'] as $bad) {
         throws(fn () => $check('textarea', $bad), $html, 'Entity refused: ' . $bad, FudeError::class);
     }
+    // KirbyTags: the gist tag renders a <script src>, in any case, nested in a
+    // caption, and whatever its URL. Spaces around the name are refused too.
+    $script = 'Field "t" takes no KirbyTag that loads a script, such as (gist: …).';
+    $gists = [
+        '(gist: https://gist.github.com/example-user/abc)',
+        '(GIST: https://gist.github.com/example-user/abc)',
+        '(Gist:https://gist.github.com/example-user/abc)',
+        '( gist : https://gist.github.com/example-user/abc)',
+        '(gist: https://other.example\@gist.github.com/abc)',
+        '(gist: https://gist.github.com/example-user/abc file: a.js)',
+        'Vorher (gist: https://gist.github.com/example-user/abc) nachher',
+        '(image: https://example.com/bild.jpg caption: (gist: https://gist.github.com/example-user/abc))',
+    ];
+    foreach ($gists as $bad) {
+        throws(fn () => $check('textarea', $bad), $script, 'gist refused: ' . $bad, FudeError::class);
+        throws(fn () => $check('text', $bad), $script, 'gist refused in a text field: ' . $bad, FudeError::class);
+    }
+    throws(fn () => $check('textarea', "(gist:\nhttps://gist.github.com/example-user/abc)"), $script, 'gist with a line break refused', FudeError::class);
+    // An alias resolves as in KirbyTag::parse().
+    KirbyTag::$aliases['schnipsel'] = 'gist';
+    try {
+        throws(fn () => $check('textarea', '(schnipsel: https://gist.github.com/example-user/abc)'), $script, 'Alias of gist refused', FudeError::class);
+    } finally {
+        unset(KirbyTag::$aliases['schnipsel']);
+    }
+
+    // A style attribute becomes inline CSS (video tag). Kirby splits a tag at
+    // "style:" in any case and with no space before it, also in a nested tag.
+    $style = 'Field "t" takes no style: attribute in a KirbyTag.';
+    $styles = [
+        '(video: https://example.com/clip.mp4 style: position: fixed)',
+        '(video: https://example.com/clip.mp4 STYLE: position: fixed)',
+        '(video: https://example.com/clip.mp4style: position: fixed)',
+        '(image: https://example.com/bild.jpg style: position: fixed)',
+        '(image: https://example.com/bild.jpg caption: (video: https://example.com/clip.mp4 style: position: fixed))',
+        '(link: https://example.com text: Mehr style: color: red)',
+    ];
+    foreach ($styles as $bad) {
+        throws(fn () => $check('textarea', $bad), $style, 'style refused: ' . $bad, FudeError::class);
+        throws(fn () => $check('text', $bad), $style, 'style refused in a text field: ' . $bad, FudeError::class);
+    }
+    throws(fn () => $check('textarea', "(video: https://example.com/clip.mp4\nstyle: position: fixed)"), $style, 'style on its own line refused', FudeError::class);
+
     // Plain text, Markdown and KirbyTags with https links pass; "<" in prose is no tag.
-    foreach (['Kinder < 6 Jahre', 'a <= b', 'Preis: 5 € > 3 €', '**fett** und _kursiv_', '[Praxis](https://example.com/kontakt)', '(link: https://example.com text: Mehr)', 'Mail: info@example.com', 'metadata: ok', 'Daten: 3 Stück', 'Zeile eins\nZeile zwei'] as $good) {
-        same(str_replace('\n', "\n", $good), $check('textarea', str_replace('\n', "\n", $good)), 'Accepted: ' . $good);
+    $goods = ['Kinder < 6 Jahre', 'a <= b', 'Preis: 5 € > 3 €', '**fett** und _kursiv_', '[Praxis](https://example.com/kontakt)', '(link: https://example.com text: Mehr)', 'Mail: info@example.com', 'metadata: ok', 'Daten: 3 Stück', 'Zeile eins\nZeile zwei'];
+    // The other KirbyTags pass as before, and "gist:" or "style:" outside a tag is prose.
+    array_push($goods,
+        '(link: https://example.com text: Mehr class: button target: _blank)',
+        '(email: info@example.com text: Schreiben Sie uns)',
+        '(tel: +49 1234 567 text: Anrufen)',
+        '(image: https://example.com/bild.jpg alt: Die Praxis caption: Unser Empfang)',
+        '(file: preisliste.pdf text: Preisliste)',
+        '(video: https://www.youtube.com/watch?v=abcdefghijk caption: Rundgang)',
+        '(date: Y)',
+        'Lifestyle: neu im Programm',
+        'Gist: kurz gesagt',
+        '(siehe Gist: unten)',
+        '(Hinweis: Freestyle ab 18 Uhr)',
+    );
+    foreach ($goods as $good) {
+        $good = str_replace('\n', "\n", $good);
+        same($good, $check('textarea', $good), 'Accepted: ' . $good);
+        // What passes renders with KirbyText as the sites do, without a script or inline CSS.
+        $rendered = $app()->kirbytext($good);
+        ok(preg_match('/<script|style=/i', $rendered) === 0, 'No script or style rendered: ' . $good, $rendered);
     }
     same('Kinder < 6 Jahre', $check('text', 'Kinder < 6 Jahre'), 'Plain < in a single-line field');
 
@@ -67,6 +132,10 @@ try {
     same([422, 'Field "telefon" must be a phone number: digits, spaces, +, -, / and brackets, at least three digits.'], [$code, $json['error']], 'Too short tel');
     [$code, $json] = fude_call($app, 'draft', ['collection' => 'profil', 'action' => 'update', 'fields' => ['text' => '<script>alert(1)</script>']], options: $options);
     same([422, str_replace('"t"', '"text"', $html)], [$code, $json['error']], 'HTML over HTTP refused');
+    [$code, $json] = fude_call($app, 'draft', ['collection' => 'profil', 'action' => 'update', 'fields' => ['text' => '(gist: https://gist.github.com/example-user/abc)']], options: $options);
+    same([422, str_replace('"t"', '"text"', $script)], [$code, $json['error']], 'gist over HTTP refused');
+    [$code, $json] = fude_call($app, 'draft', ['collection' => 'profil', 'action' => 'update', 'fields' => ['text' => '(video: https://example.com/clip.mp4 style: position: fixed)']], options: $options);
+    same([422, str_replace('"t"', '"text"', $style)], [$code, $json['error']], 'style over HTTP refused');
     same(false, $app()->page('standort')->version('changes')->exists(), 'Refused drafts write nothing');
 
     // The formats of the blueprint, as the validator reads them.

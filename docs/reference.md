@@ -69,7 +69,7 @@ Taken from the blueprint: label (translation arrays and keys); `format` (`url`, 
 | `image` | upload form part `image` | see Image fields |
 | `page` | a title from the query | see Select and page fields |
 
-`text`, `textarea` and `select` refuse HTML tags, comments, `javascript:`, `vbscript:` and `data:` schemes and `&#` entities. A plain `<` in prose is fine.
+`text`, `textarea` and `select` refuse HTML tags, comments, `javascript:`, `vbscript:` and `data:` schemes and `&#` entities. Of the KirbyTags, they refuse `(gist: …)` (a script) and a `style:` attribute in any tag (inline CSS); the other tags pass. A plain `<` in prose is fine.
 
 ## Required, ask and `when`
 

@@ -59,6 +59,8 @@ return [
     'fields.time' => 'Feld „{field}“ muss eine Uhrzeit im Format HH:MM (24 h) sein, z. B. 08:30.',
     'fields.toggle' => 'Feld „{field}“ muss wahr (true) oder falsch (false) sein.',
     'fields.html' => 'Feld „{field}“ nimmt Klartext oder Markdown, kein HTML und keine Skript-Links.',
+    'fields.script' => 'Feld „{field}“ nimmt kein KirbyTag, das ein Skript lädt, etwa (gist: …).',
+    'fields.style' => 'Feld „{field}“ nimmt kein style:-Attribut in einem KirbyTag.',
     'fields.url' => 'Feld „{field}“ muss eine Web-Adresse sein, die mit https:// beginnt.',
     'fields.email' => 'Feld „{field}“ muss eine E-Mail-Adresse sein.',
     'fields.tel' => 'Feld „{field}“ muss eine Telefonnummer sein: Ziffern, Leerzeichen, +, -, / und Klammern, mindestens drei Ziffern.',

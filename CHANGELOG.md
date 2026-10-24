@@ -10,6 +10,15 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## [1.6.1] — 2026-10-24
+
+### Fixed
+
+- **The validator rejects the `gist` tag and `style:` attributes in chat
+  content** (`text`, `textarea` and `select`, also inside a nested tag).
+  Sites render these fields with KirbyText, and both could put foreign
+  script or styles on the public site. All other KirbyTags pass as before.
+
 ## [1.6.0] — 2026-10-23
 
 ### Added
