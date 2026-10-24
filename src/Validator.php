@@ -2,6 +2,8 @@
 
 namespace Fude;
 
+use Kirby\Text\KirbyTag;
+
 /**
  * Checks the fields of a draft against the declaration — before Kirby's
  * blueprint validation runs on the finished entry (Service::checkBlueprint()).
@@ -12,6 +14,17 @@ namespace Fude;
  */
 final class Validator
 {
+    /**
+     * A KirbyTag as KirbyTags::parse() finds it (the same pattern): "(" right
+     * before a name of letters, digits, "_" or "-" and ":", in any case, up to
+     * the balanced ")". Nested tags lie inside it; an image caption is
+     * rendered as KirbyText again.
+     */
+    private const KIRBYTAG = '!(?=[^\]])(?=\([a-z0-9_-]+:)(\((?:[^()]+|(?1))*+\))!is';
+
+    /** KirbyTags that put a script on the page: Kirby renders (gist: …) as <script src>. */
+    private const SCRIPT_TAGS = ['gist'];
+
     /**
      * @param array<string, mixed> $fields the submitted fields
      * @return array<string, string> trimmed, validated text values
@@ -155,6 +168,38 @@ final class Validator
             || str_contains($value, '&#')
             || preg_match('/&colon;/i', $value) === 1) {
             throw FudeError::t('fields.html', ['field' => $name]);
+        }
+        self::checkKirbyTags($name, $value);
+    }
+
+    /**
+     * KirbyText renders KirbyTags too. Refused: a tag that loads a script,
+     * and a style attribute, which Kirby writes as inline CSS (video tag).
+     * The names follow KirbyTag::parse(): lower-cased, aliases resolved.
+     * Kirby splits a tag's attributes at "<name>:" with no word boundary,
+     * so "style:" anywhere inside a tag is refused.
+     */
+    private static function checkKirbyTags(string $name, string $value): void
+    {
+        // Kirby wants the name right between "(" and ":"; refusing spaces there too costs nothing.
+        preg_match_all('/\(\s*([a-z0-9_-]+)\s*:/i', $value, $types);
+        foreach ($types[1] as $type) {
+            $type = strtolower($type);
+            if (!isset(KirbyTag::$types[$type])) {
+                $type = KirbyTag::$aliases[$type] ?? $type;
+            }
+            if (in_array($type, self::SCRIPT_TAGS, true)) {
+                throw FudeError::t('fields.script', ['field' => $name]);
+            }
+        }
+        if (preg_match_all(self::KIRBYTAG, $value, $tags) === false) {
+            // The pattern hit a PCRE limit: refuse rather than let it through unchecked.
+            throw FudeError::t('fields.html', ['field' => $name]);
+        }
+        foreach ($tags[0] as $tag) {
+            if (stripos($tag, 'style:') !== false) {
+                throw FudeError::t('fields.style', ['field' => $name]);
+            }
         }
     }
 
