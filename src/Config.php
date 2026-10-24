@@ -101,13 +101,25 @@ final class Config
 
         // Derived from the blueprint markers first; fude.php overrides by name:
         // false removes a derived collection, an array replaces it, others are added.
-        $entries = Options::get($kirby, 'blueprints', true) === false ? [] : Blueprints::collections($kirby);
+        $derived = Options::get($kirby, 'blueprints', true) === false ? [] : Blueprints::collections($kirby);
+        $entries = $derived;
         foreach ($declared as $name => $entry) {
             if ($entry === false) {
                 unset($entries[$name]);
                 continue;
             }
             $entries[$name] = $entry;
+            // A pages collection declared for the parent and template of a
+            // marked pages section stands in for it under its own name, so a
+            // site that declared the children before keeps one collection.
+            if (is_array($entry) && ($entry['kind'] ?? null) === 'pages') {
+                foreach ($derived as $derivedName => $collection) {
+                    if ($derivedName !== $name && !array_key_exists($derivedName, $declared) && $collection['kind'] === 'pages'
+                        && $collection['parent'] === ($entry['parent'] ?? null) && $collection['template'] === ($entry['template'] ?? null)) {
+                        unset($entries[$derivedName]);
+                    }
+                }
+            }
         }
         if ($entries === [] && !is_file($file)) {
             throw FudeError::t('config.missing', [], 500);

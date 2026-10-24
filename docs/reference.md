@@ -4,17 +4,23 @@ For integrators: how blueprint markers and `site/config/fude.php` become collect
 
 ## Blueprint markers
 
-Marked fields in a page blueprint derive collections. `fude.php` can override them ([merge rules](#merge-rules)).
+Marked fields and sections in a page blueprint derive collections. `fude.php` can override them ([merge rules](#merge-rules)).
 
 | Marker | Result |
 |---|---|
 | `fude: true` or `fude: {description: …}` on a page field | one `page` collection per page, with all its marked fields |
 | `fude: true` or `fude: {…}` on a `structure` field | one `structure` collection |
+| `fude: true` or `fude: {…}` on a `pages` section | one `pages` collection: the page's children with the section's template |
 | `fude: false` on a field or sub-field | not reachable |
 
 - **Page collection:** name = page id with `/` replaced by `-`; label = page title; actions `update`.
 - **Structure collection:** name = `<page-id>-<field>` in lower case, unless `name` is set. Options: `name`, `label`, `description` (default: help text without tags), `key` (default: first text sub-field), `actions` (default `create`, `update`, `delete`), `insert`, `maxEntries`, `touch`, `readImages`. Any other option is a 500.
 - **Sub-fields:** `description`; for `files` also `maxWidth`, `alt`, `formats`, `template`. A sub-field of a known type is included without a marker, except `pages`, which needs one.
+- **Pages collection** (marked `pages` section): name = `<page-id>-<section>`, unless `name` is set; parent = the page; template = the section's one template, or `template` when it names several. Fields: `title` plus the fields marked in the template's blueprint, with the sub-field options (`files` becomes `image`). Options: `name`, `label` (default: section label), `description` (default: section help), `key` (default `title`), `actions` (default `create`, `update`), `status` (`listed` default, `unlisted`), `template`, `readImages`.
+  - Pages of that template get no collection of their own, wherever they are, so many children stay one collection. A site that replaces the parent blueprint keeps the marker, or each child page with marked fields becomes a collection (and `maxCollections` fails).
+  - Refused with a 500: a marker on another section type, a section with `parent` or `query`, two marked sections of one page for the same template, a field type Fude cannot map (also `structure`) marked in the template.
+  - Example: `events: {type: pages, templates: [event], fude: {key: startdate}}` with `fude: true` at the event fields `startDate` and `venue`.
+- **Texts:** `label`, `description` and a field's `help` may be translation arrays (`{en: …, de: …}`); the reply language is used, else English.
 - **What to mark:** ordinary content. Leave out legal texts, emergency numbers, address and map, design settings.
 
 | Blueprint type | Fude type |
@@ -31,6 +37,7 @@ Other types are skipped in a structure and refused when marked. Refused with a 5
 ## Merge rules
 
 - Markers are read first. `fude.php` then merges by collection name: `false` removes a derived collection, an array replaces it completely, a new name adds one.
+- A `pages` collection in `fude.php` with the `parent` and `template` of a marked section replaces the derived one under its own name.
 - `blueprints: false` (option): `fude.php` alone decides.
 - `maxCollections` counts derived and declared collections together.
 - Listed and unlisted pages are scanned; drafts and users never. Fields pulled in with `extends:` count, as Kirby resolves the blueprint.

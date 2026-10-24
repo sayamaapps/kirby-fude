@@ -10,6 +10,34 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## [1.7.0] — 2026-10-24
+
+### Reach
+
+- **Child pages as a blueprint marker.** `fude: true` (or `fude: {…}`) on
+  a `pages` section of a parent blueprint derives one `pages` collection:
+  the parent's children with the section's template, as `kind: pages` in
+  `fude.php` does. The fields are `title` and the fields marked in the
+  child template's blueprint. Options: `name`, `label`, `description`,
+  `key`, `actions` (default `create`, `update`), `status`, `template`,
+  `readImages`. Pages of that template get no `page` collection of their
+  own, so a calendar with 50 events stays one collection under
+  `maxCollections`. Existing markers reach nothing new.
+
+### Added
+
+- **A `pages` collection in `fude.php` for the parent and template of a
+  marked section replaces the derived one**, whatever its name: a site that
+  declared its child pages before keeps exactly one collection.
+- **Translated marker texts.** `label` and `description` in a marker and a
+  field's `help` may be translation arrays (plugin blueprints), read in the
+  reply language. Before, an array help left the description empty.
+
+### Changed
+
+- The 500 for a marked `files` field on a page names both places where
+  images are allowed.
+
 ## [1.6.1] — 2026-10-24
 
 ### Fixed
