@@ -60,6 +60,8 @@ return [
     'fields.time' => 'Field "{field}" must be a time in the form HH:MM (24 h), e.g. 08:30.',
     'fields.toggle' => 'Field "{field}" must be true or false.',
     'fields.html' => 'Field "{field}" takes plain text or Markdown, no HTML and no script links.',
+    'fields.script' => 'Field "{field}" takes no KirbyTag that loads a script, such as (gist: …).',
+    'fields.style' => 'Field "{field}" takes no style: attribute in a KirbyTag.',
     'fields.url' => 'Field "{field}" must be a web address starting with https://.',
     'fields.email' => 'Field "{field}" must be an e-mail address.',
     'fields.tel' => 'Field "{field}" must be a phone number: digits, spaces, +, -, / and brackets, at least three digits.',
