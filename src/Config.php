@@ -157,10 +157,37 @@ final class Config
         } elseif (is_string($label)) {
             // A translation key (plugin blueprints): Kirby translates field
             // labels only in the Panel form, not in the blueprint.
-            $translated = \Kirby\Toolkit\I18n::translate($label, $label, I18n::language());
-            $label = is_string($translated) ? $translated : $label;
+            $label = self::translateKey($label);
         }
         return is_string($label) && $label !== '' ? $label : null;
+    }
+
+    /**
+     * A text of a blueprint that may be a translation key (plugin blueprints,
+     * such as `higawari.panel.date.help`): it reads as its text in the reply
+     * language. Any other text, and a key without a text, stays as written.
+     */
+    public static function translateKey(string $text): string
+    {
+        $translated = \Kirby\Toolkit\I18n::translate($text, $text, I18n::language());
+        return is_string($translated) ? $translated : $text;
+    }
+
+    /**
+     * The help text of a blueprint field, as plain text on one line. A
+     * translation array or a translation key is read in the reply language,
+     * like a label. Empty when there is no help.
+     */
+    public static function helpText(array $definition): string
+    {
+        $help = $definition['help'] ?? '';
+        if (is_array($help) && $help !== []) {
+            $help = $help[I18n::language()] ?? $help['en'] ?? reset($help);
+        }
+        if (!is_string($help)) {
+            return '';
+        }
+        return trim((string) preg_replace('/\s+/u', ' ', strip_tags(self::translateKey($help))));
     }
 
     private static function invalid(string $reason): FudeError
@@ -428,13 +455,12 @@ final class Config
         if (!$editable) {
             return ['field' => $field, 'value' => 'today'];
         }
-        $help = $definition['help'] ?? '';
         return [
             'field'       => $field,
             'value'       => 'today',
             'editable'    => true,
             'label'       => $touch['label'] ?? self::label($definition) ?? $field,
-            'description' => $touch['description'] ?? (is_string($help) ? trim((string) preg_replace('/\s+/u', ' ', strip_tags($help))) : ''),
+            'description' => $touch['description'] ?? self::helpText($definition),
         ];
     }
 

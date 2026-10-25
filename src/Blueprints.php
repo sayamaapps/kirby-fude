@@ -118,7 +118,7 @@ final class Blueprints
                 self::checkOptions($marker, self::PAGE_OPTIONS, $where);
                 $pageFields[(string) $fieldName] = [
                     'type'        => self::fudeType($where, (string) ($definition['type'] ?? ''), false),
-                    'description' => self::translated($marker['description'] ?? null, $where, 'description') ?? self::help($definition),
+                    'description' => self::translated($marker['description'] ?? null, $where, 'description') ?? Config::helpText($definition),
                 ];
             }
             if ($pageFields !== []) {
@@ -213,7 +213,7 @@ final class Blueprints
             'parent'      => $page->id(),
             'template'    => $template,
             'label'       => self::translated($marker['label'] ?? null, $where, 'label') ?? Config::label($definition) ?? $section,
-            'description' => self::translated($marker['description'] ?? null, $where, 'description') ?? self::help($definition),
+            'description' => self::translated($marker['description'] ?? null, $where, 'description') ?? Config::helpText($definition),
             'actions'     => $marker['actions'] ?? self::SECTION_ACTIONS,
             'key'         => $key === null ? 'title' : strtolower($key),
             'fields'      => $fields,
@@ -298,7 +298,7 @@ final class Blueprints
             'page'        => $page->id(),
             'field'       => $field,
             'label'       => $label,
-            'description' => self::translated($marker['description'] ?? null, $where, 'description') ?? self::help($definition),
+            'description' => self::translated($marker['description'] ?? null, $where, 'description') ?? Config::helpText($definition),
             'actions'     => $marker['actions'] ?? self::DEFAULT_ACTIONS,
             'key'         => $key,
             'fields'      => $fields,
@@ -324,7 +324,7 @@ final class Blueprints
         self::checkOptions($marker, self::FIELD_OPTIONS, $where);
         $rule = [
             'type'        => $type,
-            'description' => self::translated($marker['description'] ?? null, $where, 'description') ?? self::help($definition),
+            'description' => self::translated($marker['description'] ?? null, $where, 'description') ?? Config::helpText($definition),
         ];
         if ($type !== 'image') {
             $only = array_intersect(self::IMAGE_OPTIONS, array_keys($marker));
@@ -375,25 +375,19 @@ final class Blueprints
     }
 
     /**
-     * A marker text that may also be a translation array (plugin
-     * blueprints): the reply language, else English, else the first.
+     * A marker text that may also be a translation array or a translation key
+     * (plugin blueprints): the reply language, else English, else the first.
+     * A key reads as its text in the reply language.
      */
     private static function translated(mixed $value, string $where, string $option): ?string
     {
         if (is_array($value) && $value !== [] && !array_is_list($value)) {
             $value = $value[I18n::language()] ?? $value['en'] ?? reset($value);
         }
-        return self::text($value, $where, $option);
-    }
-
-    /** The help text of a field or section (a translation array too), as plain text on one line. */
-    private static function help(array $definition): string
-    {
-        $help = $definition['help'] ?? '';
-        if (is_array($help) && $help !== []) {
-            $help = $help[I18n::language()] ?? $help['en'] ?? reset($help);
+        if (is_string($value)) {
+            $value = Config::translateKey($value);
         }
-        return is_string($help) ? trim((string) preg_replace('/\s+/u', ' ', strip_tags($help))) : '';
+        return self::text($value, $where, $option);
     }
 
     /** @param array<string, array> $collections */

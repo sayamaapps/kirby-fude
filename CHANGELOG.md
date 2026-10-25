@@ -31,6 +31,18 @@ All notable changes to this project are documented here. Versions follow
 - Drafts made before this version carry no fingerprint: their delete answers
   409 and their discard keeps the page and image. Create the draft again.
 
+## [1.7.1] — 2026-10-25
+
+### Fixed
+
+- **Translation keys in blueprint texts reach the bot as text.** A field's
+  `help` that is a translation key (plugin blueprints, such as Higawari's date
+  help) went to the bot as the key, in the description of a touch date and of
+  fields and collections. It now reads as its text in the reply language, as
+  the label already did. A marker's `label` and `description` work the same
+  way. Plain text stays as written, and so does a key without a text. A
+  translation array as the help of an editable touch date is read too.
+
 ## [1.7.0] — 2026-10-24
 
 ### Reach
