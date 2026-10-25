@@ -58,7 +58,7 @@ Enable Fude with `'fude.active' => true` in `site/config/config.php`, then creat
 | `actions` | `create`, `update` (default), `delete`, `replace` (structure only) |
 | `maxEntries` | `structure`: at most 1–100 rows, checked on `create` and `replace` |
 | `insert` | `structure`: `top` or `bottom` (default) for a created row |
-| `touch` | `structure`, `page`: `['field' => 'stand', 'value' => 'today']` sets that page date to today on every draft. With `'editable' => true`, a draft may name another day. |
+| `touch` | `structure`, `page`: `['field' => 'stand', 'value' => 'today']` sets that page date to today on every draft. With `'editable' => true`, a draft may name another day; `'default' => 'saturday'` (any weekday) gives a draft without a date the next such day instead of today. |
 | `readImages` | `true`: the model may read attached photos. Fude itself does not use it. |
 | `publishRoles` | Roles that may publish (default `['fude']`) |
 
