@@ -625,7 +625,8 @@ final class Service
      * The page field a collection's `touch` sets on every draft: today's
      * date in the time zone of `fude.timezone`, as Y-m-d. With `editable`
      * the draft may name another day (`touch` in the request), not before
-     * today; without one it is today as well.
+     * today; without one it is the touch's `default`: today, or the next
+     * named weekday (today included).
      *
      * @return array<string, string> empty when the collection declares no touch
      * @throws FudeError 422 for a date the collection does not let the draft choose
@@ -641,7 +642,7 @@ final class Service
         }
         $today = self::today($kirby, $now);
         if (!$given) {
-            return [$collection['touch']['field'] => $today];
+            return [$collection['touch']['field'] => self::touchDefault($kirby, $collection['touch'], $now)];
         }
         if (($collection['touch']['editable'] ?? false) !== true) {
             throw FudeError::t('touch.fixed', ['name' => $collection['name']]);
@@ -657,6 +658,19 @@ final class Service
             throw FudeError::t('touch.dateMin');
         }
         return [$collection['touch']['field'] => $value];
+    }
+
+    /** The day a draft without a date gets: today, or the next `default` weekday (today included). */
+    private static function touchDefault(App $kirby, array $touch, DateTimeImmutable $now): string
+    {
+        $weekday = array_search($touch['default'] ?? 'today', Config::WEEKDAYS, true);
+        $day = $now->setTimezone(Options::timezone($kirby));
+        if ($weekday === false) {
+            return $day->format('Y-m-d');
+        }
+        // ISO weekday N: 1 = Monday, the index in Config::WEEKDAYS plus one.
+        $ahead = ($weekday + 1 - (int) $day->format('N') + 7) % 7;
+        return $day->modify("+$ahead days")->format('Y-m-d');
     }
 
     /** The touch of a draft for its record: field and date, or null without touch. */

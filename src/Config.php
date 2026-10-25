@@ -58,6 +58,8 @@ final class Config
     public const ACTIONS = ['create', 'update', 'delete', 'replace'];
     /** What a collection may do when its declaration names no actions. */
     public const DEFAULT_ACTIONS = ['create', 'update'];
+    /** Days an editable touch may default to instead of today (option `default`), Monday first. */
+    public const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
     public const DEFAULT_FORMATS = ['jpg', 'png', 'webp'];
     public const DEFAULT_MAX_WIDTH = 1600;
 
@@ -419,9 +421,11 @@ final class Config
      * With `editable: true` a draft may name another day instead (not
      * before today), for a date such as "show until". `label` and
      * `description` tell the bot what the date means; they default to the
-     * field's label and help text.
+     * field's label and help text. `default` (editable only) is the day a
+     * draft without a date gets: `today`, or a weekday such as `saturday`
+     * for the next one, today included.
      *
-     * @return array{field: string, value: string, editable?: true, label?: string, description?: string}
+     * @return array{field: string, value: string, editable?: true, label?: string, description?: string, default?: string}
      */
     private static function touch(App $kirby, string $name, mixed $touch, array $collection): array
     {
@@ -452,7 +456,14 @@ final class Config
                 throw self::invalid("collection \"$name\": touch $option must be a text");
             }
         }
+        $default = $touch['default'] ?? 'today';
+        if (!is_string($default) || !in_array($default, ['today', ...self::WEEKDAYS], true)) {
+            throw self::invalid("collection \"$name\": touch default must be \"today\" or a weekday (monday … sunday)");
+        }
         if (!$editable) {
+            if ($default !== 'today') {
+                throw self::invalid("collection \"$name\": touch default needs editable: true");
+            }
             return ['field' => $field, 'value' => 'today'];
         }
         return [
@@ -461,6 +472,8 @@ final class Config
             'editable'    => true,
             'label'       => $touch['label'] ?? self::label($definition) ?? $field,
             'description' => $touch['description'] ?? self::helpText($definition),
+            // Only a weekday is kept: with today the touch keeps the shape it always had.
+            ...($default !== 'today' ? ['default' => $default] : []),
         ];
     }
 
@@ -863,7 +876,7 @@ final class Config
                     'label'       => $collection['touch']['label'],
                     'description' => $collection['touch']['description'],
                     'min'         => 'today',
-                    'default'     => 'today',
+                    'default'     => $collection['touch']['default'] ?? 'today',
                     'current'     => self::touchCurrent($kirby, $collection),
                 ];
             }

@@ -10,6 +10,18 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## [1.8.0] — 2026-10-25
+
+### Added
+
+- **`default` for an editable touch.** `'default' => 'saturday'` (any
+  weekday, `today` by default) is the day a draft without a date gets: the
+  next such day in `fude.timezone`, today included. For a weekly list whose
+  "show until" is usually Saturday, so it no longer ends the same day when
+  the message names no date. The schema's `touchDate.default` names the day;
+  a date in the draft still wins. Only with `editable: true`; anything but
+  `today` or an English weekday is a configuration error.
+
 ## [1.7.2] — 2026-10-25
 
 ### Changed

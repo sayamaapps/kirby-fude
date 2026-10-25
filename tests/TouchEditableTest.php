@@ -139,6 +139,34 @@ try {
     same(['2026-10-13', 1], [$app()->page('speisekarte')->anzeigenBis()->value(), preg_match_all('/^Anzeigenbis:/mi', (string) file_get_contents($tmp . '/content/speisekarte/speisekarte.txt'))],
         'Marker: published date, stored once');
 
+    // A weekday as default (option `default`, editable only): a draft without a date gets the next such
+    // day, today included (the test clock is Friday, 2026-10-09). A date in the draft still wins.
+    $woche = fude_declare($tmp, 'touch-default', <<<'PHP'
+    ['collections' => [
+        'samstag' => ['kind' => 'structure', 'page' => 'standort', 'field' => 'team', 'key' => 'name', 'actions' => ['create', 'replace'],
+            'touch' => ['field' => 'datum', 'value' => 'today', 'editable' => true, 'default' => 'saturday'],
+            'fields' => ['name' => ['type' => 'text', 'required' => true]]],
+        'freitag' => ['kind' => 'structure', 'page' => 'standort', 'field' => 'team', 'key' => 'name', 'actions' => ['replace'],
+            'touch' => ['field' => 'datum', 'value' => 'today', 'editable' => true, 'default' => 'friday'],
+            'fields' => ['name' => ['type' => 'text', 'required' => true]]],
+        'donnerstag' => ['kind' => 'structure', 'page' => 'standort', 'field' => 'team', 'key' => 'name', 'actions' => ['replace'],
+            'touch' => ['field' => 'datum', 'value' => 'today', 'editable' => true, 'default' => 'thursday'],
+            'fields' => ['name' => ['type' => 'text', 'required' => true]]],
+    ]]
+    PHP);
+    [, $schema] = fude_call($app, 'schema', options: $woche);
+    same(['saturday', 'today'], [$schema['collections']['samstag']['touchDate']['default'] ?? null, $schema['collections']['staff']['touchDate']['default'] ?? 'today'],
+        'Schema names the default day');
+    foreach (['samstag' => '2026-10-10', 'freitag' => '2026-10-09', 'donnerstag' => '2026-10-15'] as $sammlung => $tag) {
+        [$code, $json] = fude_call($app, 'draft', ['collection' => $sammlung, 'action' => 'replace', 'entries' => []], options: $woche);
+        same([200, $tag, $tag], [$code, $datum('changes'), $json['draft']['touch']['value'] ?? null], "Default $sammlung", $json);
+        fude_call($app, 'discard', ['id' => $json['draft']['id'], 'token' => $json['token']], options: $woche);
+    }
+    [$code, $json] = fude_call($app, 'draft', ['collection' => 'samstag', 'fields' => ['name' => 'Ben Neu'], 'touch' => '2026-10-09'], options: $woche);
+    same([200, '2026-10-09'], [$code, $datum('changes')], 'A date in the draft wins over the default', $json);
+    fude_call($app, 'discard', ['id' => $json['draft']['id'], 'token' => $json['token']], options: $woche);
+    same('saturday', Fude\Config::load($app(options: $woche))['samstag']['touch']['default'] ?? null, 'Config keeps the default day');
+
     // Declaration mistakes are loud.
     $bad = function (string $touch, string $name) use ($tmp, $app): array {
         $php = "['collections' => ['staff' => ['kind' => 'structure', 'page' => 'standort', 'field' => 'team', 'key' => 'name', 'touch' => $touch, 'fields' => ['name' => 'text']]]]";
@@ -149,6 +177,10 @@ try {
     same([500, $prefix . 'touch editable must be true or false'], $bad("['field' => 'datum', 'value' => 'today', 'editable' => 'ja']", 'te1'), 'editable must be a bool');
     same([500, $prefix . 'touch label must be a text'], $bad("['field' => 'datum', 'value' => 'today', 'editable' => true, 'label' => 5]", 'te2'), 'label must be a text');
     same([500, $prefix . 'touch description must be a text'], $bad("['field' => 'datum', 'value' => 'today', 'description' => []]", 'te3'), 'description must be a text');
+    same([500, $prefix . 'touch default must be "today" or a weekday (monday … sunday)'],
+        $bad("['field' => 'datum', 'value' => 'today', 'editable' => true, 'default' => 'samstag']", 'te4'), 'default must be a weekday');
+    same([500, $prefix . 'touch default needs editable: true'],
+        $bad("['field' => 'datum', 'value' => 'today', 'default' => 'saturday']", 'te5'), 'default only with editable');
 
     // The non-editable touch keeps its old shape (sites and packages compare it).
     $config = Fude\Config::load($app(options: $options));
