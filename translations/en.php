@@ -33,6 +33,7 @@ return [
     'collection.deleteKey' => 'A delete needs "key": the {field} of the entry to delete.',
     'collection.deleteFields' => 'Action "delete" takes only the key: no fields, no image.',
     'collection.hasChildren' => 'The page "{name}" has child pages and cannot be deleted here.',
+    'collection.fileInUse' => 'The page "{name}" has a file another page uses ({file}). Delete it in the Panel.',
     'collection.replaceFields' => 'Action "replace" takes "entries" only, not fields.',
     'collection.replaceImage' => 'Action "replace" takes no image.',
     'collection.maxEntries' => 'The list holds at most {max} entries.',
@@ -81,6 +82,7 @@ return [
     'draft.expired' => 'This draft is older than {hours} hours and can no longer be published. Create a new one.',
     'draft.conflict' => 'The published content changed since this draft was made. Create a new draft.',
     'draft.changed' => 'The draft was changed in the Panel meanwhile. Publish it there, or discard it and start again.',
+    'draft.files' => 'Files on the page changed since this draft was made (added, replaced or edited). Create a new draft.',
     'draft.gone' => 'The draft no longer exists on the page.',
     'draft.internal' => 'Internal error, nothing changed.',
 ];

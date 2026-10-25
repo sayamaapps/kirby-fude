@@ -5,6 +5,7 @@ namespace Fude;
 use DateTimeImmutable;
 use Kirby\Cms\App;
 use Kirby\Cms\File;
+use Kirby\Cms\ModelWithContent;
 use Kirby\Cms\Page;
 use Kirby\Cms\User;
 use Kirby\Content\Version;
@@ -255,6 +256,7 @@ final class Service
             'replace'     => $replace,
             'touch'       => self::touchRecord($touched),
             'file'        => $file?->filename(),
+            'fileHash'    => $file === null ? null : self::filesHash([$file]),
             'hash'        => $hash,
             'changesHash' => self::changesHash($page->version('changes')),
             'preview'     => $page->version('changes')->url(),
@@ -336,6 +338,7 @@ final class Service
                 'index'       => null,
                 'fields'      => $clean,
                 'file'        => $file?->filename(),
+                'filesHash'   => self::filesHash($child->files()),
                 'hash'        => $hash,
                 'changesHash' => self::changesHash($child->version('latest')),
                 'preview'     => $child->version('latest')->url(),
@@ -365,6 +368,7 @@ final class Service
                 'index'       => $index,
                 'fields'      => [],
                 'file'        => null,
+                'filesHash'   => self::filesHash($child->files()),
                 'hash'        => $hash,
                 'changesHash' => null,
                 'preview'     => $child->version('latest')->url(),
@@ -398,6 +402,7 @@ final class Service
             'index'       => $index,
             'fields'      => $clean,
             'file'        => $file?->filename(),
+            'fileHash'    => $file === null ? null : self::filesHash([$file]),
             'hash'        => $hash,
             'changesHash' => self::changesHash($child->version('changes')),
             'preview'     => $child->version('changes')->url(),
@@ -475,6 +480,17 @@ final class Service
                 }
                 if ($child->hasChildren() || $child->hasDrafts()) {
                     throw FudeError::t('collection.hasChildren', ['name' => $child->title()->value()], 409);
+                }
+                // Files go with the page: only those the draft saw, unchanged,
+                // and none another page uses.
+                if (!hash_equals((string) ($record['filesHash'] ?? ''), self::filesHash($child->files()))) {
+                    throw FudeError::t('draft.files', [], 409);
+                }
+                $elsewhere = self::elsewhere($child);
+                foreach ($child->files() as $file) {
+                    if (self::usedIn($elsewhere, $file)) {
+                        throw FudeError::t('collection.fileInUse', ['name' => $child->title()->value(), 'file' => $file->filename()], 409);
+                    }
                 }
                 $url = $child->parent()->url();
                 $child->delete();
@@ -772,8 +788,9 @@ final class Service
      * Whether a draft page Fude created is still exactly what the draft left:
      * the content matches the fingerprint taken at draft time (as publish
      * demands), nobody holds a Panel lock or has unsaved Panel changes on it,
-     * and it has no subpages, subpage drafts or files besides Fude's own image.
-     * Only then may a discard delete it, recursively.
+     * it has no subpages or subpage drafts, its files are the ones the draft
+     * left (none added, replaced or with edited metadata), and no other page
+     * uses one of them. Only then may a discard delete it, recursively.
      */
     private static function isUntouched(Page $page, array $record): bool
     {
@@ -786,8 +803,12 @@ final class Service
         if ($page->hasChildren() || $page->hasDrafts()) {
             return false;
         }
+        if (!hash_equals((string) ($record['filesHash'] ?? ''), self::filesHash($page->files()))) {
+            return false;
+        }
+        $elsewhere = self::elsewhere($page);
         foreach ($page->files() as $file) {
-            if ($file->filename() !== ($record['file'] ?? null)) {
+            if (self::usedIn($elsewhere, $file)) {
                 return false;
             }
         }
@@ -881,13 +902,15 @@ final class Service
 
     /**
      * Removes the file a discarded draft uploaded — but only when the draft
-     * owned it alone: its changes version just went ($removed) and the
-     * published content doesn't use the file. A file the published version
-     * uses means the draft was consumed (published in the Panel, or the
-     * reference written there otherwise): it stays. So it does without our
-     * changes version: the file may be live, or an editor dropped the draft.
+     * owned it alone: its changes version just went ($removed), the file is
+     * as the draft left it (no replaced binary, no edited metadata), and
+     * nothing else uses it: neither the published content of its page nor any
+     * other page or the site. A file in use means the draft was consumed
+     * (published in the Panel, or the reference written there otherwise): it
+     * stays. So it does without our changes version: the file may be live, or
+     * an editor dropped the draft.
      *
-     * @return bool true when the file stays because the published page uses it
+     * @return bool true when the file stays because it is used or was edited
      */
     private static function removeFile(Page $page, array $record, bool $removed): bool
     {
@@ -901,6 +924,9 @@ final class Service
         if (self::isReferenced($page, $file)) {
             return true;
         }
+        if (!hash_equals((string) ($record['fileHash'] ?? ''), self::filesHash([$file]))) {
+            return true;
+        }
         if ($removed) {
             $file->delete();
         }
@@ -908,24 +934,127 @@ final class Service
     }
 
     /**
-     * Whether the page's published (latest) content refers to the file: by its
-     * UUID (a files field) or by its file name (also covers the file id and
-     * Kirbytext). Unreadable content counts as referenced: when in doubt, the
-     * file stays.
+     * Whether anything refers to the file: the published (latest) content of
+     * its own page by UUID or file name (that also covers the file id and
+     * Kirbytext), or another page or the site (see usedIn()). Unreadable
+     * content counts as referenced: when in doubt, the file stays.
      */
     private static function isReferenced(Page $page, File $file): bool
     {
-        $content = json_encode($page->version('latest')->read() ?? [], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        if (!is_string($content)) {
+        $own = self::storedText($page, ['latest']);
+        if ($own === null) {
             return true;
         }
-        $uuid = $file->content()->get('uuid')->value();
-        foreach ([$file->filename(), is_string($uuid) && $uuid !== '' ? 'file://' . $uuid : null] as $needle) {
-            if ($needle !== null && str_contains($content, $needle)) {
+        $uuid = self::fileUuid($file);
+        foreach ([$file->filename(), $uuid] as $needle) {
+            if ($needle !== null && str_contains($own, $needle)) {
                 return true;
             }
         }
+        return self::usedIn(self::elsewhere($page), $file);
+    }
+
+    /**
+     * What the site and every page except this one store (drafts included,
+     * published and unsaved Panel changes, every language), one text per
+     * model; null for one that could not be read.
+     *
+     * @return list<string|null>
+     */
+    private static function elsewhere(Page $page): array
+    {
+        $site = $page->site();
+        $texts = [self::storedText($site)];
+        foreach ($site->index(true) as $other) {
+            if ($other->id() !== $page->id()) {
+                $texts[] = self::storedText($other);
+            }
+        }
+        return $texts;
+    }
+
+    /**
+     * Whether one of the texts from elsewhere() names the file: by UUID (a
+     * files field) or by file id (a files field without UUIDs, Kirbytext from
+     * another page). A bare file name there means a file of that other page.
+     *
+     * @param list<string|null> $texts
+     */
+    private static function usedIn(array $texts, File $file): bool
+    {
+        $needles = array_filter([$file->id(), self::fileUuid($file)]);
+        foreach ($texts as $text) {
+            if ($text === null) {
+                return true;
+            }
+            foreach ($needles as $needle) {
+                if (str_contains($text, $needle)) {
+                    return true;
+                }
+            }
+        }
         return false;
+    }
+
+    /** The file's `file://` UUID as content stores it, or null when it has none. */
+    private static function fileUuid(File $file): ?string
+    {
+        $uuid = $file->content()->get('uuid')->value();
+        return is_string($uuid) && $uuid !== '' ? 'file://' . $uuid : null;
+    }
+
+    /**
+     * Everything a page, file or the site stores in the given versions, in
+     * every language, as one JSON text; null when it cannot be encoded.
+     *
+     * @param list<string> $versions
+     */
+    private static function storedText(ModelWithContent $model, array $versions = ['latest', 'changes']): ?string
+    {
+        $text = json_encode(self::contents($model, $versions), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        return is_string($text) ? $text : null;
+    }
+
+    /**
+     * What a model stores in the given versions, per version and language
+     * (every language of a multi-language site); a missing version is [].
+     *
+     * @param list<string> $versions
+     * @return list<array<string, mixed>>
+     */
+    private static function contents(ModelWithContent $model, array $versions): array
+    {
+        $kirby = $model->kirby();
+        $languages = $kirby->multilang() ? $kirby->languages()->values() : ['default'];
+        $contents = [];
+        foreach ($versions as $version) {
+            foreach ($languages as $language) {
+                $contents[] = $model->version($version)->read($language) ?? [];
+            }
+        }
+        return $contents;
+    }
+
+    /**
+     * Fingerprint of files as they are now: file name, binary content and
+     * metadata (both versions, every language, without the UUID and lock
+     * Kirby writes on its own). A Panel upload, a replaced file or an edited
+     * alt text between draft and confirmation changes it.
+     *
+     * @param iterable<File> $files
+     */
+    private static function filesHash(iterable $files): string
+    {
+        $state = [];
+        foreach ($files as $file) {
+            $meta = self::contents($file, ['latest', 'changes']);
+            foreach ($meta as $key => $content) {
+                unset($meta[$key]['uuid'], $meta[$key]['lock']);
+            }
+            $state[$file->filename()] = [is_file($file->root()) ? hash_file('xxh128', $file->root()) : null, $meta];
+        }
+        ksort($state);
+        return hash('sha256', (string) json_encode($state, JSON_UNESCAPED_UNICODE));
     }
 
     /** The upload named "image", or null when none was sent. */

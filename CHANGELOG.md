@@ -10,6 +10,27 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## [Unreleased]
+
+### Fixed
+
+- **Discard keeps a file another page uses.** Before, only the draft's own
+  page counted: an image that a files field or KirbyText on another page (or
+  the site) referred to was deleted with the draft. Now every page, drafts
+  and unsaved Panel changes included, in every language, counts, by UUID or
+  file id. A file edited since the draft (alt text, replaced image) stays as
+  well.
+- **A confirmed page delete no longer takes files added or edited after the
+  draft.** The delete draft fingerprints the page's files (names, content,
+  metadata); a Panel upload, a replaced file or an edited alt text in between
+  answers 409, as a content edit already did. A page with a file another page
+  uses is not deleted by the bot either (409).
+- **Discard of a created page keeps it when its image was edited or is used
+  elsewhere.** Before, an unchanged file name was enough to delete the page
+  with an image whose metadata had been edited in the Panel.
+- Drafts made before this version carry no fingerprint: their delete answers
+  409 and their discard keeps the page and image. Create the draft again.
+
 ## [1.7.0] — 2026-10-24
 
 ### Reach
