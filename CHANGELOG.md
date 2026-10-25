@@ -10,7 +10,7 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
-## [Unreleased]
+## [1.7.2] — 2026-10-25
 
 ### Changed
 
