@@ -32,6 +32,7 @@ return [
     'collection.deleteKey' => 'Zum Löschen fehlt „key“: {field} des Eintrags, der gelöscht werden soll.',
     'collection.deleteFields' => 'Die Aktion „delete“ braucht nur den Schlüssel: keine Felder, kein Bild.',
     'collection.hasChildren' => 'Die Seite „{name}“ hat Unterseiten und kann hier nicht gelöscht werden.',
+    'collection.fileInUse' => 'Die Seite „{name}“ hat eine Datei, die eine andere Seite verwendet ({file}). Bitte im Panel löschen.',
     'collection.replaceFields' => 'Die Aktion „replace“ nimmt nur „entries“, keine Felder.',
     'collection.replaceImage' => 'Die Aktion „replace“ nimmt kein Bild.',
     'collection.maxEntries' => 'Die Liste hat höchstens {max} Einträge.',
@@ -80,6 +81,7 @@ return [
     'draft.expired' => 'Dieser Entwurf ist älter als {hours} Stunden und kann nicht mehr veröffentlicht werden. Bitte neu anlegen.',
     'draft.conflict' => 'Der veröffentlichte Inhalt hat sich seit diesem Entwurf geändert. Bitte einen neuen Entwurf anlegen.',
     'draft.changed' => 'Der Entwurf wurde inzwischen im Panel geändert. Dort veröffentlichen, oder verwerfen und neu beginnen.',
+    'draft.files' => 'Die Dateien der Seite haben sich seit dem Entwurf geändert (neu, ersetzt oder bearbeitet). Neuen Entwurf anlegen.',
     'draft.gone' => 'Der Entwurf existiert auf der Seite nicht mehr.',
     'draft.internal' => 'Interner Fehler, nichts geändert.',
 ];

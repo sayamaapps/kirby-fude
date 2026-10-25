@@ -97,7 +97,7 @@ All routes need Basic Auth. Replies are JSON with `ok`, `format` (currently 1) a
 | `POST /fude/publish` | `id`, `token`, `actor` | `id`, `url`, `hash` |
 | `POST /fude/discard` | `id`, `token`, `actor` | `id`, `kept` (`true` if a Panel editor's work stays) |
 
-Errors: 400 malformed request, 401 login, 403 HTTPS, role, token or publish permission, 404 unknown collection, entry or draft, 409 conflict (entry exists, page changed, draft edited in the Panel), 410 draft expired or gone, 422 validation, 423 page locked or with unsaved Panel changes, 500 configuration error.
+Errors: 400 malformed request, 401 login, 403 HTTPS, role, token or publish permission, 404 unknown collection, entry or draft, 409 conflict (entry exists, page or its files changed, draft edited in the Panel, file used on another page), 410 draft expired or gone, 422 validation, 423 page locked or with unsaved Panel changes, 500 configuration error.
 
 ## Options
 
@@ -126,7 +126,8 @@ Routes answer 403 unless the connection itself is TLS. Behind a TLS-terminating 
 ## What happens on the page
 
 - **Structure and page drafts** go into the page's `changes` version; a new child page is a draft page until published. Publish validates against the blueprint again; a Panel editor can publish or discard the draft there.
-- **Images** become Kirby files on the page. Discard removes a file only if the draft owned it alone.
+- **Images** become Kirby files on the page. Discard removes a file only if the draft owned it alone: unchanged since the draft and used nowhere else on the site.
+- **Deleting a page** takes its files only as the draft saw them: a file added or edited since, or one another page uses, answers 409.
 
 ## Stored data
 
