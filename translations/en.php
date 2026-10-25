@@ -30,6 +30,7 @@ return [
     'collection.notFound' => 'No entry with {field} "{key}".',
     'collection.ambiguous' => 'Several entries with {field} "{key}" — change this one in the Panel.',
     'collection.exists' => 'There is already an entry with {field} "{key}". Use action "update".',
+    'collection.keyTaken' => 'Another entry already has {field} "{key}". Two entries could no longer be told apart.',
     'collection.deleteKey' => 'A delete needs "key": the {field} of the entry to delete.',
     'collection.deleteFields' => 'Action "delete" takes only the key: no fields, no image.',
     'collection.hasChildren' => 'The page "{name}" has child pages and cannot be deleted here.',
@@ -67,6 +68,8 @@ return [
     'fields.email' => 'Field "{field}" must be an e-mail address.',
     'fields.tel' => 'Field "{field}" must be a phone number: digits, spaces, +, -, / and brackets, at least three digits.',
     'fields.blueprint' => 'The page blueprint rejects the entry: {errors}',
+    'fields.hidden' => 'Field "{field}" applies only when "{other}" is {value}. Send "{other}" with it, or leave the field out.',
+    'fields.hiddenFixed' => 'Field "{field}" has no effect on this entry: it applies only when "{other}" is {value}. Change "{other}" in the Panel.',
 
     'image.upload' => 'The image upload failed (code {code}).',
     'image.size' => 'The image is larger than {max} MB.',

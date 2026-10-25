@@ -62,6 +62,10 @@ Other types are skipped in a structure and refused when marked. Refused with a 5
 
 Taken from the blueprint: label (translation arrays and keys); `format` (`url`, `email`, `tel` text fields); `required: true`, unless the field is in a `pages` collection with a blueprint `default` (Kirby fills it when it creates the page) or a `when` hides it; `maxlength` and number bounds (the tighter one wins); image `template` from `uploads`.
 
+A value for a field that the blueprint's `when` hides on this entry is a 422, read from the entry's stored values with the draft's on top (a new entry starts from the blueprint defaults). An emptied field passes. When the condition is on a declared field, the draft may send it along; otherwise it changes in the Panel only.
+
+The key stays unique: an update to a key another entry has is a 409, at draft time and again at publish.
+
 ## Field types
 
 | Type | Accepts | Notes |

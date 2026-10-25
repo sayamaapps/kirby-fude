@@ -10,6 +10,26 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## [Unreleased]
+
+### Changed
+
+- **A value for a field the blueprint hides on the entry is a 422.** A
+  blueprint `when` decides per entry whether a field counts (a price only
+  while the event is not free). Before, a draft could set such a field: the
+  publish succeeded and nothing visible changed. Now the draft names the
+  condition. The entry's stored values count, with the draft's on top; a new
+  entry starts from the blueprint defaults. An emptied field passes. When
+  the condition is on a declared field, the bot can send it along.
+
+### Fixed
+
+- **An update can no longer give an entry the key of another one.** Two
+  entries with one key could not be named by it afterwards (409 "several
+  entries"). Draft and publish both answer 409 now; publish checks again for
+  `pages` collections, whose hash covers only the changed page, and for a
+  pending create whose key another entry took meanwhile.
+
 ## [1.7.1] — 2026-10-25
 
 ### Fixed
