@@ -176,6 +176,18 @@ final class Service
             }
             $index = Content::find($collection, $rows, $key);
             $entry['key'] = trim($key);
+            if ($action === 'update' && isset($clean[$keyField])) {
+                self::checkKeyFree($collection, $rows, $clean[$keyField], $index);
+            }
+        }
+
+        if ($action === 'replace') {
+            foreach ($entries as $row) {
+                $published = array_values(array_filter($rows, fn ($old) => Content::sameKey($old[$keyField] ?? '', $row[$keyField])));
+                self::checkShown($collection, $published[0] ?? [], $row);
+            }
+        } elseif ($action !== 'delete') {
+            self::checkShown($collection, self::storedEntry($kirby, $collection, $rows, $index), $clean);
         }
 
         if ($collection['kind'] === 'page') {
@@ -467,6 +479,7 @@ final class Service
                 if (!$child->isDraft()) {
                     throw FudeError::t('draft.gone', [], 410);
                 }
+                self::checkKeyFree($collection, Content::rows($kirby, $collection), (string) $record['key'], null);
                 if (!hash_equals($record['changesHash'], self::changesHash($child->version('latest')))) {
                     throw FudeError::t('draft.changed', [], 409);
                 }
@@ -500,6 +513,12 @@ final class Service
             } else {
                 self::checkLock($child);
                 self::checkHash($kirby, $collection, $record, $child);
+                // The hash covers this page only: another may have taken the new key since.
+                if (isset($record['fields'][$collection['key']])) {
+                    $rows = Content::rows($kirby, $collection);
+                    $self = array_search($child->id(), array_column($rows, '_id'), true);
+                    self::checkKeyFree($collection, $rows, $record['fields'][$collection['key']], $self === false ? null : $self);
+                }
                 $changes = $child->version('changes');
                 if (!$changes->exists()) {
                     throw FudeError::t('draft.gone', [], 410);
@@ -813,6 +832,76 @@ final class Service
             }
         }
         return true;
+    }
+
+    /**
+     * No entry but $except has the key value yet. An update must not give an
+     * entry the key of another one, nor may publish make two of them: neither
+     * could be named by its key afterwards.
+     *
+     * @throws FudeError 409
+     */
+    private static function checkKeyFree(array $collection, array $rows, string $value, ?int $except): void
+    {
+        $keyField = $collection['key'];
+        foreach ($rows as $index => $row) {
+            if ($index !== $except && Content::sameKey($row[$keyField] ?? '', $value)) {
+                throw FudeError::t('collection.keyTaken', ['field' => $collection['fields'][$keyField]['label'], 'key' => trim($value)], 409);
+            }
+        }
+    }
+
+    /**
+     * The entry a draft changes, as stored: the structure row, the child
+     * page's or the page's published content; [] for a new entry.
+     *
+     * @return array<string, mixed>
+     */
+    private static function storedEntry(App $kirby, array $collection, array $rows, ?int $index): array
+    {
+        if ($collection['kind'] === 'page') {
+            return Content::page($kirby, $collection)->version('latest')->read() ?? [];
+        }
+        if ($index === null) {
+            return [];
+        }
+        if ($collection['kind'] === 'structure') {
+            return $rows[$index];
+        }
+        return $kirby->page($rows[$index]['_id'])?->version('latest')->read() ?? [];
+    }
+
+    /**
+     * A value for a field the blueprint hides on this entry (`when`) would
+     * change nothing anyone sees: the Panel hides the field, and the site
+     * goes by the condition (a price on a free event). Refused, naming the
+     * condition. The entry is its stored content with the draft's values on
+     * top; a field it does not store has its blueprint default. An emptied
+     * field passes.
+     *
+     * @param array<string, mixed> $stored the entry as stored, [] for a new one
+     * @param array<string, string> $values the draft's validated values
+     * @throws FudeError 422
+     */
+    private static function checkShown(array $collection, array $stored, array $values): void
+    {
+        foreach ($values as $name => $value) {
+            if ($value === '') {
+                continue;
+            }
+            foreach ($collection['fields'][$name]['shownWhen'] ?? [] as $other => $condition) {
+                $actual = $values[$other] ?? $stored[$other] ?? null;
+                $actual = $actual === null ? $condition['default'] : (is_bool($actual) ? ($actual ? 'true' : 'false') : (is_scalar($actual) ? (string) $actual : ''));
+                if ($actual === '' && $condition['toggle']) {
+                    $actual = 'false';
+                }
+                if ($actual === $condition['value']) {
+                    continue;
+                }
+                $params = ['field' => $collection['fields'][$name]['label'], 'other' => $condition['label'], 'value' => $condition['value']];
+                throw FudeError::t(isset($collection['fields'][$other]) ? 'fields.hidden' : 'fields.hiddenFixed', $params);
+            }
+        }
     }
 
     private static function checkHash(App $kirby, array $collection, array $record, ?Page $target): void

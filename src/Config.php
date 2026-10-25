@@ -556,6 +556,10 @@ final class Config
             if ($field['ask'] && is_array($condition)) {
                 $field['askWhen'] = $condition;
             }
+            $shown = self::shownWhen($blueprint, $definition);
+            if ($shown !== []) {
+                $field['shownWhen'] = $shown;
+            }
             if (is_int($definition['maxlength'] ?? null) && $definition['maxlength'] > 0) {
                 $field['maxlength'] = isset($field['maxlength']) ? min($field['maxlength'], $definition['maxlength']) : $definition['maxlength'];
             }
@@ -655,6 +659,36 @@ final class Config
             }
         }
         return $depends === [] ? true : $depends;
+    }
+
+    /**
+     * A blueprint field's `when`, for checking a draft against the entry it
+     * changes: per field the value it must have, the value an entry without
+     * one has (the blueprint default; a toggle without one is off), whether
+     * it is a toggle and its label. Empty when the field is always shown.
+     *
+     * @param array<string, array> $blueprint
+     * @return array<string, array{value: string, default: string, toggle: bool, label: string}>
+     */
+    private static function shownWhen(array $blueprint, array $definition): array
+    {
+        $when = $definition['when'] ?? null;
+        if (!is_array($when)) {
+            return [];
+        }
+        $shown = [];
+        foreach ($when as $other => $expected) {
+            $other = strtolower((string) $other);
+            $toggle = ($blueprint[$other]['type'] ?? null) === 'toggle';
+            $default = self::stored($blueprint[$other]['default'] ?? '');
+            $shown[$other] = [
+                'value'   => self::stored($expected),
+                'default' => $default === '' && $toggle ? 'false' : $default,
+                'toggle'  => $toggle,
+                'label'   => self::label($blueprint[$other] ?? []) ?? ucfirst($other),
+            ];
+        }
+        return $shown;
     }
 
     /** A blueprint value as the content stores it: toggles as "true"/"false". */

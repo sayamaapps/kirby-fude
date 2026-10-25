@@ -29,6 +29,7 @@ return [
     'collection.notFound' => 'Kein Eintrag mit {field} „{key}“.',
     'collection.ambiguous' => 'Mehrere Einträge mit {field} „{key}“ — diesen bitte im Panel ändern.',
     'collection.exists' => 'Es gibt schon einen Eintrag mit {field} „{key}“. Bitte Aktion „update“ verwenden.',
+    'collection.keyTaken' => 'Ein anderer Eintrag hat schon {field} „{key}“. Zwei Einträge ließen sich dann nicht mehr unterscheiden.',
     'collection.deleteKey' => 'Zum Löschen fehlt „key“: {field} des Eintrags, der gelöscht werden soll.',
     'collection.deleteFields' => 'Die Aktion „delete“ braucht nur den Schlüssel: keine Felder, kein Bild.',
     'collection.hasChildren' => 'Die Seite „{name}“ hat Unterseiten und kann hier nicht gelöscht werden.',
@@ -66,6 +67,8 @@ return [
     'fields.email' => 'Feld „{field}“ muss eine E-Mail-Adresse sein.',
     'fields.tel' => 'Feld „{field}“ muss eine Telefonnummer sein: Ziffern, Leerzeichen, +, -, / und Klammern, mindestens drei Ziffern.',
     'fields.blueprint' => 'Der Blueprint der Seite lehnt den Eintrag ab: {errors}',
+    'fields.hidden' => 'Feld „{field}“ gilt nur, wenn „{other}“ {value} ist. „{other}“ mitschicken oder das Feld weglassen.',
+    'fields.hiddenFixed' => 'Feld „{field}“ wirkt bei diesem Eintrag nicht: Es gilt nur, wenn „{other}“ {value} ist. „{other}“ bitte im Panel ändern.',
 
     'image.upload' => 'Der Bild-Upload ist fehlgeschlagen (Code {code}).',
     'image.size' => 'Das Bild ist größer als {max} MB.',
