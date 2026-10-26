@@ -1,8 +1,8 @@
 {
     "name": "sayamaapps/kirby-fude",
     "description": "Change declared Kirby site content by chat message: drafts, preview links, explicit publish.",
-    "type": "kirby-plugin",
     "license": "MIT",
+    "type": "kirby-plugin",
     "keywords": [
         "kirby",
         "kirby-plugin",
@@ -12,13 +12,13 @@
         "chat",
         "drafts"
     ],
-    "homepage": "https://github.com/sayamaapps/kirby-fude",
     "authors": [
         {
             "name": "Simon Räder",
             "homepage": "https://sayamaapps.de"
         }
     ],
+    "homepage": "https://github.com/sayamaapps/kirby-fude",
     "support": {
         "issues": "https://github.com/sayamaapps/kirby-fude/issues",
         "source": "https://github.com/sayamaapps/kirby-fude"
@@ -39,14 +39,6 @@
         "phpunit/phpunit": "11.5.55",
         "vimeo/psalm": "^6.20"
     },
-    "scripts": {
-        "analyze:phpmd": "vendor/bin/phpmd src,index.php github phpmd.xml.dist",
-        "analyze:psalm": "vendor/bin/psalm",
-        "analyze:require-checker": "vendor/bin/composer-require-checker check --config-file=composer-require-checker.json composer.json",
-        "analyze:unused": "vendor/bin/composer-unused",
-        "normalize:check": "@composer normalize --dry-run",
-        "test": "vendor/bin/phpunit"
-    },
     "config": {
         "allow-plugins": {
             "ergebnis/composer-normalize": true,
@@ -64,5 +56,13 @@
             "compatible": "^5.0"
         },
         "kirby-cms-path": false
+    },
+    "scripts": {
+        "analyze:phpmd": "vendor/bin/phpmd src,index.php github phpmd.xml.dist",
+        "analyze:psalm": "vendor/bin/psalm",
+        "analyze:require-checker": "vendor/bin/composer-require-checker check --config-file=composer-require-checker.json composer.json",
+        "analyze:unused": "vendor/bin/composer-unused",
+        "normalize:check": "@composer normalize --dry-run",
+        "test": "vendor/bin/phpunit"
     }
 }
