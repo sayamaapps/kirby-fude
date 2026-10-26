@@ -40,9 +40,9 @@ final class DiscardTest extends TestCase
 
 			// Discard of an expired draft still works (no lifetime check there).
 			[, $json] = fude_call($app, 'draft', ['collection' => 'team', 'fields' => ['name' => 'Alt']]);
-			$record = Fude\Drafts::read($app(), $json['draft']['id']);
+			$record = Sayamaapps\Fude\Drafts::read($app(), $json['draft']['id']);
 			$record['createdTs'] -= 100 * 3600;
-			Fude\Drafts::write($app(), $record);
+			Sayamaapps\Fude\Drafts::write($app(), $record);
 			same(200, fude_call($app, 'discard', ['id' => $json['draft']['id'], 'token' => $json['token']])[0], 'Expired draft can be discarded');
 			same(false, $app()->page('standort')->version('changes')->exists(), 'Changes removed');
 

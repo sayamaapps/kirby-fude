@@ -1,7 +1,7 @@
 <?php
 
-use Fude\Blueprints;
-use Fude\Config;
+use Sayamaapps\Fude\Blueprints;
+use Sayamaapps\Fude\Config;
 use Kirby\Form\Form;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -228,7 +228,7 @@ final class BlueprintsTest extends TestCase
 			[$code, $json] = $draft('oeffnung', 'update', ['von' => '09:00'], 'mo');
 			same(200, $code, 'Update by the select key', $json);
 			[$code, $pub] = $publish($json);
-			same(['mo', '09:00:00'], [Fude\Content::rows($app(), $c['oeffnung'])[0]['tag'], Fude\Content::rows($app(), $c['oeffnung'])[0]['von']], 'Updated row published by select key', $pub);
+			same(['mo', '09:00:00'], [Sayamaapps\Fude\Content::rows($app(), $c['oeffnung'])[0]['tag'], Sayamaapps\Fude\Content::rows($app(), $c['oeffnung'])[0]['von']], 'Updated row published by select key', $pub);
 
 			[$code, $json] = $draft('urlaub', 'create', ['von' => '2026-12-24', 'grund' => 'Heiligabend']);
 			same(200, $code, 'Date-keyed create', $json);
@@ -236,10 +236,10 @@ final class BlueprintsTest extends TestCase
 			[$code, $json] = $draft('urlaub', 'update', ['grund' => 'Weihnachten'], '2026-12-24');
 			same(200, $code, 'Update by the date key', $json);
 			same(200, $publish($json)[0], 'Publish the update');
-			same([['von' => '2026-12-24', 'grund' => 'Weihnachten']], array_map(fn ($r) => ['von' => $r['von'], 'grund' => $r['grund']], Fude\Content::rows($app(), $c['urlaub'])), 'Date-keyed row updated in place');
+			same([['von' => '2026-12-24', 'grund' => 'Weihnachten']], array_map(fn ($r) => ['von' => $r['von'], 'grund' => $r['grund']], Sayamaapps\Fude\Content::rows($app(), $c['urlaub'])), 'Date-keyed row updated in place');
 			[$code, $json] = $draft('urlaub', 'delete', [], '2026-12-24');
 			same(200, $code, 'Delete by the date key', $json);
-			same([200, []], [$publish($json)[0], Fude\Content::rows($app(), $c['urlaub'])], 'Row gone after publish');
+			same([200, []], [$publish($json)[0], Sayamaapps\Fude\Content::rows($app(), $c['urlaub'])], 'Row gone after publish');
 			[$code, $json] = $draft('urlaub', 'delete', [], '2026-12-24');
 			same(404, $code, 'Deleted date key is not found any more', $json);
 

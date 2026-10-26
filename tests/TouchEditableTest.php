@@ -183,7 +183,7 @@ final class TouchEditableTest extends TestCase
 			[$code, $json] = fude_call($app, 'draft', ['collection' => 'samstag', 'fields' => ['name' => 'Ben Neu'], 'touch' => '2026-10-09'], options: $woche);
 			same([200, '2026-10-09'], [$code, $datum('changes')], 'A date in the draft wins over the default', $json);
 			fude_call($app, 'discard', ['id' => $json['draft']['id'], 'token' => $json['token']], options: $woche);
-			same('saturday', Fude\Config::load($app(options: $woche))['samstag']['touch']['default'] ?? null, 'Config keeps the default day');
+			same('saturday', Sayamaapps\Fude\Config::load($app(options: $woche))['samstag']['touch']['default'] ?? null, 'Config keeps the default day');
 
 			// Declaration mistakes are loud.
 			$bad = function (string $touch, string $name) use ($tmp, $app): array {
@@ -207,7 +207,7 @@ final class TouchEditableTest extends TestCase
 			);
 
 			// The non-editable touch keeps its old shape (sites and packages compare it).
-			$config = Fude\Config::load($app(options: $options));
+			$config = Sayamaapps\Fude\Config::load($app(options: $options));
 			same(['field' => 'datum', 'value' => 'today'], $config['fixed']['touch'], 'Fixed touch unchanged');
 			same(
 				['field' => 'datum', 'value' => 'today', 'editable' => true, 'label' => 'Stand', 'description' => 'Bis einschließlich dieses Tages sichtbar.'],

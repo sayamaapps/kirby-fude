@@ -1,7 +1,7 @@
 <?php
 
-use Fude\FudeError;
-use Fude\Validator;
+use Sayamaapps\Fude\FudeError;
+use Sayamaapps\Fude\Validator;
 use Kirby\Text\KirbyTag;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;

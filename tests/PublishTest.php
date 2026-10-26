@@ -1,6 +1,6 @@
 <?php
 
-use Fude\Drafts;
+use Sayamaapps\Fude\Drafts;
 use Kirby\Data\Data;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;

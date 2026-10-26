@@ -1,6 +1,6 @@
 <?php
 
-namespace Fude;
+namespace Sayamaapps\Fude;
 
 use Kirby\Cms\App;
 use Kirby\Cms\Page;

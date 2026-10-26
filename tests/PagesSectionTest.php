@@ -1,7 +1,7 @@
 <?php
 
-use Fude\Blueprints;
-use Fude\Config;
+use Sayamaapps\Fude\Blueprints;
+use Sayamaapps\Fude\Config;
 use Kirby\Form\Form;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -234,7 +234,7 @@ final class PagesSectionTest extends TestCase
 				[$c['description'], $c['fields']['beginn']['description'], $c['fields']['hinweis']['description']],
 				'German texts'
 			);
-			Fude\I18n::setLanguage('en');
+			Sayamaapps\Fude\I18n::setLanguage('en');
 
 			// (f) Panel: the marked section and the child blueprint still load.
 			$kirby = $app();

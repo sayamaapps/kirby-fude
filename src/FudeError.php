@@ -1,6 +1,6 @@
 <?php
 
-namespace Fude;
+namespace Sayamaapps\Fude;
 
 /**
  * An error the caller can act on. The message is already translated

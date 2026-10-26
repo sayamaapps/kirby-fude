@@ -75,9 +75,9 @@ final class FileOwnershipTest extends TestCase
 
 			// A draft made before files were fingerprinted: kept, when in doubt.
 			[, $json] = fude_call($app, 'draft', ['collection' => 'news', 'fields' => ['title' => 'Alter Entwurf', 'text' => 'x']]);
-			$record = Fude\Drafts::read($app(), $json['draft']['id']);
+			$record = Sayamaapps\Fude\Drafts::read($app(), $json['draft']['id']);
 			unset($record['filesHash']);
-			Fude\Drafts::write($app(), $record);
+			Sayamaapps\Fude\Drafts::write($app(), $record);
 			[$code, $j] = fude_call($app, 'discard', ['id' => $json['draft']['id'], 'token' => $json['token']]);
 			same([200, true], [$code, $j['kept']], 'Record without filesHash: the page stays');
 

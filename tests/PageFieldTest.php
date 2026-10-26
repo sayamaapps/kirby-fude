@@ -1,6 +1,6 @@
 <?php
 
-use Fude\Config;
+use Sayamaapps\Fude\Config;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;

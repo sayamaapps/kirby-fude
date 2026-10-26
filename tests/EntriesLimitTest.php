@@ -27,7 +27,7 @@ final class EntriesLimitTest extends TestCase
                 ],
             ]]
             PHP);
-			$limit = Fude\Service::MAX_REPLACE_ENTRIES;
+			$limit = Sayamaapps\Fude\Service::MAX_REPLACE_ENTRIES;
 			same(100, $limit, 'Hard limit is 100');
 
 			// Over the hard limit, without any maxEntries — and the rows are invalid

@@ -12,17 +12,25 @@ A chat bot proposes a change, for example a new team member with a photo. Fude s
 - One log line per call: account, channel tag, route, outcome.
 - Own bot role without Panel access; HTTPS only; English and German replies.
 
-## Requirements
-
-- PHP 8.2–8.4 with `gd` (or ImageMagick) and `mbstring`; Kirby 5; a writable `storage` root (drafts and the log live in `<storage>/fude/`)
+Kirby 5 · PHP 8.2 to 8.5 · `gd` (or ImageMagick) and `mbstring` · a writable `storage` root (drafts and the log live in `<storage>/fude/`)
 
 ## Installation
+
+With Composer:
 
 ```sh
 composer require sayamaapps/kirby-fude
 ```
 
 Composer installs to `site/plugins/fude/`. Add that path to `.gitignore` and deploy it like `vendor/`.
+
+From a ZIP archive: unpack it to `site/plugins/fude/`.
+
+As a Git submodule: `git submodule add https://github.com/sayamaapps/kirby-fude.git site/plugins/fude`.
+
+## Requirements
+
+Kirby 5 is supported; PHP 8.2 to 8.5 is tested in CI.
 
 ## Usage
 
@@ -46,7 +54,7 @@ return [
 ];
 ```
 
-Enable Fude with `'fude.active' => true` in `site/config/config.php`, then create a Panel account with the role **Fude (bot)** and a long random password.
+Enable Fude with `'sayamaapps.fude.active' => true` in `site/config/config.php` (the older `'fude.active'` still works, see Deprecations), then create a Panel account with the role **Fude (bot)** and a long random password.
 
 ### Collections
 
@@ -101,9 +109,18 @@ Errors: 400 malformed request, 401 login, 403 HTTPS, role, token or publish perm
 
 ## Options
 
-All keys are read as `fude.<name>`, flat or nested. `null` counts as not set.
+Options are read as `sayamaapps.fude.<name>`, flat or nested. `null` counts as not set. The old spelling `fude.<name>` is still read when the new key is not set; it is deprecated and will be removed in 2.0.
 
-| Option | Default | Meaning |
+Example, `site/config/config.php`:
+
+```php
+return [
+    'sayamaapps.fude.active'   => true,
+    'sayamaapps.fude.language' => 'de',
+];
+```
+
+| Option (old spelling `fude.<name>`) | Default | Meaning |
 |---|---|---|
 | `active` | `false` | Master switch. Off: routes answer 404 and the role does not exist. |
 | `config` | `site/config/fude.php` | Declaration file, relative to the project root or absolute |
@@ -121,7 +138,7 @@ All keys are read as `fude.<name>`, flat or nested. `null` counts as not set.
 
 ## HTTPS
 
-Routes answer 403 unless the connection itself is TLS. Behind a TLS-terminating proxy, list it in `fude.trustedProxies` and have it send `X-Forwarded-Proto: https`; the header counts only from a listed address. Check a site with `curl -s -o /dev/null -w '%{http_code}\n' https://example.com/fude/schema`: 401 means the check passed; a 403 names the cause in `error`.
+Routes answer 403 unless the connection itself is TLS. Behind a TLS-terminating proxy, list it in `sayamaapps.fude.trustedProxies` (old: `fude.trustedProxies`) and have it send `X-Forwarded-Proto: https`; the header counts only from a listed address. Check a site with `curl -s -o /dev/null -w '%{http_code}\n' https://example.com/fude/schema`: 401 means the check passed; a 403 names the cause in `error`.
 
 ## What happens on the page
 
@@ -136,6 +153,19 @@ Fude processes no visitor data and stores no IP addresses, user agents or full-s
 - Proposed content as a `changes` version or draft page, until published or discarded.
 - Draft records in `storage/fude/drafts/` (field values, account, channel tag), deleted on publish or discard.
 - A log in `storage/fude/log.jsonl`: who, when, route, collection, action, key, outcome. No field values, no images; it restarts at 4 MB.
+
+## Deprecations
+
+Deprecated since this release, removed in 2.0:
+
+| Old | New |
+|---|---|
+| `fude.<name>` options | `sayamaapps.fude.<name>` (the old key still works) |
+| `fude_option()` | `Sayamaapps\Fude\Options::get()` |
+| `fude_not_found()` | `Sayamaapps\Fude\Service::notFound()` |
+| classes in namespace `Fude\` | the same classes in `Sayamaapps\Fude\` (aliases in `legacy.php`) |
+
+The deprecated names print a deprecation notice when Kirby runs in debug mode. Routes, the role `fude`, blueprint markers, the JSON format and the storage paths are unchanged.
 
 Tests: `composer test`. Issues and pull requests are welcome, without a support promise. Report security problems privately through GitHub's vulnerability reporting. Changes: [CHANGELOG.md](CHANGELOG.md).
 

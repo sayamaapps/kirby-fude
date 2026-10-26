@@ -52,14 +52,14 @@ final class ConfigTest extends TestCase
 			[$code, $error] = $with($team("'name' => 'text', 'rolle' => ['type' => 'text', 'maxlength' => 10]"));
 			same([200, null], [$code, $error], 'Minimal declaration');
 			$kirby = $app(options: ['fude.config' => 'site/config/fude-' . $configs . '.php']);
-			$c = Fude\Config::load($kirby);
+			$c = Sayamaapps\Fude\Config::load($kirby);
 			same(['name', ['create', 'update'], ['fude'], 'Team', 10, true], [$c['team']['key'], $c['team']['actions'], $c['team']['publishRoles'], $c['team']['label'], $c['team']['fields']['rolle']['maxlength'], $c['team']['fields']['name']['required']], 'Defaults and the blueprint required flag');
 			// Absolute config path.
 			[$code] = fude_call($app, 'schema', options: ['fude.config' => $tmp . '/site/config/fude.php']);
 			same(200, $code, 'Absolute path');
 			// The key field is required even when the declaration does not say so.
 			file_put_contents($tmp . '/site/config/fude-key.php', "<?php\nreturn ['collections' => ['team' => ['kind' => 'structure', 'page' => 'standort', 'field' => 'team', 'key' => 'rolle', 'fields' => ['name' => 'text', 'rolle' => 'text']]]];\n");
-			$c = Fude\Config::load($app(options: ['fude.config' => 'site/config/fude-key.php']));
+			$c = Sayamaapps\Fude\Config::load($app(options: ['fude.config' => 'site/config/fude-key.php']));
 			same([true, 'rolle'], [$c['team']['fields']['rolle']['required'], $c['team']['key']], 'Key field forced to required');
 			// German locale: the config error itself is translated, the reason not.
 			$file = 'site/config/fude-de.php';

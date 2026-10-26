@@ -1,6 +1,6 @@
 <?php
 
-namespace Fude;
+namespace Sayamaapps\Fude;
 
 use DateTimeImmutable;
 use Kirby\Cms\App;
@@ -1073,10 +1073,25 @@ final class Service
 		];
 	}
 
+	/** Kirby's real 404: no format of its own that would reveal the module. */
+	public static function notFound(): Response
+	{
+		// Without content/error/, errorPage() returns null; then an empty 404 instead of a 500.
+		$page = App::instance()->site()->errorPage();
+
+		return new Response($page?->render() ?? '', 'text/html', 404);
+	}
+
+	/** The route entry point: one request, with the current time in Europe/Berlin. */
+	public static function respondNow(string $route): Response
+	{
+		return self::respond(App::instance(), new DateTimeImmutable('now', new \DateTimeZone('Europe/Berlin')), $route);
+	}
+
 	public static function respond(App $kirby, DateTimeImmutable $now, string $route): Response
 	{
 		if (Options::get($kirby, 'active', false) !== true || !in_array($route, self::ROUTES, true)) {
-			return fude_not_found();
+			return self::notFound();
 		}
 		I18n::setLanguage(Options::language($kirby));
 		$entry = ['route' => $route, 'user' => null, 'actor' => null];

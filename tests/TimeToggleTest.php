@@ -1,8 +1,8 @@
 <?php
 
-use Fude\Config;
-use Fude\FudeError;
-use Fude\Validator;
+use Sayamaapps\Fude\Config;
+use Sayamaapps\Fude\FudeError;
+use Sayamaapps\Fude\Validator;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
@@ -123,7 +123,7 @@ final class TimeToggleTest extends TestCase
 			[$code, $json] = fude_call($app, 'draft', ['collection' => 'termine', 'action' => 'update', 'key' => 'Sprechstunde', 'fields' => ['aktiv' => 'TRUE']], options: $options);
 			same(200, $code, 'Row update', $json);
 			fude_call($app, 'publish', ['id' => $json['draft']['id'], 'token' => $json['token']], options: $options);
-			$rows = Fude\Content::rows($app(), $c['termine']);
+			$rows = Sayamaapps\Fude\Content::rows($app(), $c['termine']);
 			same(
 				[['name' => 'Sprechstunde', 'zeit' => '14:00:00', 'aktiv' => 'true']],
 				array_map(fn ($r) => ['name' => $r['name'], 'zeit' => $r['zeit'], 'aktiv' => $r['aktiv']], $rows),
