@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<ruleset name="Noren"
+	xmlns="http://pmd.sf.net/ruleset/1.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://pmd.sf.net/ruleset/1.0.0 http://pmd.sf.net/ruleset_xml_schema.xsd"
+	xsi:noNamespaceSchemaLocation="http://pmd.sf.net/ruleset_xml_schema.xsd">
+	<description>PHP Mess Detector rules for Noren (TST-10). Every exclusion and raised threshold has its reason here.</description>
+
+	<rule ref="rulesets/cleancode.xml">
+		<!-- The helper classes (Options, I18n, Log, Holidays) are static by design, as in Kirby's own code. -->
+		<exclude name="StaticAccess" />
+		<!-- Public flags such as withNote, merge and withYear are part of the public API (VER-3). -->
+		<exclude name="BooleanArgumentFlag" />
+		<!-- The assignment in a condition keeps the status cascade in reading order. -->
+		<exclude name="IfStatementAssignment" />
+		<!-- Early returns are not enforced; some guards read better with else. -->
+		<exclude name="ElseExpression" />
+	</rule>
+
+	<!-- codesize: NPathComplexity is not used, the cyclomatic complexity below covers the same branching.
+	     ExcessiveClassComplexity is not used: the domain classes are large by design; splitting them is a follow-up. -->
+	<rule ref="rulesets/codesize.xml/CyclomaticComplexity">
+		<!-- Open: Holidays::ids() (29), Schedule::status() (30), fromFields() (24) branch on purpose. Default 10 after the follow-up. -->
+		<properties>
+			<property name="reportLevel" value="31" />
+		</properties>
+	</rule>
+	<rule ref="rulesets/codesize.xml/ExcessiveMethodLength">
+		<!-- Open: Schedule::status() has 131 lines. Splitting it is a follow-up. -->
+		<properties>
+			<property name="minimum" value="140" />
+		</properties>
+	</rule>
+	<rule ref="rulesets/codesize.xml/ExcessiveParameterList" />
+
+	<rule ref="rulesets/design.xml">
+		<!-- Schedule, Locations and Options are the public domain classes; splitting them changes the API (VER-3). -->
+		<exclude name="TooManyPublicMethods" />
+		<exclude name="TooManyMethods" />
+		<exclude name="CouplingBetweenObjects" />
+	</rule>
+
+	<rule ref="rulesets/naming.xml">
+		<!-- Short names are the formulas of the Easter algorithm (Meeus/Jones/Butcher) and array keys in tables. -->
+		<exclude name="ShortVariable" />
+		<!-- I18n::t() is the translation shorthand used in snippets and tests. -->
+		<exclude name="ShortMethodName" />
+	</rule>
+
+	<rule ref="rulesets/unusedcode.xml" />
+</ruleset>

@@ -1,13 +1,12 @@
 name: CI
 
 on:
-  # Feature-Branches prüft der PR, main nach dem Merge. Reine Doku-Änderungen
-  # laufen mit.
+  # Feature branches are checked by their pull request, main after the merge.
   push:
     branches: [main]
   pull_request:
 
-# Ein neuer Push auf denselben PR bricht den veralteten Lauf ab.
+# A new push to the same pull request cancels the outdated run.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -17,13 +16,16 @@ permissions:
 
 jobs:
   tests:
-    name: PHP ${{ matrix.php }}
+    name: PHP ${{ matrix.php }}, ${{ matrix.deps }}
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     strategy:
       fail-fast: false
       matrix:
-        php: ['8.2', '8.3', '8.4']
+        php: ['8.2', '8.3', '8.4', '8.5']
+        # lowest: the oldest Kirby 5 and the oldest dependencies allowed by composer.json.
+        # highest: the newest versions. composer.lock is not committed (see .gitignore).
+        deps: [lowest, highest]
     steps:
       - uses: actions/checkout@v4
 
@@ -33,8 +35,103 @@ jobs:
           extensions: gd, mbstring
           coverage: none
 
-      - name: Install dev dependencies (Kirby as fixture)
+      - name: Install dependencies, lowest versions
+        if: matrix.deps == 'lowest'
+        run: composer update --no-interaction --no-progress --prefer-dist --prefer-lowest --prefer-stable
+
+      - name: Install dependencies, highest versions
+        if: matrix.deps == 'highest'
         run: composer install --no-interaction --no-progress --prefer-dist
 
+      - name: Tests (Kirby as fixture)
+        run: vendor/bin/phpunit
+
+  analysis:
+    name: Analysis, PHP 8.4
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # PHP Mess Detector 2.x prints deprecation lines on PHP 8.5 and would
+      # mix them into its report, so this job stays on 8.4.
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: gd, mbstring
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Composer validate
+        run: composer validate --strict --no-check-version --no-check-all
+
+      - name: Composer normalize
+        run: composer normalize:check
+
+      - name: Undeclared dependencies
+        run: composer analyze:require-checker
+
+      - name: Unused dependencies
+        run: composer analyze:unused
+
+      - name: Psalm
+        run: composer analyze:psalm
+
+      - name: PHP Mess Detector
+        run: composer analyze:phpmd
+
+  style:
+    name: Code style, PHP 8.4
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # getkirby/php-cs needs PHP 8.3 or newer, so it is installed globally and
+      # not as a dependency: the package itself supports PHP 8.2.
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - name: Install php-cs
+        run: |
+          composer global require --no-interaction getkirby/php-cs:0.2.1
+          echo "$(composer global config home)/vendor/bin" >> "$GITHUB_PATH"
+
+      - name: Check code style
+        run: kirby-cs fix --dry-run --diff
+
+  # Kirby 6 is a pre-release. This job runs the same tests against it so the
+  # next major shows up early. Failing tests show up as a warning and never
+  # fail the workflow, so main keeps its green check. Kirby 6 is required only
+  # inside the job: composer.json stays on Kirby 5.
+  kirby-6:
+    name: Kirby 6 pre-release, PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # Kirby 6 supports PHP 8.3 to 8.5.
+        php: ['8.3', '8.4', '8.5']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: gd, mbstring
+          coverage: none
+
+      # platform.php resolves the dependencies for PHP 8.2, which Kirby 6 no
+      # longer supports. ^6.0@beta installs the newest Kirby 6 release: a beta
+      # or release candidate until the stable version is out.
+      - name: Install dev dependencies with Kirby 6
+        run: |
+          composer config --unset platform.php
+          composer require --dev 'getkirby/cms:^6.0@beta' --with-all-dependencies --no-interaction --no-progress --prefer-dist
+
       - name: Tests
-        run: sh tests/run.sh
+        run: vendor/bin/phpunit || echo "::warning title=Kirby 6::Tests fail against the Kirby 6 pre-release, see the log"
