@@ -16,29 +16,29 @@ use Kirby\Cms\App;
  */
 final class Log
 {
-    public const FILE = 'log.jsonl';
-    private const MAX_BYTES = 4 * 1024 * 1024;
+	public const FILE = 'log.jsonl';
+	private const MAX_BYTES = 4 * 1024 * 1024;
 
-    public static function file(App $kirby): string
-    {
-        return Options::directory($kirby) . '/' . self::FILE;
-    }
+	public static function file(App $kirby): string
+	{
+		return Options::directory($kirby) . '/' . self::FILE;
+	}
 
-    public static function write(App $kirby, array $entry, \DateTimeImmutable $now): void
-    {
-        try {
-            $dir = Options::directory($kirby);
-            if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
-                throw new \RuntimeException('Cannot create ' . $dir);
-            }
-            $file = self::file($kirby);
-            $mode = is_file($file) && filesize($file) > self::MAX_BYTES ? 0 : FILE_APPEND;
-            $line = json_encode(['at' => $now->format(DATE_ATOM)] + $entry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            if ($line === false || @file_put_contents($file, $line . "\n", $mode | LOCK_EX) === false) {
-                throw new \RuntimeException('Cannot write ' . $file);
-            }
-        } catch (\Throwable $e) {
-            error_log('Fude: log not written: ' . $e->getMessage());
-        }
-    }
+	public static function write(App $kirby, array $entry, \DateTimeImmutable $now): void
+	{
+		try {
+			$dir = Options::directory($kirby);
+			if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
+				throw new \RuntimeException('Cannot create ' . $dir);
+			}
+			$file = self::file($kirby);
+			$mode = is_file($file) && filesize($file) > self::MAX_BYTES ? 0 : FILE_APPEND;
+			$line = json_encode(['at' => $now->format(DATE_ATOM)] + $entry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+			if ($line === false || @file_put_contents($file, $line . "\n", $mode | LOCK_EX) === false) {
+				throw new \RuntimeException('Cannot write ' . $file);
+			}
+		} catch (\Throwable $e) {
+			error_log('Fude: log not written: ' . $e->getMessage());
+		}
+	}
 }

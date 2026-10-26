@@ -48,14 +48,14 @@ const RD_TERMIN = <<<'YML'
 #[RunTestsInSeparateProcesses]
 final class RequiredDefaultTest extends TestCase
 {
-    public function testBehaviour(): void
-    {
-        [$tmp, $app] = fude_fixture();
-        try {
-            mkdir($tmp . '/content/termine', 0700, true);
-            file_put_contents($tmp . '/content/termine/termine.txt', "Title: Termine\n");
-            file_put_contents($tmp . '/site/blueprints/pages/termin.yml', RD_TERMIN);
-            $declaration = <<<'PHP'
+	public function testBehaviour(): void
+	{
+		[$tmp, $app] = fude_fixture();
+		try {
+			mkdir($tmp . '/content/termine', 0700, true);
+			file_put_contents($tmp . '/content/termine/termine.txt', "Title: Termine\n");
+			file_put_contents($tmp . '/site/blueprints/pages/termin.yml', RD_TERMIN);
+			$declaration = <<<'PHP'
             ['collections' => [
                 'termine' => ['kind' => 'pages', 'parent' => 'termine', 'template' => 'termin', 'key' => 'title',
                     'fields' => ['title' => 'text', 'zustand' => 'select', 'kapazitaet' => 'number']],
@@ -63,36 +63,36 @@ final class RequiredDefaultTest extends TestCase
                     'fields' => ['title' => 'text', 'zustand' => ['type' => 'select', 'required' => true]]],
             ]]
             PHP;
-            $opt = fude_declare($tmp, 'rd', $declaration) + ['fude.blueprints' => false];
+			$opt = fude_declare($tmp, 'rd', $declaration) + ['fude.blueprints' => false];
 
-            [$code, $json] = fude_call($app, 'schema', options: $opt);
-            same(200, $code, 'Schema');
-            same([false, true, true], [
-                $json['collections']['termine']['fields']['zustand']['required'] ?? null,
-                $json['collections']['termine']['fields']['kapazitaet']['required'] ?? null,
-                $json['collections']['streng']['fields']['zustand']['required'] ?? null,
-            ], 'Required with a default: not required; without a default or declared required: required');
+			[$code, $json] = fude_call($app, 'schema', options: $opt);
+			same(200, $code, 'Schema');
+			same([false, true, true], [
+				$json['collections']['termine']['fields']['zustand']['required'] ?? null,
+				$json['collections']['termine']['fields']['kapazitaet']['required'] ?? null,
+				$json['collections']['streng']['fields']['zustand']['required'] ?? null,
+			], 'Required with a default: not required; without a default or declared required: required');
 
-            [$code, $json] = fude_call($app, 'draft', ['collection' => 'termine', 'fields' => ['title' => 'Herbstkurs', 'kapazitaet' => '8']], options: $opt);
-            same(200, $code, 'Create without the defaulted field');
-            same('geplant', $app()->page($json['draft']['page'])->zustand()->value(), 'Kirby filled the default');
-            same(200, fude_call($app, 'publish', ['id' => $json['draft']['id'], 'token' => $json['token']], options: $opt)[0], 'Published');
+			[$code, $json] = fude_call($app, 'draft', ['collection' => 'termine', 'fields' => ['title' => 'Herbstkurs', 'kapazitaet' => '8']], options: $opt);
+			same(200, $code, 'Create without the defaulted field');
+			same('geplant', $app()->page($json['draft']['page'])->zustand()->value(), 'Kirby filled the default');
+			same(200, fude_call($app, 'publish', ['id' => $json['draft']['id'], 'token' => $json['token']], options: $opt)[0], 'Published');
 
-            [$code, $json] = fude_call($app, 'draft', ['collection' => 'termine', 'fields' => ['title' => 'Winterkurs']], options: $opt);
-            same([422, 'Field "kapazitaet" is required.'], [$code, $json['error'] ?? null], 'Required without a default stays required');
-            [$code, $json] = fude_call($app, 'draft', ['collection' => 'streng', 'fields' => ['title' => 'Winterkurs']], options: $opt);
-            same([422, 'Field "zustand" is required.'], [$code, $json['error'] ?? null], 'Declared required stays required');
-            [$code, $json] = fude_call($app, 'draft', ['collection' => 'termine', 'action' => 'update', 'key' => 'Herbstkurs', 'fields' => ['zustand' => '']], options: $opt);
-            same(422, $code, 'Emptying it on an existing page: the blueprint refuses');
-            ok(str_contains($json['error'] ?? '', 'Zustand'), 'The blueprint names the field', $json['error'] ?? null);
+			[$code, $json] = fude_call($app, 'draft', ['collection' => 'termine', 'fields' => ['title' => 'Winterkurs']], options: $opt);
+			same([422, 'Field "kapazitaet" is required.'], [$code, $json['error'] ?? null], 'Required without a default stays required');
+			[$code, $json] = fude_call($app, 'draft', ['collection' => 'streng', 'fields' => ['title' => 'Winterkurs']], options: $opt);
+			same([422, 'Field "zustand" is required.'], [$code, $json['error'] ?? null], 'Declared required stays required');
+			[$code, $json] = fude_call($app, 'draft', ['collection' => 'termine', 'action' => 'update', 'key' => 'Herbstkurs', 'fields' => ['zustand' => '']], options: $opt);
+			same(422, $code, 'Emptying it on an existing page: the blueprint refuses');
+			ok(str_contains($json['error'] ?? '', 'Zustand'), 'The blueprint names the field', $json['error'] ?? null);
 
-            $kirby = $app();
-            $kirby->impersonate('kirby');
-            $slug = $kirby->page('termine')->children()->first()->id();
-            $structure = fude_declare($tmp, 'rds', "['collections' => ['zeiten' => ['kind' => 'structure', 'page' => '$slug', 'field' => 'zeiten', 'key' => 'tag', 'fields' => ['tag' => 'text', 'zustand' => 'select']]]]") + ['fude.blueprints' => false];
-            same(true, fude_call($app, 'schema', options: $structure)[1]['collections']['zeiten']['fields']['zustand']['required'] ?? null, 'Structure rows get no defaults: still required');
-        } finally {
-            cleanup($tmp);
-        }
-    }
+			$kirby = $app();
+			$kirby->impersonate('kirby');
+			$slug = $kirby->page('termine')->children()->first()->id();
+			$structure = fude_declare($tmp, 'rds', "['collections' => ['zeiten' => ['kind' => 'structure', 'page' => '$slug', 'field' => 'zeiten', 'key' => 'tag', 'fields' => ['tag' => 'text', 'zustand' => 'select']]]]") + ['fude.blueprints' => false];
+			same(true, fude_call($app, 'schema', options: $structure)[1]['collections']['zeiten']['fields']['zustand']['required'] ?? null, 'Structure rows get no defaults: still required');
+		} finally {
+			cleanup($tmp);
+		}
+	}
 }

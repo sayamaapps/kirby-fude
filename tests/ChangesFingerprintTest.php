@@ -14,31 +14,31 @@ use PHPUnit\Framework\TestCase;
 #[RunTestsInSeparateProcesses]
 final class ChangesFingerprintTest extends TestCase
 {
-    public function testBehaviour(): void
-    {
-        [$tmp, $app] = fude_fixture();
-        try {
-            [$code, $json] = fude_call($app, 'draft', ['collection' => 'team', 'fields' => ['name' => 'Anna Neu', 'rolle' => 'MFA']]);
-            same(200, $code, 'Structure draft', $json);
-            $draft = ['id' => $json['draft']['id'], 'token' => $json['token']];
+	public function testBehaviour(): void
+	{
+		[$tmp, $app] = fude_fixture();
+		try {
+			[$code, $json] = fude_call($app, 'draft', ['collection' => 'team', 'fields' => ['name' => 'Anna Neu', 'rolle' => 'MFA']]);
+			same(200, $code, 'Structure draft', $json);
+			$draft = ['id' => $json['draft']['id'], 'token' => $json['token']];
 
-            // Somebody edits the introduction in the Panel, without publishing.
-            $kirby = $app();
-            $kirby->impersonate('kirby');
-            $changes = $kirby->page('standort')->version('changes');
-            $content = $changes->read();
-            $content['einleitung'] = 'Vom Panel geaendert.';
-            $changes->save($content);
+			// Somebody edits the introduction in the Panel, without publishing.
+			$kirby = $app();
+			$kirby->impersonate('kirby');
+			$changes = $kirby->page('standort')->version('changes');
+			$content = $changes->read();
+			$content['einleitung'] = 'Vom Panel geaendert.';
+			$changes->save($content);
 
-            [$code, $j] = fude_call($app, 'publish', $draft);
-            same([409, 'The draft was changed in the Panel meanwhile. Publish it there, or discard it and start again.'], [$code, $j['error'] ?? null], 'Panel edit of another field blocks publish', $j);
-            same(['latest' => 'Unser Haus in Musterstadt.'], ['latest' => $app()->page('standort')->version('latest')->read()['einleitung']], 'Published introduction untouched');
+			[$code, $j] = fude_call($app, 'publish', $draft);
+			same([409, 'The draft was changed in the Panel meanwhile. Publish it there, or discard it and start again.'], [$code, $j['error'] ?? null], 'Panel edit of another field blocks publish', $j);
+			same(['latest' => 'Unser Haus in Musterstadt.'], ['latest' => $app()->page('standort')->version('latest')->read()['einleitung']], 'Published introduction untouched');
 
-            [$code, $j] = fude_call($app, 'discard', $draft);
-            same([200, true], [$code, $j['kept'] ?? null], 'Discard keeps the Panel version', $j);
-            same('Vom Panel geaendert.', $app()->page('standort')->version('changes')->read()['einleitung'], 'Panel introduction still in the changes version');
-        } finally {
-            cleanup($tmp);
-        }
-    }
+			[$code, $j] = fude_call($app, 'discard', $draft);
+			same([200, true], [$code, $j['kept'] ?? null], 'Discard keeps the Panel version', $j);
+			same('Vom Panel geaendert.', $app()->page('standort')->version('changes')->read()['einleitung'], 'Panel introduction still in the changes version');
+		} finally {
+			cleanup($tmp);
+		}
+	}
 }

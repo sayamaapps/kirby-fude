@@ -37,52 +37,52 @@ use Fude\Service;
 /** Reads `fude.<key>`. */
 function fude_option(string $key, mixed $default = null): mixed
 {
-    return Options::get(App::instance(), $key, $default);
+	return Options::get(App::instance(), $key, $default);
 }
 
 /** Kirby's real 404 — no format of its own that would reveal the module. */
 function fude_not_found(): Response
 {
-    // Without content/error/, errorPage() returns null; then an empty 404 instead of a 500.
-    $page = App::instance()->site()->errorPage();
-    return new Response($page?->render() ?? '', 'text/html', 404);
+	// Without content/error/, errorPage() returns null; then an empty 404 instead of a 500.
+	$page = App::instance()->site()->errorPage();
+	return new Response($page?->render() ?? '', 'text/html', 404);
 }
 
 $fudeTranslations = [];
 foreach (I18n::LANGUAGES as $fudeLanguage) {
-    foreach (I18n::table($fudeLanguage) as $fudeKey => $fudeText) {
-        $fudeTranslations[$fudeLanguage]['fude.' . $fudeKey] = $fudeText;
-    }
+	foreach (I18n::table($fudeLanguage) as $fudeKey => $fudeText) {
+		$fudeTranslations[$fudeLanguage]['fude.' . $fudeKey] = $fudeText;
+	}
 }
 unset($fudeLanguage, $fudeKey, $fudeText);
 
 App::plugin('sayamaapps/fude', [
-    /**
-     * The role of the bot account — only with the module switched on,
-     * otherwise it would appear in every site's Panel role selection.
-     *
-     * option() already works here (optionsFromConfig() runs before
-     * extensionsFromPlugins()). Kirby loads this file only ONCE per PHP
-     * process, though: several App instances in one test see the role as
-     * the first one created it. On a server that is one request.
-     */
-    'blueprints' => fude_option('active', false) === true
-        ? ['users/' . Service::ROLE => __DIR__ . '/blueprints/fude.yml']
-        : [],
+	/**
+	 * The role of the bot account — only with the module switched on,
+	 * otherwise it would appear in every site's Panel role selection.
+	 *
+	 * option() already works here (optionsFromConfig() runs before
+	 * extensionsFromPlugins()). Kirby loads this file only ONCE per PHP
+	 * process, though: several App instances in one test see the role as
+	 * the first one created it. On a server that is one request.
+	 */
+	'blueprints' => fude_option('active', false) === true
+		? ['users/' . Service::ROLE => __DIR__ . '/blueprints/fude.yml']
+		: [],
 
-    // The reply strings, also usable as t('fude.<key>').
-    'translations' => $fudeTranslations,
+	// The reply strings, also usable as t('fude.<key>').
+	'translations' => $fudeTranslations,
 
-    'routes' => function () {
-        $now = fn () => new \DateTimeImmutable('now', new \DateTimeZone('Europe/Berlin'));
-        return [
-            ['pattern' => 'fude/schema',  'method' => 'GET',  'action' => fn () => Service::respond(App::instance(), $now(), 'schema')],
-            ['pattern' => 'fude/draft',   'method' => 'POST', 'action' => fn () => Service::respond(App::instance(), $now(), 'draft')],
-            ['pattern' => 'fude/publish', 'method' => 'POST', 'action' => fn () => Service::respond(App::instance(), $now(), 'publish')],
-            ['pattern' => 'fude/discard', 'method' => 'POST', 'action' => fn () => Service::respond(App::instance(), $now(), 'discard')],
-            // Anything else under /fude/, and GET on the POST routes: the real 404.
-            ['pattern' => 'fude/(:all?)', 'method' => 'ALL', 'action' => fn () => fude_not_found()],
-        ];
-    },
+	'routes' => function () {
+		$now = fn () => new \DateTimeImmutable('now', new \DateTimeZone('Europe/Berlin'));
+		return [
+			['pattern' => 'fude/schema',  'method' => 'GET',  'action' => fn () => Service::respond(App::instance(), $now(), 'schema')],
+			['pattern' => 'fude/draft',   'method' => 'POST', 'action' => fn () => Service::respond(App::instance(), $now(), 'draft')],
+			['pattern' => 'fude/publish', 'method' => 'POST', 'action' => fn () => Service::respond(App::instance(), $now(), 'publish')],
+			['pattern' => 'fude/discard', 'method' => 'POST', 'action' => fn () => Service::respond(App::instance(), $now(), 'discard')],
+			// Anything else under /fude/, and GET on the POST routes: the real 404.
+			['pattern' => 'fude/(:all?)', 'method' => 'ALL', 'action' => fn () => fude_not_found()],
+		];
+	},
 ]);
 unset($fudeTranslations);
