@@ -1,12 +1,17 @@
 <?php
+
+use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use PHPUnit\Framework\TestCase;
+
 /**
  * Markers that cannot be honoured are loud: a site field marker, an unsupported
  * type, files on a page, a name collision, an unknown option, a touch field
  * the page does not have, too many collections, and a marked section that
- * is no plain pages section of one template. Kirby caches blueprints once per PHP process, so every case
- * runs in a child process of its own (this file, with the case name as argument).
+ * is no plain pages section of one template. Kirby caches blueprints once per
+ * PHP process, so every case runs in a process of its own (RunTestsInSeparateProcesses).
  */
-require __DIR__ . '/support.php';
 
 const CASES = [
     'site' => [
@@ -104,31 +109,35 @@ const CASES = [
     ],
 ];
 
-/** Child process: one case, prints the error (or 200) of a schema call. */
-if (isset($argv[1])) {
-    $case = CASES[$argv[1]];
-    [$tmp, $app] = fude_fixture();
-    file_put_contents($tmp . '/site/blueprints/pages/standort.yml', "title: Standort\nfields: {}\n");
-    foreach ($case['files'] as $path => $yaml) {
-        file_put_contents($tmp . '/site/blueprints/' . $path, $yaml);
+/**
+ * Markers that cannot be honoured are loud: a site field marker, an unsupported
+ * type, files on a page, a name collision, an unknown option, a touch field
+ * the page does not have, too many collections, and a marked section that
+ * is no plain pages section of one template. Kirby caches blueprints once per PHP process, so every case
+ * runs in a child process of its own (this file, with the case name as argument).
+ */
+#[CoversNothing]
+#[RunTestsInSeparateProcesses]
+final class BlueprintsErrorsTest extends TestCase
+{
+    /** @return array<string, array{0: string}> */
+    public static function cases(): array
+    {
+        return array_map(fn (string $name): array => [$name], array_keys(CASES));
     }
-    $options = fude_declare($tmp, 'none', "['collections' => []]");
-    [$code, $json] = fude_call($app, 'schema', options: $case['options'] + $options);
-    echo json_encode([$code, $json['error'] ?? null], JSON_UNESCAPED_UNICODE);
-    cleanup($tmp);
-    exit(0);
-}
 
-$failed = false;
-try {
-    foreach (CASES as $name => $case) {
-        $out = shell_exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__) . ' ' . escapeshellarg($name) . ' 2>&1');
-        same(json_encode([500, $case['error']], JSON_UNESCAPED_UNICODE), trim((string) $out), 'Error case ' . $name);
+    #[DataProvider('cases')]
+    public function testErrorCase(string $name): void
+    {
+        $case = CASES[$name];
+        [$tmp, $app] = fude_fixture();
+        file_put_contents($tmp . '/site/blueprints/pages/standort.yml', "title: Standort\nfields: {}\n");
+        foreach ($case['files'] as $path => $yaml) {
+            file_put_contents($tmp . '/site/blueprints/' . $path, $yaml);
+        }
+        $options = fude_declare($tmp, 'none', "['collections' => []]");
+        [$code, $json] = fude_call($app, 'schema', options: $case['options'] + $options);
+        cleanup($tmp);
+        same([500, $case['error']], [$code, $json['error'] ?? null], 'Error case ' . $name);
     }
-} catch (Throwable $e) {
-    fwrite(STDERR, 'BlueprintsErrors: ' . $e->getMessage() . "\n");
-    $failed = true;
 }
-global $n;
-echo "BlueprintsErrors: $n checks\n";
-exit($failed ? 1 : 0);

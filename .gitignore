@@ -2,3 +2,4 @@
 /kirby/
 /composer.lock
 .DS_Store
+/.phpunit.cache

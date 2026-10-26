@@ -3,7 +3,15 @@
     "description": "Change declared Kirby site content by chat message: drafts, preview links, explicit publish.",
     "type": "kirby-plugin",
     "license": "MIT",
-    "keywords": ["kirby", "kirby-plugin", "kirby-5", "content", "bot", "chat", "drafts"],
+    "keywords": [
+        "kirby",
+        "kirby-plugin",
+        "kirby-5",
+        "content",
+        "bot",
+        "chat",
+        "drafts"
+    ],
     "homepage": "https://github.com/sayamaapps/kirby-fude",
     "authors": [
         {
@@ -20,10 +28,11 @@
         "getkirby/composer-installer": "^1.2"
     },
     "require-dev": {
-        "getkirby/cms": "^5.0"
+        "getkirby/cms": "^5.0",
+        "phpunit/phpunit": "11.5.55"
     },
     "scripts": {
-        "test": "sh tests/run.sh"
+        "test": "vendor/bin/phpunit"
     },
     "config": {
         "optimize-autoloader": true,

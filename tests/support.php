@@ -5,77 +5,58 @@
  * page) and one pages collection (notes under a parent), the plugin
  * symlinked into site/plugins/, a bot account and an admin account.
  *
- * Every test file is a standalone script (exit code 0 = pass): it includes
- * this file, builds the fixture, runs its checks with same()/throws() and
- * cleans up. Kirby loads index.php only once per process, so the FIRST app
- * of a process decides whether the role `fude` exists — the fixture always
- * builds it with fude.active on.
+ * Loaded by tests/bootstrap.php. Kirby loads index.php only once per
+ * process, so the FIRST app of a process decides whether the role `fude`
+ * exists — the fixture always builds it with fude.active on.
  */
 
 use Fude\I18n;
 use Fude\Service;
+use Kirby\Filesystem\Dir;
+use PHPUnit\Framework\Assert;
 
 $base = dirname(__DIR__);
-if (!is_file($base . '/vendor/autoload.php')) {
-    fwrite(STDERR, "Composer dependencies missing; run composer install first\n");
-    exit(1);
-}
-require $base . '/vendor/autoload.php';
 
 // Kirby logs failed logins via error_log (auth.debug); keep that out of the
 // test output and make it checkable.
 $GLOBALS['fudeLogFile'] = sys_get_temp_dir() . '/fude-test-log-' . bin2hex(random_bytes(6)) . '.txt';
 ini_set('error_log', $GLOBALS['fudeLogFile']);
-register_shutdown_function(fn () => @unlink($GLOBALS['fudeLogFile']));
-
-$n = 0;
-function same($expected, $actual, string $what): void
-{
-    global $n;
-    if ($expected !== $actual) {
-        throw new RuntimeException($what . ': ' . var_export($actual, true));
+register_shutdown_function(static function (): void {
+    if (is_file($GLOBALS['fudeLogFile'])) {
+        unlink($GLOBALS['fudeLogFile']);
     }
-    $n++;
+});
+
+/** Asserts that two values are identical (===), with a label. */
+function same(mixed $expected, mixed $actual, string $what): void
+{
+    Assert::assertSame($expected, $actual, $what);
 }
+
+/** Asserts that a condition holds, with a label. */
 function ok(bool $condition, string $what, mixed $detail = null): void
 {
-    global $n;
-    if (!$condition) {
-        throw new RuntimeException($what . ($detail === null ? '' : ': ' . var_export($detail, true)));
-    }
-    $n++;
+    Assert::assertTrue($condition, $detail === null ? $what : $what . ': ' . var_export($detail, true));
 }
+
+/** Asserts that $f throws $class with a message containing $pattern. */
 function throws(callable $f, string $pattern, string $what, string $class = InvalidArgumentException::class): void
 {
-    global $n;
     try {
         $f();
     } catch (Throwable $e) {
-        if (!$e instanceof $class) {
-            throw new RuntimeException($what . ': wrong exception ' . get_class($e) . ' ' . $e->getMessage());
-        }
-        if (!str_contains($e->getMessage(), $pattern)) {
-            throw new RuntimeException($what . ': wrong message ' . $e->getMessage());
-        }
-        $n++;
+        Assert::assertInstanceOf($class, $e, $what);
+        Assert::assertStringContainsString($pattern, $e->getMessage(), $what);
+
         return;
     }
-    throw new RuntimeException($what . ': no exception');
+    Assert::fail($what . ': no exception');
 }
+
+/** Removes a fixture site (symlinks are removed, not followed). */
 function cleanup(string $path): void
 {
-    if (!is_dir($path)) {
-        return;
-    }
-    $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
-    foreach ($files as $file) {
-        if ($file->isDir() && !$file->isLink()) {
-            rmdir($file->getPathname());
-        } else {
-            unlink($file->getPathname());
-        }
-    }
-    rmdir($path);
+    Dir::remove($path);
 }
 
 const FUDE_BOT = 'fude@example.invalid';
