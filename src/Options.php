@@ -3,18 +3,25 @@
 namespace Sayamaapps\Fude;
 
 use Kirby\Cms\App;
+use Kirby\Cms\Helpers;
 
 /**
- * Reads `fude.*` options.
+ * Reads the plugin's options: `sayamaapps.fude.<key>`, and the 1.x spelling
+ * `fude.<key>` as a deprecated fallback.
  *
  * `null` counts as "not set", like Kirby's own option(), so a key set to
- * null falls back to the default. Both spellings work, flat
- * (`'fude.active' => true`) and nested (`'fude' => ['active' => true]`).
+ * null falls back to the next spelling and then to the default. Both
+ * spellings work, flat (`'sayamaapps.fude.active' => true`) and nested
+ * (`'sayamaapps' => ['fude' => ['active' => true]]`).
  */
 final class Options
 {
 	public const DEFAULT_TIMEZONE = 'Europe/Berlin';
-	public const PREFIX = 'fude.';
+	/** The option namespace of the plugin (OPT-1). */
+	public const PREFIX = 'sayamaapps.fude.';
+
+	/** The 1.x namespace, read when the new key is not set. Removed in 2.0. */
+	public const LEGACY_PREFIX = 'fude.';
 
 	/** The declaration of what the bot may change: `site/config/fude.php`. */
 	public static function configFile(App $kirby): string
@@ -32,9 +39,28 @@ final class Options
 		return $kirby->root('storage') . '/fude';
 	}
 
+	/**
+	 * Reads one option: `sayamaapps.fude.<key>`, otherwise `fude.<key>`
+	 * (deprecated, announced in debug mode), otherwise $default.
+	 */
 	public static function get(App $kirby, string $key, mixed $default = null): mixed
 	{
-		return $kirby->option(self::PREFIX . $key) ?? $default;
+		$value = $kirby->option(self::PREFIX . $key);
+		if ($value !== null) {
+			return $value;
+		}
+
+		$legacy = $kirby->option(self::LEGACY_PREFIX . $key);
+		if ($legacy !== null) {
+			Helpers::deprecated(
+				'The option ' . self::LEGACY_PREFIX . $key . ' is deprecated, use ' . self::PREFIX . $key,
+				'option-prefix'
+			);
+
+			return $legacy;
+		}
+
+		return $default;
 	}
 
 	/** Whether $address (the connection's REMOTE_ADDR) lies in `fude.trustedProxies`. */
