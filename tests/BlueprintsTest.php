@@ -1,11 +1,11 @@
 <?php
 
-use Sayamaapps\Fude\Blueprints;
-use Sayamaapps\Fude\Config;
 use Kirby\Form\Form;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Blueprints;
+use Sayamaapps\Fude\Config;
 
 const BP_STANDORT = <<<'YML'
     title: Standort

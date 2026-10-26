@@ -1,9 +1,9 @@
 <?php
 
-use Sayamaapps\Fude\Config;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Config;
 
 /** Fixture boots, role exists, config loads, routes registered. */
 #[CoversNothing]

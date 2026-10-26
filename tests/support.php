@@ -10,10 +10,10 @@
  * exists — the fixture always builds it with fude.active on.
  */
 
-use Sayamaapps\Fude\I18n;
-use Sayamaapps\Fude\Service;
 use Kirby\Filesystem\Dir;
 use PHPUnit\Framework\Assert;
+use Sayamaapps\Fude\I18n;
+use Sayamaapps\Fude\Service;
 
 $base = dirname(__DIR__);
 

@@ -1,6 +1,5 @@
 <?php
 
-use Kirby\Cms\App;
 use Sayamaapps\Fude\Service;
 
 // The routes under /fude/*. Anything else under /fude/, and GET on the POST

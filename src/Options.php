@@ -2,6 +2,7 @@
 
 namespace Sayamaapps\Fude;
 
+use DateTimeZone;
 use Kirby\Cms\App;
 use Kirby\Cms\Helpers;
 
@@ -17,11 +18,12 @@ use Kirby\Cms\Helpers;
 final class Options
 {
 	public const DEFAULT_TIMEZONE = 'Europe/Berlin';
-	/** The option namespace of the plugin (OPT-1). */
-	public const PREFIX = 'sayamaapps.fude.';
 
 	/** The 1.x namespace, read when the new key is not set. Removed in 2.0. */
 	public const LEGACY_PREFIX = 'fude.';
+
+	/** The option namespace of the plugin (OPT-1). */
+	public const PREFIX = 'sayamaapps.fude.';
 
 	/** The declaration of what the bot may change: `site/config/fude.php`. */
 	public static function configFile(App $kirby): string
@@ -164,13 +166,13 @@ final class Options
 	 *
 	 * @throws FudeError 500 when the option is not a time zone
 	 */
-	public static function timezone(App $kirby): \DateTimeZone
+	public static function timezone(App $kirby): DateTimeZone
 	{
 		$zone = self::get($kirby, 'timezone', self::DEFAULT_TIMEZONE);
-		if (!is_string($zone) || !in_array($zone, \DateTimeZone::listIdentifiers(), true)) {
+		if (!is_string($zone) || !in_array($zone, DateTimeZone::listIdentifiers(), true)) {
 			throw FudeError::t('config.timezone', ['value' => is_string($zone) ? $zone : get_debug_type($zone)], 500);
 		}
-		return new \DateTimeZone($zone);
+		return new DateTimeZone($zone);
 	}
 
 	/**

@@ -1,10 +1,10 @@
 <?php
 
-use Sayamaapps\Fude\Drafts;
 use Kirby\Data\Data;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Drafts;
 
 /**
  * POST /fude/publish: token, lifetime, hash conflict with a parallel Panel

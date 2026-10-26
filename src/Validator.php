@@ -174,6 +174,8 @@ final class Validator
 	 * The names follow KirbyTag::parse(): lower-cased, aliases resolved.
 	 * Kirby splits a tag's attributes at "<name>:" with no word boundary,
 	 * so "style:" anywhere inside a tag is refused.
+	 *
+	 * @SuppressWarnings(PHPMD.UndefinedVariable) KirbyTag::$aliases is a static property, not a variable.
 	 */
 	private static function checkKirbyTags(string $name, string $value): void
 	{

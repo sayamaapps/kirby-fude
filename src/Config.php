@@ -881,6 +881,7 @@ final class Config
 	 * for the next one, today included.
 	 *
 	 * @return array{field: string, value: string, editable?: true, label?: string, description?: string, default?: string}
+	 * @psalm-suppress InvalidReturnType, InvalidReturnStatement the optional keys are set per branch, the shape is checked by the tests
 	 */
 	private static function touch(App $kirby, string $name, mixed $touch, array $collection): array
 	{

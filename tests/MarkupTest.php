@@ -1,11 +1,11 @@
 <?php
 
-use Sayamaapps\Fude\FudeError;
-use Sayamaapps\Fude\Validator;
 use Kirby\Text\KirbyTag;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\FudeError;
+use Sayamaapps\Fude\Validator;
 
 /**
  * Text is plain text or Markdown, never HTML: sites render textareas with

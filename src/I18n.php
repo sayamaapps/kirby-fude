@@ -28,6 +28,24 @@ final class I18n
 		return self::$language;
 	}
 
+	/**
+	 * The tables as Kirby plugin translations: `fude.<key>` per language. Kirby
+	 * reads them for blueprint labels; the replies use table() instead.
+	 *
+	 * @return array<string, array<string, string>>
+	 */
+	public static function pluginTranslations(): array
+	{
+		$translations = [];
+		foreach (self::LANGUAGES as $language) {
+			foreach (self::table($language) as $key => $text) {
+				$translations[$language]['fude.' . $key] = $text;
+			}
+		}
+
+		return $translations;
+	}
+
 	public static function setLanguage(string $language): void
 	{
 		self::$language = in_array($language, self::LANGUAGES, true) ? $language : 'en';
@@ -54,23 +72,5 @@ final class I18n
 			return [];
 		}
 		return self::$tables[$language] ??= require dirname(__DIR__) . '/translations/' . $language . '.php';
-	}
-
-	/**
-	 * The tables as Kirby plugin translations: `fude.<key>` per language. Kirby
-	 * reads them for blueprint labels; the replies use table() instead.
-	 *
-	 * @return array<string, array<string, string>>
-	 */
-	public static function pluginTranslations(): array
-	{
-		$translations = [];
-		foreach (self::LANGUAGES as $language) {
-			foreach (self::table($language) as $key => $text) {
-				$translations[$language]['fude.' . $key] = $text;
-			}
-		}
-
-		return $translations;
 	}
 }

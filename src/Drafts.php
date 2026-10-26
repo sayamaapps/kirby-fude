@@ -3,6 +3,7 @@
 namespace Sayamaapps\Fude;
 
 use Kirby\Cms\App;
+use RuntimeException;
 
 /**
  * Draft records: one JSON file per draft in `<storage>/fude/drafts/`.
@@ -38,7 +39,7 @@ final class Drafts
 	{
 		$dir = self::directory($kirby);
 		if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
-			throw new \RuntimeException('Cannot create ' . $dir);
+			throw new RuntimeException('Cannot create ' . $dir);
 		}
 		$record['id'] = bin2hex(random_bytes(8));
 		$record['token'] = bin2hex(random_bytes(16));
@@ -93,7 +94,7 @@ final class Drafts
 		$file = self::directory($kirby) . '/' . $record['id'] . '.json';
 		$json = json_encode($record, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 		if ($json === false || @file_put_contents($file, $json, LOCK_EX) === false) {
-			throw new \RuntimeException('Cannot write ' . $file);
+			throw new RuntimeException('Cannot write ' . $file);
 		}
 	}
 }

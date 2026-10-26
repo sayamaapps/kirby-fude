@@ -1,9 +1,9 @@
 <?php
 
-use Sayamaapps\Fude\I18n;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\I18n;
 
 /**
  * Translations: every language file has the same keys and placeholders as

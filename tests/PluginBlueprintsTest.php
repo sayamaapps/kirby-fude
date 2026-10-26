@@ -1,10 +1,10 @@
 <?php
 
-use Sayamaapps\Fude\Config;
 use Kirby\Form\Form;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Config;
 
 /**
  * Markers in blueprints that a plugin brings along: a module ships a tab and

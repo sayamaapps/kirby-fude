@@ -3,6 +3,7 @@
 namespace Sayamaapps\Fude;
 
 use DateTimeImmutable;
+use DateTimeZone;
 use Kirby\Cms\App;
 use Kirby\Cms\File;
 use Kirby\Cms\ModelWithContent;
@@ -274,6 +275,7 @@ final class Service
 		return $contents;
 	}
 
+	/** @SuppressWarnings(PHPMD.UnusedFormalParameter) the time stays in the signature shared with draft() and publish(). */
 	private static function discard(App $kirby, array $collections, array $input, DateTimeImmutable $now, array &$entry): array
 	{
 		$record = Drafts::read($kirby, (string)($input['id'] ?? ''));
@@ -748,7 +750,7 @@ final class Service
 		$state = [];
 		foreach ($files as $file) {
 			$meta = self::contents($file, ['latest', 'changes']);
-			foreach ($meta as $key => $content) {
+			foreach (array_keys($meta) as $key) {
 				unset($meta[$key]['uuid'], $meta[$key]['lock']);
 			}
 			$state[$file->filename()] = [is_file($file->root()) ? hash_file('xxh128', $file->root()) : null, $meta];
@@ -782,6 +784,7 @@ final class Service
 		} catch (Throwable) {
 			throw FudeError::t('request.json', [], 400);
 		}
+		/** @psalm-suppress TypeDoesNotContainType the decoded body may be a scalar, the check is the contract */
 		if (!is_array($data)) {
 			throw FudeError::t('request.json', [], 400);
 		}
@@ -852,6 +855,15 @@ final class Service
 			$headers['WWW-Authenticate'] = 'Basic realm="Fude", charset="UTF-8"';
 		}
 		return Response::json($data, $status, true, $headers);
+	}
+
+	/** Kirby's real 404: no format of its own that would reveal the module. */
+	public static function notFound(): Response
+	{
+		// Without content/error/, errorPage() returns null; then an empty 404 instead of a 500.
+		$page = App::instance()->site()->errorPage();
+
+		return new Response($page?->render() ?? '', 'text/html', 404);
 	}
 
 	/**
@@ -1073,21 +1085,6 @@ final class Service
 		];
 	}
 
-	/** Kirby's real 404: no format of its own that would reveal the module. */
-	public static function notFound(): Response
-	{
-		// Without content/error/, errorPage() returns null; then an empty 404 instead of a 500.
-		$page = App::instance()->site()->errorPage();
-
-		return new Response($page?->render() ?? '', 'text/html', 404);
-	}
-
-	/** The route entry point: one request, with the current time in Europe/Berlin. */
-	public static function respondNow(string $route): Response
-	{
-		return self::respond(App::instance(), new DateTimeImmutable('now', new \DateTimeZone('Europe/Berlin')), $route);
-	}
-
 	public static function respond(App $kirby, DateTimeImmutable $now, string $route): Response
 	{
 		if (Options::get($kirby, 'active', false) !== true || !in_array($route, self::ROUTES, true)) {
@@ -1122,6 +1119,12 @@ final class Service
 			Log::write($kirby, $entry + ['status' => 500, 'error' => $e::class . ': ' . $e->getMessage()], $now);
 			return self::json(['ok' => false, 'error' => I18n::t('draft.internal')], 500);
 		}
+	}
+
+	/** The route entry point: one request, with the current time in Europe/Berlin. */
+	public static function respondNow(string $route): Response
+	{
+		return self::respond(App::instance(), new DateTimeImmutable('now', new DateTimeZone('Europe/Berlin')), $route);
 	}
 
 	// --- Routes --------------------------------------------------------------
@@ -1234,6 +1237,8 @@ final class Service
 		if (($collection['touch']['editable'] ?? false) !== true) {
 			throw FudeError::t('touch.fixed', ['name' => $collection['name']]);
 		}
+		// preg_match() fills $parts; the placeholders are only read after a match.
+		$parts = ['', '', '', ''];
 		// A real calendar day in the form YYYY-MM-DD, as for a date field.
 		$valid = is_string($value) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/D', $value, $parts) === 1 &&
 			checkdate((int)$parts[2], (int)$parts[3], (int)$parts[1]);

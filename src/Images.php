@@ -6,6 +6,7 @@ use Kirby\Cms\App;
 use Kirby\Cms\File;
 use Kirby\Cms\Page;
 use Kirby\Toolkit\Str;
+use RuntimeException;
 
 /**
  * Takes a photo from the chat and stores it the way the blueprint wants it.
@@ -77,7 +78,7 @@ final class Images
 	{
 		$tmpDir = Options::directory($kirby) . '/tmp';
 		if (!is_dir($tmpDir) && !@mkdir($tmpDir, 0775, true) && !is_dir($tmpDir)) {
-			throw new \RuntimeException('Cannot create ' . $tmpDir);
+			throw new RuntimeException('Cannot create ' . $tmpDir);
 		}
 		// Capped: a key may be 500 characters, a filename must stay well
 		// under the 255-byte limit of common filesystems.
@@ -94,7 +95,7 @@ final class Images
 				'quality' => 85,
 			]);
 			if (!is_file($resized)) {
-				throw new \RuntimeException('Thumb component wrote nothing');
+				throw new RuntimeException('Thumb component wrote nothing');
 			}
 			$props = [
 				'source'   => $resized,

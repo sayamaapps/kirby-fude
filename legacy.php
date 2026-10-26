@@ -11,7 +11,6 @@ use Sayamaapps\Fude\Service;
  * Loaded once by index.php, after the class map is registered. Class aliases
  * and function wrappers only; no logic here.
  */
-
 class_alias(\Sayamaapps\Fude\Blueprints::class, 'Fude\\Blueprints');
 class_alias(\Sayamaapps\Fude\Config::class, 'Fude\\Config');
 class_alias(\Sayamaapps\Fude\Content::class, 'Fude\\Content');

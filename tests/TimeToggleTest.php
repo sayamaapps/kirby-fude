@@ -1,11 +1,11 @@
 <?php
 
-use Sayamaapps\Fude\Config;
-use Sayamaapps\Fude\FudeError;
-use Sayamaapps\Fude\Validator;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Config;
+use Sayamaapps\Fude\FudeError;
+use Sayamaapps\Fude\Validator;
 
 /**
  * Field types time and toggle. Stored as Kirby's own fields save them: a

@@ -67,7 +67,7 @@ final class Content
 	{
 		$content = $page->version('latest')->read() ?? [];
 		$value = $content[$field] ?? '';
-		return is_string($value) ? $value : (string)Data::encode($value, 'yaml');
+		return is_string($value) ? $value : Data::encode($value, 'yaml');
 	}
 
 	/** The page that holds a structure collection, or the parent of a pages collection. */
@@ -138,6 +138,7 @@ final class Content
 		} catch (\Throwable) {
 			return [];
 		}
+		/** @psalm-suppress RedundantCondition, TypeDoesNotContainType Data::decode() is typed as array, a YAML scalar still yields [] */
 		return array_values(array_filter(is_array($rows) ? $rows : [], 'is_array'));
 	}
 }
