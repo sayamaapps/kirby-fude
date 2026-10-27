@@ -490,7 +490,7 @@ class Service
 			$child?->delete(true);
 			throw $e;
 		}
-		$record = Drafts::create($kirby, [
+		return self::recordDraft($ctx, [
 			'collection'  => $collection['name'],
 			'kind'        => 'pages',
 			'action'      => 'create',
@@ -503,11 +503,7 @@ class Service
 			'hash'        => $hash,
 			'changesHash' => self::changesHash($child->version('latest')),
 			'preview'     => $child->version('latest')->url(),
-			'user'        => $ctx->entry['user'],
-			'actor'       => $ctx->entry['actor'],
 		], $now);
-		$ctx->entry['draft'] = $record['id'];
-		return ['draft' => Drafts::public($record), 'token' => $record['token'], 'preview' => $record['preview']];
 	}
 
 	private static function draftPage(DraftContext $ctx): array
@@ -536,7 +532,7 @@ class Service
 		if ($action === 'delete') {
 			// Nothing is touched before publish: the page stays until then,
 			// and the draft only names it.
-			$record = Drafts::create($kirby, [
+			return self::recordDraft($ctx, [
 				'collection'  => $collection['name'],
 				'kind'        => 'pages',
 				'action'      => 'delete',
@@ -550,11 +546,7 @@ class Service
 				'hash'        => $hash,
 				'changesHash' => null,
 				'preview'     => $child->version('latest')->url(),
-				'user'        => $ctx->entry['user'],
-				'actor'       => $ctx->entry['actor'],
 			], $now);
-			$ctx->entry['draft'] = $record['id'];
-			return ['draft' => Drafts::public($record), 'token' => $record['token'], 'preview' => $record['preview']];
 		}
 		$content = self::stored($kirby, $collection, $clean);
 		if ($upload !== null) {
@@ -571,7 +563,7 @@ class Service
 			$file?->delete();
 			throw $e;
 		}
-		$record = Drafts::create($kirby, [
+		return self::recordDraft($ctx, [
 			'collection'  => $collection['name'],
 			'kind'        => 'pages',
 			'action'      => 'update',
@@ -585,11 +577,7 @@ class Service
 			'hash'        => $hash,
 			'changesHash' => self::changesHash($child->version('changes')),
 			'preview'     => $child->version('changes')->url(),
-			'user'        => $ctx->entry['user'],
-			'actor'       => $ctx->entry['actor'],
 		], $now);
-		$ctx->entry['draft'] = $record['id'];
-		return ['draft' => Drafts::public($record), 'token' => $record['token'], 'preview' => $record['preview']];
 	}
 
 	/**
@@ -704,7 +692,7 @@ class Service
 			throw $e;
 		}
 
-		$record = Drafts::create($kirby, [
+		return self::recordDraft($ctx, [
 			'collection'  => $collection['name'],
 			'kind'        => 'structure',
 			'action'      => $action,
@@ -719,11 +707,7 @@ class Service
 			'hash'        => $hash,
 			'changesHash' => self::changesHash($page->version('changes')),
 			'preview'     => $page->version('changes')->url(),
-			'user'        => $ctx->entry['user'],
-			'actor'       => $ctx->entry['actor'],
 		], $now);
-		$ctx->entry['draft'] = $record['id'];
-		return ['draft' => Drafts::public($record), 'token' => $record['token'], 'preview' => $record['preview']];
 	}
 
 	/**
@@ -1059,6 +1043,19 @@ class Service
 		$hash = Content::hash($kirby, $collection, null);
 		Drafts::delete($kirby, $record['id']);
 		return ['id' => $record['id'], 'url' => $url, 'hash' => $hash];
+	}
+
+	/**
+	 * Creates the draft record with the caller's user and actor, sets the entry's
+	 * draft id and returns the reply.
+	 *
+	 * @param array<string, mixed> $record the record without user and actor
+	 */
+	private static function recordDraft(DraftContext $ctx, array $record, DateTimeImmutable $now): array
+	{
+		$saved = Drafts::create($ctx->kirby, [...$record, 'user' => $ctx->entry['user'], 'actor' => $ctx->entry['actor']], $now);
+		$ctx->entry['draft'] = $saved['id'];
+		return ['draft' => Drafts::public($saved), 'token' => $saved['token'], 'preview' => $saved['preview']];
 	}
 
 	/**
