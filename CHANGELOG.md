@@ -10,6 +10,18 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## [Unreleased]
+
+### Changed
+
+- **Plugin layout follows the Kirby plugin conventions; behaviour is the same.**
+  Classes live in `Sayamaapps\Fude\`, loaded by a class map. The 1.x names
+  keep working: `Fude\` classes (aliases in `legacy.php`, `Fude\FudeError`
+  from the start), `fude_option()` and `fude_not_found()`, the `fude.<name>`
+  options and the `fude.<key>` translations. None of them prints a notice.
+  Their removal is planned for 2.0 (README, "Planned for 2.0").
+- Tests run on PHPUnit; Psalm, PHP Mess Detector and the code style are in CI.
+
 ## [1.8.0] — 2026-10-25
 
 ### Added
@@ -47,7 +59,7 @@ All notable changes to this project are documented here. Versions follow
 ### Fixed
 
 - **Translation keys in blueprint texts reach the bot as text.** A field's
-  `help` that is a translation key (plugin blueprints, such as Higawari's date
+  `help` that is a translation key (plugin blueprints, such as another plugin's date
   help) went to the bot as the key, in the description of a touch date and of
   fields and collections. It now reads as its text in the reply language, as
   the label already did. A marker's `label` and `description` work the same

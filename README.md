@@ -54,7 +54,7 @@ return [
 ];
 ```
 
-Enable Fude with `'sayamaapps.fude.active' => true` in `site/config/config.php` (the older `'fude.active'` still works, see Deprecations), then create a Panel account with the role **Fude (bot)** and a long random password.
+Enable Fude with `'fude.active' => true` in `site/config/config.php`, then create a Panel account with the role **Fude (bot)** and a long random password.
 
 ### Collections
 
@@ -109,18 +109,18 @@ Errors: 400 malformed request, 401 login, 403 HTTPS, role, token or publish perm
 
 ## Options
 
-Options are read as `sayamaapps.fude.<name>` in the flat form shown below; the nested form is not read for these keys. `null` counts as not set. The old spelling `fude.<name>` is still read when the new key is not set; it is deprecated and will be removed in 2.0.
+Options are read as `fude.<name>`, in the flat form shown below or nested (`'fude' => ['active' => true]`). `null` counts as not set.
 
 Example, `site/config/config.php`:
 
 ```php
 return [
-    'sayamaapps.fude.active'   => true,
-    'sayamaapps.fude.language' => 'de',
+    'fude.active'   => true,
+    'fude.language' => 'de',
 ];
 ```
 
-| Option (`sayamaapps.fude.<name>`, old spelling `fude.<name>`) | Default | Meaning |
+| Option (`fude.<name>`) | Default | Meaning |
 |---|---|---|
 | `active` | `false` | Master switch. Off: routes answer 404 and the role does not exist. |
 | `config` | `site/config/fude.php` | Declaration file, relative to the project root or absolute |
@@ -138,7 +138,7 @@ return [
 
 ## HTTPS
 
-Routes answer 403 unless the connection itself is TLS. Behind a TLS-terminating proxy, list it in `sayamaapps.fude.trustedProxies` (old: `fude.trustedProxies`) and have it send `X-Forwarded-Proto: https`; the header counts only from a listed address. Check a site with `curl -s -o /dev/null -w '%{http_code}\n' https://example.com/fude/schema`: 401 means the check passed; a 403 names the cause in `error`.
+Routes answer 403 unless the connection itself is TLS. Behind a TLS-terminating proxy, list it in `fude.trustedProxies` and have it send `X-Forwarded-Proto: https`; the header counts only from a listed address. Check a site with `curl -s -o /dev/null -w '%{http_code}\n' https://example.com/fude/schema`: 401 means the check passed; a 403 names the cause in `error`.
 
 ## What happens on the page
 
@@ -154,18 +154,26 @@ Fude processes no visitor data and stores no IP addresses, user agents or full-s
 - Draft records in `storage/fude/drafts/` (field values, account, channel tag), deleted on publish or discard.
 - A log in `storage/fude/log.jsonl`: who, when, route, collection, action, key, outcome. No field values, no images; it restarts at 4 MB.
 
-## Deprecations
+## Deviations from Kirby's plugin conventions
 
-Deprecated since this release, removed in 2.0:
+These stay as in 1.x. Each one is a choice, not an oversight.
 
-| Old | New |
-|---|---|
-| `fude.<name>` options | `sayamaapps.fude.<name>` (the old key still works) |
-| `fude_option()` | `Sayamaapps\Fude\Options::get()` |
-| `fude_not_found()` | `Sayamaapps\Fude\Service::notFound()` |
-| classes in namespace `Fude\` | the same classes in `Sayamaapps\Fude\` (aliases in `legacy.php`) |
+- **Role and blueprint names carry no plugin prefix.** The role `fude` and the blueprint `users/fude` are public names. Renaming them would detach existing bot accounts, so the change waits for 2.0.
+- **Drafts, the log and resized images use PHP's file functions.** Kirby's `F::write()` and `Dir::make()` throw Kirby's exception class on a path they cannot write, where 1.x throws `RuntimeException`. The plugin keeps its own calls so that the exception class and the messages stay the same.
+- **Reply texts come from `I18n::t()`, not from Kirby's translation lookup.** The replies are written in the language of the request (`fude.language`) and must also work without a Kirby app, as in 1.x. The same tables are registered as Kirby plugin translations, so the Panel reads the same text.
 
-The deprecated names print a deprecation notice when Kirby runs in debug mode. Routes, the role `fude`, blueprint markers, the JSON format and the storage paths are unchanged.
+## Planned for 2.0
+
+1.x keeps every public name, option key, translation key, exception class and route. The names below are marked `@deprecated` in the code, and 1.x prints no runtime notice for them. 2.0 is planned to:
+
+- read options as `sayamaapps.fude.<name>` only; the `fude.<name>` spelling stops being read,
+- register plugin translations as `sayamaapps.fude.<key>` only,
+- remove `fude_option()` and `fude_not_found()`: use `Sayamaapps\Fude\Options::get()` and `Sayamaapps\Fude\Service::notFound()`,
+- remove the `Fude\` class names: the classes stay in `Sayamaapps\Fude\`,
+- throw Kirby's exception class for internal failures (drafts, log, image files) instead of `RuntimeException`,
+- give the role and the blueprint a plugin prefix. Bot accounts with the role `fude` must then be switched to the new role by hand.
+
+Routes, the JSON format and the storage paths are unchanged in 1.x and planned unchanged for 2.0.
 
 Tests: `composer test`. Issues and pull requests are welcome, without a support promise. Report security problems privately through GitHub's vulnerability reporting. Changes: [CHANGELOG.md](CHANGELOG.md).
 
