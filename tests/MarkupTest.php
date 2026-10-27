@@ -1,7 +1,7 @@
 <?php
 
 use Kirby\Text\KirbyTag;
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 use Sayamaapps\Fude\FudeError;
@@ -16,7 +16,7 @@ use Sayamaapps\Fude\Validator;
  * Blueprint url, email and tel fields are checked by their format before the
  * Panel's own rules see them.
  */
-#[CoversNothing]
+#[CoversClass(Validator::class)]
 #[RunTestsInSeparateProcesses]
 final class MarkupTest extends TestCase
 {

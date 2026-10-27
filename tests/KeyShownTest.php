@@ -1,8 +1,9 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Service;
 
 /**
  * Two guards on what a draft may do to an entry. An update may not give an
@@ -11,7 +12,7 @@ use PHPUnit\Framework\TestCase;
  * the blueprint hides on this entry (`when`) is refused: it would change
  * nothing anyone sees, like a price on a free event.
  */
-#[CoversNothing]
+#[CoversClass(Service::class)]
 #[RunTestsInSeparateProcesses]
 final class KeyShownTest extends TestCase
 {

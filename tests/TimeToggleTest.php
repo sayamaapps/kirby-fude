@@ -1,6 +1,6 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 use Sayamaapps\Fude\Config;
@@ -13,7 +13,7 @@ use Sayamaapps\Fude\Validator;
  * times with an optional seconds part, and booleans (JSON true/false) or
  * the strings "true"/"false" in any case. Empty means not set, unless required.
  */
-#[CoversNothing]
+#[CoversClass(Validator::class)]
 #[RunTestsInSeparateProcesses]
 final class TimeToggleTest extends TestCase
 {

@@ -1,7 +1,7 @@
 <?php
 
 use Kirby\Form\Form;
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 use Sayamaapps\Fude\Blueprints;
@@ -128,7 +128,7 @@ const PS_DECLARED = <<<'PHP'
  * parent and template wins, false removes), translated texts, and the Panel
  * loading such blueprints. The pages "kurse" and "orte" live in this file only.
  */
-#[CoversNothing]
+#[CoversClass(Config::class)]
 #[RunTestsInSeparateProcesses]
 final class PagesSectionTest extends TestCase
 {

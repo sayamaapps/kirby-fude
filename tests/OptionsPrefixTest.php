@@ -1,6 +1,6 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 use Sayamaapps\Fude\Options;
@@ -10,7 +10,7 @@ use Sayamaapps\Fude\Options;
  * read when the new key is not set and announces itself as deprecated in debug
  * mode. The new key wins when both are set.
  */
-#[CoversNothing]
+#[CoversClass(Options::class)]
 #[RunTestsInSeparateProcesses]
 final class OptionsPrefixTest extends TestCase
 {

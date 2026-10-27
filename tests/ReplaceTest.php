@@ -1,9 +1,10 @@
 <?php
 
 use Kirby\Data\Data;
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Service;
 
 function replaceTitles(callable $app, string $version): array
 {
@@ -19,7 +20,7 @@ function replaceTitles(callable $app, string $version): array
  * draft. Every row is validated like a create; no image; `maxEntries` caps the
  * list for replace and create; an empty list is allowed.
  */
-#[CoversNothing]
+#[CoversClass(Service::class)]
 #[RunTestsInSeparateProcesses]
 final class ReplaceTest extends TestCase
 {

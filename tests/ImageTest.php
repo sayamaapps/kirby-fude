@@ -1,9 +1,10 @@
 <?php
 
 use Kirby\Data\Data;
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Images;
 
 /**
  * Image rules: formats outside the declaration refused, non-images refused,
@@ -13,7 +14,7 @@ use PHPUnit\Framework\TestCase;
  * the file survives the publish. A collection without an image field takes
  * no upload.
  */
-#[CoversNothing]
+#[CoversClass(Images::class)]
 #[RunTestsInSeparateProcesses]
 final class ImageTest extends TestCase
 {

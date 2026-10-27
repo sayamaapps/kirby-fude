@@ -1,9 +1,10 @@
 <?php
 
 use Kirby\Data\Data;
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Service;
 
 function titles(callable $app, string $version): array
 {
@@ -18,7 +19,7 @@ function titles(callable $app, string $version): array
  * create puts the new row in a structure list. Only structure collections;
  * any other value is a configuration error.
  */
-#[CoversNothing]
+#[CoversClass(Service::class)]
 #[RunTestsInSeparateProcesses]
 final class InsertTest extends TestCase
 {

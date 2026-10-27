@@ -1,15 +1,16 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Service;
 
 /**
  * HTTPS check: decided by the connection, not by Kirby's `url` option.
  * Direct connections, plain HTTP on an https `url`, and a reverse proxy
  * that terminates TLS (only from an address in `fude.trustedProxies`).
  */
-#[CoversNothing]
+#[CoversClass(Service::class)]
 #[RunTestsInSeparateProcesses]
 final class HttpsTest extends TestCase
 {

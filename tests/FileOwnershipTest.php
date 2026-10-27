@@ -1,8 +1,9 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Service;
 
 function fude_editor(callable $app): Kirby\Cms\App
 {
@@ -17,7 +18,7 @@ function fude_editor(callable $app): Kirby\Cms\App
  * edited since the draft; a confirmed page delete refuses when the page's
  * files changed after the draft or another page uses one of them.
  */
-#[CoversNothing]
+#[CoversClass(Service::class)]
 #[RunTestsInSeparateProcesses]
 final class FileOwnershipTest extends TestCase
 {

@@ -1,15 +1,16 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Config;
 
 /**
  * site/config/fude.php: every mistake in the declaration is loud (500 with
  * the reason) — a field the blueprint does not know, an incompatible type,
  * a key that is not a text field, unknown kinds, actions, formats.
  */
-#[CoversNothing]
+#[CoversClass(Config::class)]
 #[RunTestsInSeparateProcesses]
 final class ConfigTest extends TestCase
 {

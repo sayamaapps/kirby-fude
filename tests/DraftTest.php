@@ -1,8 +1,9 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Service;
 
 /**
  * POST /fude/draft on a structure collection: the changes version carries
@@ -11,7 +12,7 @@ use PHPUnit\Framework\TestCase;
  * updates change only the named fields, Panel locks and pending Panel
  * changes block a draft.
  */
-#[CoversNothing]
+#[CoversClass(Service::class)]
 #[RunTestsInSeparateProcesses]
 final class DraftTest extends TestCase
 {

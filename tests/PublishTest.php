@@ -1,17 +1,18 @@
 <?php
 
 use Kirby\Data\Data;
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 use Sayamaapps\Fude\Drafts;
+use Sayamaapps\Fude\Service;
 
 /**
  * POST /fude/publish: token, lifetime, hash conflict with a parallel Panel
  * edit, draft changed in the Panel, then the real publish — content live,
  * changes version gone, record gone, second publish 404.
  */
-#[CoversNothing]
+#[CoversClass(Service::class)]
 #[RunTestsInSeparateProcesses]
 final class PublishTest extends TestCase
 {

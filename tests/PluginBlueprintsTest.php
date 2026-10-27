@@ -1,9 +1,10 @@
 <?php
 
 use Kirby\Form\Form;
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Blueprints;
 use Sayamaapps\Fude\Config;
 
 /**
@@ -12,7 +13,7 @@ use Sayamaapps\Fude\Config;
  * and the collection is derived without a line in site/config/fude.php. Also
  * the marker option `touch`, which a module needs to stamp its date field.
  */
-#[CoversNothing]
+#[CoversClass(Blueprints::class)]
 #[RunTestsInSeparateProcesses]
 final class PluginBlueprintsTest extends TestCase
 {

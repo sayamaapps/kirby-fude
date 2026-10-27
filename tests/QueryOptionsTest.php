@@ -1,6 +1,6 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 use Sayamaapps\Fude\Config;
@@ -112,7 +112,7 @@ const QO_NOTE = <<<'YML'
  * field), declared options checked against the resolved set, and a query
  * that fails. The fixture page "filiale" lives in this file only.
  */
-#[CoversNothing]
+#[CoversClass(Config::class)]
 #[RunTestsInSeparateProcesses]
 final class QueryOptionsTest extends TestCase
 {

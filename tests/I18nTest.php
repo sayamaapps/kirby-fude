@@ -1,6 +1,6 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 use Sayamaapps\Fude\I18n;
@@ -9,7 +9,7 @@ use Sayamaapps\Fude\I18n;
  * Translations: every language file has the same keys and placeholders as
  * en.php; fallbacks work; the tables are registered as Kirby translations.
  */
-#[CoversNothing]
+#[CoversClass(I18n::class)]
 #[RunTestsInSeparateProcesses]
 final class I18nTest extends TestCase
 {

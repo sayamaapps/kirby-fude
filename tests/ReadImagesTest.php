@@ -1,6 +1,6 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 use Sayamaapps\Fude\Config;
@@ -31,7 +31,7 @@ const RI_SPEISEKARTE = <<<'YML'
  * kind, a marker option on structure fields, listed in the schema only when
  * true. Anything but a boolean is a 500.
  */
-#[CoversNothing]
+#[CoversClass(Config::class)]
 #[RunTestsInSeparateProcesses]
 final class ReadImagesTest extends TestCase
 {

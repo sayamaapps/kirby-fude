@@ -1,8 +1,9 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Service;
 
 const ASK_TERMIN = <<<'YML'
     title: Termin
@@ -98,7 +99,7 @@ const ASK_TERMIN = <<<'YML'
  * in-person event without a link is fine and an online one is refused. The
  * page "termine" lives in this file only.
  */
-#[CoversNothing]
+#[CoversClass(Service::class)]
 #[RunTestsInSeparateProcesses]
 final class AskTest extends TestCase
 {

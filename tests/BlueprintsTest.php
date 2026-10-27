@@ -1,7 +1,7 @@
 <?php
 
 use Kirby\Form\Form;
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 use Sayamaapps\Fude\Blueprints;
@@ -150,7 +150,7 @@ function bp_error(string $tmp, callable $app, array $files, array $options = [])
  * still loading such a blueprint, and draft → publish with a select and a
  * date as row key.
  */
-#[CoversNothing]
+#[CoversClass(Blueprints::class)]
 #[RunTestsInSeparateProcesses]
 final class BlueprintsTest extends TestCase
 {

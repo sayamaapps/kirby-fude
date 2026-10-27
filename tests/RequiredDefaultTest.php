@@ -1,8 +1,9 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Validator;
 
 const RD_TERMIN = <<<'YML'
     title: Termin
@@ -44,7 +45,7 @@ const RD_TERMIN = <<<'YML'
  * blueprint. Declared `required: true` and structure rows (which get no
  * defaults) stay required. The page "termine" lives in this file only.
  */
-#[CoversNothing]
+#[CoversClass(Validator::class)]
 #[RunTestsInSeparateProcesses]
 final class RequiredDefaultTest extends TestCase
 {

@@ -1,9 +1,10 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Blueprints;
 
 /**
  * Markers that cannot be honoured are loud: a site field marker, an unsupported
@@ -115,7 +116,7 @@ const CASES = [
  * is no plain pages section of one template. Kirby caches blueprints once per PHP process, so every case
  * runs in a child process of its own (this file, with the case name as argument).
  */
-#[CoversNothing]
+#[CoversClass(Blueprints::class)]
 #[RunTestsInSeparateProcesses]
 final class BlueprintsErrorsTest extends TestCase
 {

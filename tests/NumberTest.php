@@ -1,15 +1,16 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Validator;
 
 /**
  * Field type number: a decimal comma or point, stored with a point. Bounds
  * `min` and `max` come from the declaration and the blueprint — the tighter
  * one wins — and the schema exports them. Anything else is refused.
  */
-#[CoversNothing]
+#[CoversClass(Validator::class)]
 #[RunTestsInSeparateProcesses]
 final class NumberTest extends TestCase
 {

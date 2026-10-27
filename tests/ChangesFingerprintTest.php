@@ -1,8 +1,9 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Service;
 
 /**
  * A structure draft is confirmed as a whole: the fingerprint covers the whole
@@ -10,7 +11,7 @@ use PHPUnit\Framework\TestCase;
  * (here the introduction of the same page) between draft and publish must be
  * refused with 409, and discard must keep that Panel version.
  */
-#[CoversNothing]
+#[CoversClass(Service::class)]
 #[RunTestsInSeparateProcesses]
 final class ChangesFingerprintTest extends TestCase
 {

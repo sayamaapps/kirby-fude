@@ -1,8 +1,9 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Service;
 
 /**
  * Action "delete" on both collection kinds. A structure row leaves the
@@ -10,7 +11,7 @@ use PHPUnit\Framework\TestCase;
  * only deleted by publish. Delete takes no fields and no image, needs
  * "delete" in the collection's actions, and an unknown key is a 404.
  */
-#[CoversNothing]
+#[CoversClass(Service::class)]
 #[RunTestsInSeparateProcesses]
 final class DeleteTest extends TestCase
 {

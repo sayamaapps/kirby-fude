@@ -1,8 +1,9 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\I18n;
 
 /**
  * Texts of a plugin blueprint that reach the bot: a translation key in a
@@ -11,7 +12,7 @@ use PHPUnit\Framework\TestCase;
  * as written, and so does a key without a text. A translation array as the
  * help of an editable touch date is read too.
  */
-#[CoversNothing]
+#[CoversClass(I18n::class)]
 #[RunTestsInSeparateProcesses]
 final class TranslatedTextsTest extends TestCase
 {

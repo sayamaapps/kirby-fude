@@ -1,8 +1,9 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Service;
 
 /**
  * Collection option `touch`: every draft of the collection also sets a page
@@ -10,7 +11,7 @@ use PHPUnit\Framework\TestCase;
  * must exist on the page with a date or text type. Other collections leave
  * the field alone.
  */
-#[CoversNothing]
+#[CoversClass(Service::class)]
 #[RunTestsInSeparateProcesses]
 final class TouchTest extends TestCase
 {

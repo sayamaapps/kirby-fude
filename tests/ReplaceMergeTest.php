@@ -1,9 +1,10 @@
 <?php
 
 use Kirby\Data\Data;
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Service;
 
 function teamRows(callable $app, string $version): array
 {
@@ -24,7 +25,7 @@ function teamRows(callable $app, string $version): array
  * list (their files stay on the page, as with delete). The draft reports
  * kept, added, removed and withoutImage.
  */
-#[CoversNothing]
+#[CoversClass(Service::class)]
 #[RunTestsInSeparateProcesses]
 final class ReplaceMergeTest extends TestCase
 {

@@ -1,8 +1,9 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Service;
 
 /**
  * Limits on the raw input of replace, regardless of maxEntries: at most
@@ -10,7 +11,7 @@ use PHPUnit\Framework\TestCase;
  * a JSON string of at most 64 KB, a JSON depth of 4, and a declared
  * maxEntries above the hard limit is a configuration error.
  */
-#[CoversNothing]
+#[CoversClass(Service::class)]
 #[RunTestsInSeparateProcesses]
 final class EntriesLimitTest extends TestCase
 {

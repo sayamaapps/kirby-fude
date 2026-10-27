@@ -1,6 +1,6 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 use Sayamaapps\Fude\Config;
@@ -101,7 +101,7 @@ const PF_PFLICHT = <<<'YML'
  * and the blueprint markers. The pages "orte", "kalender" and "anfahrt"
  * live in this file only.
  */
-#[CoversNothing]
+#[CoversClass(Config::class)]
 #[RunTestsInSeparateProcesses]
 final class PageFieldTest extends TestCase
 {

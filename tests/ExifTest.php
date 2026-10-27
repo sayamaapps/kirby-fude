@@ -1,8 +1,9 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Images;
 
 function exif_tiff(): string
 {
@@ -32,7 +33,7 @@ function exif_jpeg(string $file): void
  * kept at its size. The test JPEG is generated here: GD image plus an APP1
  * Exif segment with a GPS IFD. Checked by the bytes, which needs no extension.
  */
-#[CoversNothing]
+#[CoversClass(Images::class)]
 #[RunTestsInSeparateProcesses]
 final class ExifTest extends TestCase
 {

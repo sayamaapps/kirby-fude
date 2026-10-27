@@ -1,15 +1,17 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Options;
 use Sayamaapps\Fude\Service;
 
 /**
  * The 1.x functions keep working until 2.0: fude_option() reads the old key
  * through Options::get(), fude_not_found() answers Kirby's own 404 page.
  */
-#[CoversNothing]
+#[CoversClass(Service::class)]
+#[CoversClass(Options::class)]
 #[RunTestsInSeparateProcesses]
 final class LegacyTest extends TestCase
 {

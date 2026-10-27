@@ -1,8 +1,9 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Service;
 
 /**
  * POST /fude/discard: removes the changes version and the uploaded file,
@@ -10,7 +11,7 @@ use PHPUnit\Framework\TestCase;
  * call 404). A changes version edited in the Panel meanwhile is kept, and so
  * is a created page the Panel has worked on since.
  */
-#[CoversNothing]
+#[CoversClass(Service::class)]
 #[RunTestsInSeparateProcesses]
 final class DiscardTest extends TestCase
 {

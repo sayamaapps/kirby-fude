@@ -1,13 +1,34 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Blueprints;
+use Sayamaapps\Fude\Config;
+use Sayamaapps\Fude\Content;
+use Sayamaapps\Fude\Drafts;
+use Sayamaapps\Fude\FudeError;
+use Sayamaapps\Fude\I18n;
+use Sayamaapps\Fude\Images;
+use Sayamaapps\Fude\Log;
+use Sayamaapps\Fude\Options;
+use Sayamaapps\Fude\Service;
+use Sayamaapps\Fude\Validator;
 
 /**
  * The class map in autoload.php matches src/: one entry per file, the file
  * name is the class name, and every class loads through the map.
  */
-#[CoversNothing]
+#[CoversClass(Blueprints::class)]
+#[CoversClass(Config::class)]
+#[CoversClass(Content::class)]
+#[CoversClass(Drafts::class)]
+#[CoversClass(FudeError::class)]
+#[CoversClass(I18n::class)]
+#[CoversClass(Images::class)]
+#[CoversClass(Log::class)]
+#[CoversClass(Options::class)]
+#[CoversClass(Service::class)]
+#[CoversClass(Validator::class)]
 final class AutoloadTest extends TestCase
 {
 	public function testEveryEntryLoadsItsClass(): void

@@ -1,15 +1,16 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Validator;
 
 /**
  * Validation at /fude/draft: unknown field, wrong type, select outside the
  * options, required, maxlength (own and from the blueprint), unknown
  * collection or action, malformed input — nothing is written on any of them.
  */
-#[CoversNothing]
+#[CoversClass(Validator::class)]
 #[RunTestsInSeparateProcesses]
 final class ValidationTest extends TestCase
 {

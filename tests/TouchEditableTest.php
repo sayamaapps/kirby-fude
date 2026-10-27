@@ -1,8 +1,9 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Service;
 
 /**
  * Collection option `touch` with `editable: true`: a draft may name the day
@@ -11,7 +12,7 @@ use PHPUnit\Framework\TestCase;
  * (`touchDate`) with its published value. A collection whose touch is not
  * editable, or that has no touch, refuses the parameter.
  */
-#[CoversNothing]
+#[CoversClass(Service::class)]
 #[RunTestsInSeparateProcesses]
 final class TouchEditableTest extends TestCase
 {

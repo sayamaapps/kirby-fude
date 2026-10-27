@@ -1,15 +1,16 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Validator;
 
 /**
  * Field type `date`: YYYY-MM-DD, a real calendar date, empty allowed unless
  * required. `min: 'today'` refuses dates before today (today = the draft's
  * clock in PHP's time zone). Other values of min are configuration errors.
  */
-#[CoversNothing]
+#[CoversClass(Validator::class)]
 #[RunTestsInSeparateProcesses]
 final class DateTest extends TestCase
 {

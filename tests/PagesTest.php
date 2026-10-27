@@ -1,8 +1,9 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Service;
 
 /**
  * A pages collection: create makes a draft page (invisible, previewable
@@ -10,7 +11,7 @@ use PHPUnit\Framework\TestCase;
  * child; discard deletes the draft page or the changes; hash conflict when
  * the child was published in the Panel meanwhile.
  */
-#[CoversNothing]
+#[CoversClass(Service::class)]
 #[RunTestsInSeparateProcesses]
 final class PagesTest extends TestCase
 {

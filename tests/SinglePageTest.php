@@ -1,8 +1,9 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Fude\Service;
 
 /**
  * kind: page — one page is the collection. Its declared fields are the page
@@ -10,7 +11,7 @@ use PHPUnit\Framework\TestCase;
  * changes version (like structure), publish/discard work the same way, and
  * the schema lists the one entry with the published values.
  */
-#[CoversNothing]
+#[CoversClass(Service::class)]
 #[RunTestsInSeparateProcesses]
 final class SinglePageTest extends TestCase
 {

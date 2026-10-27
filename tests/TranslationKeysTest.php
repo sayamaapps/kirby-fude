@@ -1,6 +1,6 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 use Sayamaapps\Fude\I18n;
@@ -9,7 +9,7 @@ use Sayamaapps\Fude\I18n;
  * Plugin translations come as sayamaapps.fude.<key> and as the 1.x alias
  * fude.<key>, with the same text, for every language Fude ships.
  */
-#[CoversNothing]
+#[CoversClass(I18n::class)]
 #[RunTestsInSeparateProcesses]
 final class TranslationKeysTest extends TestCase
 {
