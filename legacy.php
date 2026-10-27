@@ -1,5 +1,6 @@
 <?php
 
+use Kirby\Cms\App;
 use Kirby\Cms\Helpers;
 use Kirby\Http\Response;
 use Sayamaapps\Fude\Options;
@@ -8,20 +9,20 @@ use Sayamaapps\Fude\Service;
 /**
  * Names of the 1.x API, kept until 2.0 (README, Deprecations).
  *
- * Loaded once by index.php, after the class map is registered. Class aliases
- * and function wrappers only; no logic here.
+ * Loaded once by index.php, after the class map is registered. Aliases and
+ * function wrappers only; no logic here.
+ *
+ * A `Fude\` class name becomes an alias when it is first used. An eager
+ * class_alias() would load every class on every request.
  */
-class_alias(\Sayamaapps\Fude\Blueprints::class, 'Fude\\Blueprints');
-class_alias(\Sayamaapps\Fude\Config::class, 'Fude\\Config');
-class_alias(\Sayamaapps\Fude\Content::class, 'Fude\\Content');
-class_alias(\Sayamaapps\Fude\Drafts::class, 'Fude\\Drafts');
-class_alias(\Sayamaapps\Fude\FudeError::class, 'Fude\\FudeError');
-class_alias(\Sayamaapps\Fude\I18n::class, 'Fude\\I18n');
-class_alias(\Sayamaapps\Fude\Images::class, 'Fude\\Images');
-class_alias(\Sayamaapps\Fude\Log::class, 'Fude\\Log');
-class_alias(\Sayamaapps\Fude\Options::class, 'Fude\\Options');
-class_alias(\Sayamaapps\Fude\Service::class, 'Fude\\Service');
-class_alias(\Sayamaapps\Fude\Validator::class, 'Fude\\Validator');
+spl_autoload_register(static function (string $class): void {
+	if (str_starts_with($class, 'Fude\\')) {
+		$target = 'Sayamaapps\\Fude\\' . substr($class, strlen('Fude\\'));
+		if (class_exists($target)) {
+			class_alias($target, $class);
+		}
+	}
+});
 
 if (Helpers::hasOverride('fude_option') === false) {
 	/** Reads `fude.<key>`. Deprecated: use Sayamaapps\Fude\Options::get(). */
@@ -32,7 +33,7 @@ if (Helpers::hasOverride('fude_option') === false) {
 			'fude-function'
 		);
 
-		return Options::get(Kirby\Cms\App::instance(), $key, $default);
+		return Options::get(App::instance(), $key, $default);
 	}
 }
 
