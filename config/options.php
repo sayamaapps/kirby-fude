@@ -1,6 +1,6 @@
 <?php
 
-// Options Fude reads, relative to the plugin: `sayamaapps.fude.<key>` (OPT-1).
+// Options Fude reads, relative to the plugin: `sayamaapps.fude.<key>`.
 // Each value is null on purpose. Options::get() gives the default at every read,
 // and a default here would hide the 1.x spelling `fude.<key>` (fallback).
 return [

@@ -27,7 +27,7 @@ class Options
 	/** The 1.x namespace, read when the new key is not set. Removed in 2.0. */
 	public const LEGACY_PREFIX = 'fude.';
 
-	/** The option namespace of the plugin (OPT-1). */
+	/** The option namespace of the plugin. */
 	public const PREFIX = 'sayamaapps.fude.';
 
 	/** The declaration of what the bot may change: `site/config/fude.php`. */
