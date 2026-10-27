@@ -60,8 +60,18 @@
     "scripts": {
         "analyze:phpmd": "vendor/bin/phpmd src,index.php github phpmd.xml.dist",
         "analyze:psalm": "vendor/bin/psalm",
-        "analyze:require-checker": "vendor/bin/composer-require-checker check --config-file=composer-require-checker.json composer.json",
-        "analyze:unused": "vendor/bin/composer-unused",
+        "analyze:require-checker": "vendor/bin/composer-require-checker check --config-file=config/composer-require-checker.json composer.json",
+        "analyze:unused": "vendor/bin/composer-unused --configuration=config/composer-unused.php",
+        "ci": [
+            "@composer validate --strict --no-check-version --no-check-all",
+            "@composer normalize:check",
+            "@composer analyze:require-checker",
+            "@composer analyze:unused",
+            "@composer check-platform-reqs",
+            "@composer analyze:psalm",
+            "@composer analyze:phpmd",
+            "@composer test"
+        ],
         "normalize:check": "@composer normalize --dry-run",
         "test": "vendor/bin/phpunit"
     }

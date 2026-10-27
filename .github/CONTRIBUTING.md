@@ -21,6 +21,7 @@ To try the plugin on a site, link or copy the folder to `site/plugins/fude/`.
 Run these before you open a pull request. CI runs the same checks on PHP 8.2 to 8.5.
 
 ```sh
+composer ci                       # all checks below, without the style check
 composer test                     # PHPUnit
 composer analyze:psalm            # Psalm
 composer analyze:phpmd            # PHP Mess Detector

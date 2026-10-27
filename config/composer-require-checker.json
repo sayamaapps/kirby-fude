@@ -3,7 +3,10 @@
 		"index.php",
 		"legacy.php",
 		"autoload.php",
-		"config/*.php",
+		"config/blueprints.php",
+		"config/options.php",
+		"config/routes.php",
+		"config/translations.php",
 		"src/*.php"
 	],
 	"symbol-whitelist": [

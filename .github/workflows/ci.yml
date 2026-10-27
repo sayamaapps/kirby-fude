@@ -24,8 +24,8 @@ jobs:
       matrix:
         php: ['8.2', '8.3', '8.4', '8.5']
         # lowest: the oldest Kirby 5 and the oldest dependencies allowed by composer.json.
-        # highest: the newest versions. composer.lock is not committed (see .gitignore).
-        deps: [lowest, highest]
+        # locked: the versions in composer.lock, the ones the plugin is developed against.
+        deps: [lowest, locked]
     steps:
       - uses: actions/checkout@v4
 
@@ -39,8 +39,8 @@ jobs:
         if: matrix.deps == 'lowest'
         run: composer update --no-interaction --no-progress --prefer-dist --prefer-lowest --prefer-stable
 
-      - name: Install dependencies, highest versions
-        if: matrix.deps == 'highest'
+      - name: Install dependencies, locked versions
+        if: matrix.deps == 'locked'
         run: composer install --no-interaction --no-progress --prefer-dist
 
       - name: Tests (Kirby as fixture)
@@ -74,6 +74,19 @@ jobs:
 
       - name: Unused dependencies
         run: composer analyze:unused
+
+      # phpcpd 6 needs sebastian/cli-parser 1.x, which PHPUnit 11 excludes, so
+      # it is installed globally and not as a dependency.
+      - name: Install phpcpd
+        run: |
+          composer global require --no-interaction sebastian/phpcpd:6.0.3
+          echo "$(composer global config home)/vendor/bin" >> "$GITHUB_PATH"
+
+      - name: Copy-paste detection
+        run: phpcpd --fuzzy --exclude tests --exclude vendor .
+
+      - name: Platform requirements
+        run: composer check-platform-reqs
 
       - name: Psalm
         run: composer analyze:psalm
