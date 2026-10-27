@@ -7,6 +7,10 @@ namespace Sayamaapps\Fude;
  * (I18n::t()), the status becomes the HTTP status, `data` is merged into the
  * JSON body (for example the current hash on a conflict).
  *
+ * It stays a RuntimeException rather than a Kirby exception: code that
+ * catches RuntimeException keeps working. Service::respond() turns it into
+ * the JSON reply, so Kirby's error page never shows it.
+ *
  * @author    Simon Räder <https://sayamaapps.de>
  * @link      https://github.com/sayamaapps/kirby-fude
  * @copyright Simon Räder
