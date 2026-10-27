@@ -13,18 +13,6 @@ use Sayamaapps\Fude\Service;
 #[RunTestsInSeparateProcesses]
 final class LegacyTest extends TestCase
 {
-	public function testFudeOptionReadsTheOldKeyWithADefault(): void
-	{
-		[$tmp, $app] = fude_fixture();
-		try {
-			$app(options: ['fude.maxCollections' => 7]);
-			same(7, fude_option('maxCollections', 30), 'Old key read by the 1.x function');
-			same('dflt', fude_option('nonexistent', 'dflt'), 'Default when neither key is set');
-		} finally {
-			cleanup($tmp);
-		}
-	}
-
 	public function testFudeNotFoundAnswersWithA404(): void
 	{
 		[$tmp, $app] = fude_fixture();
@@ -33,6 +21,18 @@ final class LegacyTest extends TestCase
 			same(404, fude_not_found()->code(), '1.x 404 function');
 			same(404, Service::notFound()->code(), 'Service::notFound()');
 			same(404, Service::respondNow('nope')->code(), 'Unknown route through the entry point');
+		} finally {
+			cleanup($tmp);
+		}
+	}
+
+	public function testFudeOptionReadsTheOldKeyWithADefault(): void
+	{
+		[$tmp, $app] = fude_fixture();
+		try {
+			$app(options: ['fude.maxCollections' => 7]);
+			same(7, fude_option('maxCollections', 30), 'Old key read by the 1.x function');
+			same('dflt', fude_option('nonexistent', 'dflt'), 'Default when neither key is set');
 		} finally {
 			cleanup($tmp);
 		}
