@@ -15,7 +15,6 @@ use Kirby\Cms\Helpers;
  * spellings work, flat (`'sayamaapps.fude.active' => true`) and nested
  * (`'sayamaapps' => ['fude' => ['active' => true]]`).
  *
- * @package   Sayamaapps\Fude
  * @author    Simon Räder <https://sayamaapps.de>
  * @link      https://github.com/sayamaapps/kirby-fude
  * @copyright Simon Räder
@@ -79,7 +78,11 @@ class Options
 		}
 		$ip = self::unmapped($ip);
 		foreach (self::trustedProxies($kirby) as $entry) {
-			[$net, $bits] = self::parseRange($entry);
+			$range = self::parseRange($entry);
+			if ($range === null) {
+				continue;
+			}
+			[$net, $bits] = $range;
 			if (strlen($net) !== strlen($ip)) {
 				continue;
 			}
@@ -134,8 +137,8 @@ class Options
 	 */
 	private static function parseRange(string $entry): array|null
 	{
-		[$address, $bits] = str_contains($entry, '/') ? explode('/', $entry, 2) : [$entry, null];
-		$net = @inet_pton($address);
+		[$address, $bits] = array_pad(explode('/', $entry, 2), 2, null);
+		$net = $address === null ? false : @inet_pton($address);
 		if ($net === false) {
 			return null;
 		}
@@ -162,7 +165,7 @@ class Options
 		if (is_string($id) && trim($id) !== '') {
 			return trim($id);
 		}
-		return strtolower((string)parse_url($kirby->url('index'), PHP_URL_HOST));
+		return strtolower((string)parse_url((string)$kirby->url('index'), PHP_URL_HOST));
 	}
 
 	/**
@@ -175,7 +178,7 @@ class Options
 	public static function timezone(App $kirby): DateTimeZone
 	{
 		$zone = self::get($kirby, 'timezone', self::DEFAULT_TIMEZONE);
-		if (!is_string($zone) || !in_array($zone, DateTimeZone::listIdentifiers(), true)) {
+		if (!is_string($zone) || $zone === '' || !in_array($zone, DateTimeZone::listIdentifiers(), true)) {
 			throw FudeError::t('config.timezone', ['value' => is_string($zone) ? $zone : get_debug_type($zone)], 500);
 		}
 		return new DateTimeZone($zone);

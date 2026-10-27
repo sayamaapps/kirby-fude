@@ -14,7 +14,6 @@ use Kirby\Data\Data;
  * version is Fude's own draft (or a Panel editor's unsaved work) and never
  * part of the hash.
  *
- * @package   Sayamaapps\Fude
  * @author    Simon Räder <https://sayamaapps.de>
  * @link      https://github.com/sayamaapps/kirby-fude
  * @copyright Simon Räder
@@ -63,7 +62,7 @@ class Content
 		if ($target !== null) {
 			$content = $target->version('latest')->read() ?? [];
 			unset($content['uuid'], $content['lock']);
-			return hash('sha256', json_encode($content, JSON_UNESCAPED_UNICODE));
+			return hash('sha256', (string)json_encode($content, JSON_UNESCAPED_UNICODE));
 		}
 		return hash('sha256', implode("\n", $page->children()->keys()));
 	}

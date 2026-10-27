@@ -18,7 +18,6 @@ use RuntimeException;
  * original ends up on the server. Formats outside the declaration are
  * refused.
  *
- * @package   Sayamaapps\Fude
  * @author    Simon Räder <https://sayamaapps.de>
  * @link      https://github.com/sayamaapps/kirby-fude
  * @copyright Simon Räder

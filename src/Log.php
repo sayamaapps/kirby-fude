@@ -15,7 +15,6 @@ use RuntimeException;
  * Logging never breaks a request: errors are swallowed after a note in the
  * PHP error log. Starts over at 4 MB.
  *
- * @package   Sayamaapps\Fude
  * @author    Simon Räder <https://sayamaapps.de>
  * @link      https://github.com/sayamaapps/kirby-fude
  * @copyright Simon Räder

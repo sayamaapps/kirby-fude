@@ -9,6 +9,7 @@ use Kirby\Cms\File;
 use Kirby\Cms\ModelWithContent;
 use Kirby\Cms\Page;
 use Kirby\Cms\User;
+use Kirby\Content\Field;
 use Kirby\Content\Version;
 use Kirby\Form\Form;
 use Kirby\Http\Request\Auth\BasicAuth;
@@ -38,7 +39,6 @@ use Throwable;
  * Kirby's own Version::publish(), which validates against the blueprint
  * once more.
  *
- * @package   Sayamaapps\Fude
  * @author    Simon Räder <https://sayamaapps.de>
  * @link      https://github.com/sayamaapps/kirby-fude
  * @copyright Simon Räder
@@ -122,7 +122,7 @@ class Service
 	{
 		$content = $version->read() ?? [];
 		unset($content['lock']);
-		return hash('sha256', json_encode($content, JSON_UNESCAPED_UNICODE));
+		return hash('sha256', (string)json_encode($content, JSON_UNESCAPED_UNICODE));
 	}
 
 	/**
@@ -416,11 +416,11 @@ class Service
 			$entry['key'] = null; // the whole list, no single entry
 		} elseif ($action === 'create') {
 			foreach ($rows as $row) {
-				if (Content::sameKey($row[$keyField] ?? '', $clean[$keyField])) {
-					throw FudeError::t('collection.exists', ['field' => $keyLabel, 'key' => $clean[$keyField]], 409);
+				if (Content::sameKey($row[$keyField ?? ''] ?? '', $clean[$keyField ?? ''])) {
+					throw FudeError::t('collection.exists', ['field' => $keyLabel, 'key' => $clean[$keyField ?? '']], 409);
 				}
 			}
-			$entry['key'] = $clean[$keyField];
+			$entry['key'] = $clean[$keyField ?? ''];
 		} else {
 			// update and delete both name an existing entry.
 			$key = $input['key'] ?? null;
@@ -429,14 +429,14 @@ class Service
 			}
 			$index = Content::find($collection, $rows, $key);
 			$entry['key'] = trim($key);
-			if ($action === 'update' && isset($clean[$keyField])) {
-				self::checkKeyFree($collection, $rows, $clean[$keyField], $index);
+			if ($action === 'update' && isset($clean[$keyField ?? ''])) {
+				self::checkKeyFree($collection, $rows, $clean[$keyField ?? ''], $index);
 			}
 		}
 
 		if ($action === 'replace') {
-			foreach ($entries as $row) {
-				$published = array_values(array_filter($rows, fn ($old) => Content::sameKey($old[$keyField] ?? '', $row[$keyField])));
+			foreach ($entries ?? [] as $row) {
+				$published = array_values(array_filter($rows, fn ($old) => Content::sameKey($old[$keyField ?? ''] ?? '', $row[$keyField ?? ''])));
 				self::checkShown($collection, $published[0] ?? [], $row);
 			}
 		} elseif ($action !== 'delete') {
@@ -464,8 +464,7 @@ class Service
 		string $action,
 		DateTimeImmutable $now,
 		array &$entry
-	): array
-	{
+	): array {
 		$file = null;
 		if ($action === 'create') {
 			$hash = Content::hash($kirby, $collection);
@@ -480,6 +479,7 @@ class Service
 					'isDraft'  => true,
 				]);
 				if ($upload !== null) {
+					assert($format !== null && $imageField !== null);
 					$file = self::storeImage($kirby, $child, $collection, $upload, $format, $imageField, $content);
 					$content[$imageField] = [self::fileReference($file)];
 					$child = $child->update([$imageField => $content[$imageField]]);
@@ -509,6 +509,7 @@ class Service
 			return ['draft' => Drafts::public($record), 'token' => $record['token'], 'preview' => $record['preview']];
 		}
 
+		assert($index !== null);
 		$child = $kirby->page($rows[$index]['_id']);
 		if (!$child instanceof Page) {
 			throw FudeError::t('collection.page', ['name' => $collection['name']], 500);
@@ -540,6 +541,7 @@ class Service
 		}
 		$content = self::stored($kirby, $collection, $clean);
 		if ($upload !== null) {
+			assert($format !== null && $imageField !== null);
 			$file = self::storeImage($kirby, $child, $collection, $upload, $format, $imageField, $rows[$index] + $clean);
 			$content[$imageField] = [self::fileReference($file)];
 		}
@@ -610,6 +612,7 @@ class Service
 		return ['draft' => Drafts::public($record), 'token' => $record['token'], 'preview' => $record['preview']];
 	}
 
+	/** @param list<array<string, mixed>> $rows the published rows */
 	private static function draftStructure(
 		App $kirby,
 		array $collection,
@@ -625,15 +628,14 @@ class Service
 		array $touched,
 		DateTimeImmutable $now,
 		array &$entry
-	): array
-	{
+	): array {
 		$field = $collection['field'];
 		self::checkEditable($page);
 		$hash = Content::hash($kirby, $collection);
 
 		// Checked before anything is stored: a refused draft leaves no file behind.
 		if (isset($collection['maxEntries']) && in_array($action, ['create', 'replace'], true)) {
-			$total = $action === 'replace' ? count($entries) : count($rows) + ($index === null ? 1 : 0);
+			$total = $action === 'replace' ? count($entries ?? []) : count($rows) + ($index === null ? 1 : 0);
 			if ($total > $collection['maxEntries']) {
 				throw FudeError::t('collection.maxEntries', ['max' => $collection['maxEntries']]);
 			}
@@ -645,10 +647,11 @@ class Service
 		if ($action === 'delete') {
 			// The row leaves the list. Its image stays on the page, as with an
 			// update: removing files is the editor's decision in the Panel.
+			assert($index !== null);
 			unset($rows[$index]);
 			$rows = array_values($rows);
 		} elseif ($action === 'replace') {
-			$stored = array_map(fn (array $row) => self::stored($kirby, $collection, $row), $entries);
+			$stored = array_values(array_map(fn (array $row) => self::stored($kirby, $collection, $row), $entries ?? []));
 			$merged = self::replaced($rows, $stored, $collection['key'], $imageField, $collection['fields']);
 			$rows = $merged['rows'];
 			$replace = $merged['summary'];
@@ -658,6 +661,7 @@ class Service
 				$row[$name] = $value;
 			}
 			if ($upload !== null) {
+				assert($format !== null && $imageField !== null);
 				$file = self::storeImage($kirby, $page, $collection, $upload, $format, $imageField, $row);
 				$row[$imageField] = [self::fileReference($file)];
 			}
@@ -787,7 +791,8 @@ class Service
 			foreach (array_keys($meta) as $key) {
 				unset($meta[$key]['uuid'], $meta[$key]['lock']);
 			}
-			$state[$file->filename()] = [is_file($file->root()) ? hash_file('xxh128', $file->root()) : null, $meta];
+			$root = (string)$file->root();
+			$state[$file->filename()] = [is_file($root) ? hash_file('xxh128', $root) : null, $meta];
 		}
 		ksort($state);
 		return hash('sha256', (string)json_encode($state, JSON_UNESCAPED_UNICODE));
@@ -796,7 +801,8 @@ class Service
 	/** The file's `file://` UUID as content stores it, or null when it has none. */
 	private static function fileUuid(File $file): string|null
 	{
-		$uuid = $file->content()->get('uuid')->value();
+		$field = $file->content()->get('uuid');
+		$uuid = $field instanceof Field ? $field->value() : null;
 		return is_string($uuid) && $uuid !== '' ? 'file://' . $uuid : null;
 	}
 
@@ -992,7 +998,7 @@ class Service
 						throw FudeError::t('collection.fileInUse', ['name' => $child->title()->value(), 'file' => $file->filename()], 409);
 					}
 				}
-				$url = $child->parent()->url();
+				$url = $child->parent()?->url();
 				$child->delete();
 				$hash = Content::hash($kirby, $collection, null);
 				Drafts::delete($kirby, $record['id']);
@@ -1063,7 +1069,7 @@ class Service
 	 * list; its files stay on the page, as with delete.
 	 *
 	 * @param list<array<string, mixed>> $current the published rows
-	 * @param list<array<string, string>> $entries the validated new rows
+	 * @param list<array<string, mixed>> $entries the validated new rows
 	 * @return array{rows: list<array<string, mixed>>, summary: array{kept: list<string>, added: list<string>, removed: list<string>, withoutImage: list<string>}}
 	 */
 	private static function replaced(array $current, array $entries, string $keyField, string|null $imageField, array $declared): array
@@ -1073,7 +1079,7 @@ class Service
 		$added = [];
 		$withoutImage = [];
 		foreach ($entries as $entry) {
-			$key = $entry[$keyField];
+			$key = (string)$entry[$keyField];
 			$base = [];
 			foreach ($current as $old) {
 				if (Content::sameKey($old[$keyField] ?? '', $key)) {

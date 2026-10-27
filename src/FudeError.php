@@ -7,7 +7,6 @@ namespace Sayamaapps\Fude;
  * (I18n::t()), the status becomes the HTTP status, `data` is merged into the
  * JSON body (for example the current hash on a conflict).
  *
- * @package   Sayamaapps\Fude
  * @author    Simon Räder <https://sayamaapps.de>
  * @link      https://github.com/sayamaapps/kirby-fude
  * @copyright Simon Räder

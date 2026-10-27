@@ -19,6 +19,7 @@
 		"Kirby\\Cms\\Pages",
 		"Kirby\\Cms\\Site",
 		"Kirby\\Cms\\User",
+		"Kirby\\Content\\Field",
 		"Kirby\\Content\\Version",
 		"Kirby\\Data\\Data",
 		"Kirby\\Field\\FieldOptions",

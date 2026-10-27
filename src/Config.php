@@ -47,7 +47,6 @@ use Kirby\Form\Form;
  * know, or knows with an incompatible type, makes the configuration invalid
  * — loudly, at every request, not silently at publish time.
  *
- * @package   Sayamaapps\Fude
  * @author    Simon Räder <https://sayamaapps.de>
  * @link      https://github.com/sayamaapps/kirby-fude
  * @copyright Simon Räder
@@ -624,9 +623,11 @@ class Config
 			// or find. Forced here, so the blueprint merge can only add to it.
 			$collection['fields'][$key]['required'] = true;
 		}
-		foreach ($collection['fields'] as $fieldName => $field) {
-			if ($field['type'] === 'image' && $field['alt'] !== null &&
-				(!isset($collection['fields'][$field['alt']]) || $collection['fields'][$field['alt']]['type'] === 'image')) {
+		$declared = $collection['fields'];
+		foreach ($declared as $fieldName => $field) {
+			$alt = $field['alt'] ?? null;
+			if ($field['type'] === 'image' && $alt !== null &&
+				(!isset($declared[$alt]) || $declared[$alt]['type'] === 'image')) {
 				throw self::invalid("collection \"$name\": field \"$fieldName\" alt must name a declared text field");
 			}
 		}
@@ -724,7 +725,7 @@ class Config
 		} catch (\Throwable $e) {
 			throw self::invalid("collection \"{$collection['name']}\": field \"$name\" query failed: " . $e->getMessage());
 		}
-		return array_map(fn (array $option) => (string)$option['value'], $options);
+		return array_values(array_map(fn (array $option) => (string)$option['value'], $options));
 	}
 
 	/**
@@ -790,12 +791,13 @@ class Config
 				$entry['touch'] = $collection['touch']['field'];
 			}
 			// A date the bot may choose (draft parameter `touch`), with its published value.
-			if (($collection['touch']['editable'] ?? false) === true) {
+			$touch = $collection['touch'] ?? [];
+			if (($touch['editable'] ?? false) === true) {
 				$entry['touchDate'] = [
-					'label'       => $collection['touch']['label'],
-					'description' => $collection['touch']['description'],
+					'label'       => $touch['label'] ?? null,
+					'description' => $touch['description'] ?? null,
 					'min'         => 'today',
-					'default'     => $collection['touch']['default'] ?? 'today',
+					'default'     => $touch['default'] ?? 'today',
 					'current'     => self::touchCurrent($kirby, $collection),
 				];
 			}

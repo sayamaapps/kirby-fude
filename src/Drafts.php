@@ -14,7 +14,6 @@ use RuntimeException;
  * what to remove again on discard. The content itself lives in Kirby (the
  * `changes` version, or a draft page); the record only points at it.
  *
- * @package   Sayamaapps\Fude
  * @author    Simon Räder <https://sayamaapps.de>
  * @link      https://github.com/sayamaapps/kirby-fude
  * @copyright Simon Räder

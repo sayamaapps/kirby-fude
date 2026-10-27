@@ -14,7 +14,6 @@ namespace Sayamaapps\Fude;
  * The language is set once per request (Options::language()) and defaults to
  * English. Missing keys fall back to English, then to the key.
  *
- * @package   Sayamaapps\Fude
  * @author    Simon Räder <https://sayamaapps.de>
  * @link      https://github.com/sayamaapps/kirby-fude
  * @copyright Simon Räder
