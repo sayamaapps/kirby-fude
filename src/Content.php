@@ -14,7 +14,7 @@ use Kirby\Data\Data;
  * version is Fude's own draft (or a Panel editor's unsaved work) and never
  * part of the hash.
  */
-final class Content
+class Content
 {
 	/**
 	 * Index of the row (or the child page) identified by the key value.

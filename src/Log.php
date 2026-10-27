@@ -15,7 +15,7 @@ use RuntimeException;
  * Logging never breaks a request: errors are swallowed after a note in the
  * PHP error log. Starts over at 4 MB.
  */
-final class Log
+class Log
 {
 	public const FILE = 'log.jsonl';
 	private const MAX_BYTES = 4 * 1024 * 1024;

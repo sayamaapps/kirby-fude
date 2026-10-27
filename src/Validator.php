@@ -12,7 +12,7 @@ use Kirby\Text\KirbyTag;
  * when it sends something that does not arrive. Image fields are not text
  * and arrive as uploads; a text value for them is refused.
  */
-final class Validator
+class Validator
 {
 	/**
 	 * A KirbyTag as KirbyTags::parse() finds it (the same pattern): "(" right

@@ -15,7 +15,7 @@ use Kirby\Cms\Helpers;
  * spellings work, flat (`'sayamaapps.fude.active' => true`) and nested
  * (`'sayamaapps' => ['fude' => ['active' => true]]`).
  */
-final class Options
+class Options
 {
 	public const DEFAULT_TIMEZONE = 'Europe/Berlin';
 

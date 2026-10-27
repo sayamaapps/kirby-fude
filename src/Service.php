@@ -38,7 +38,7 @@ use Throwable;
  * Kirby's own Version::publish(), which validates against the blueprint
  * once more.
  */
-final class Service
+class Service
 {
 	public const FORMAT = 1;
 

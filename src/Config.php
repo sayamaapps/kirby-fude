@@ -47,7 +47,7 @@ use Kirby\Form\Form;
  * know, or knows with an incompatible type, makes the configuration invalid
  * — loudly, at every request, not silently at publish time.
  */
-final class Config
+class Config
 {
 	public const ACTIONS = ['create', 'update', 'delete', 'replace'];
 

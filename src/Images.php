@@ -18,7 +18,7 @@ use RuntimeException;
  * original ends up on the server. Formats outside the declaration are
  * refused.
  */
-final class Images
+class Images
 {
 	public const DEFAULT_MAX_BYTES = 15 * 1024 * 1024;
 

@@ -36,7 +36,7 @@ use Kirby\Cms\Page;
  * the validation stays in one place. Blueprint types that Fude cannot map
  * are skipped inside structures and rejected when marked.
  */
-final class Blueprints
+class Blueprints
 {
 	private const DEFAULT_ACTIONS = ['create', 'update', 'delete'];
 	private const FIELD_OPTIONS = ['description', 'maxWidth', 'alt', 'formats', 'template'];

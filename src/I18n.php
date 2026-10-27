@@ -13,7 +13,7 @@ namespace Sayamaapps\Fude;
  * The language is set once per request (Options::language()) and defaults to
  * English. Missing keys fall back to English, then to the key.
  */
-final class I18n
+class I18n
 {
 	/** Languages Fude ships. English is the default and the fallback. */
 	public const LANGUAGES = ['en', 'de'];

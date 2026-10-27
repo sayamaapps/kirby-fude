@@ -14,7 +14,7 @@ use RuntimeException;
  * what to remove again on discard. The content itself lives in Kirby (the
  * `changes` version, or a draft page); the record only points at it.
  */
-final class Drafts
+class Drafts
 {
 	public const DEFAULT_LIFETIME = 48 * 3600;
 
