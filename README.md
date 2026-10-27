@@ -120,7 +120,7 @@ return [
 ];
 ```
 
-| Option (old spelling `fude.<name>`) | Default | Meaning |
+| Option (`sayamaapps.fude.<name>`, old spelling `fude.<name>`) | Default | Meaning |
 |---|---|---|
 | `active` | `false` | Master switch. Off: routes answer 404 and the role does not exist. |
 | `config` | `site/config/fude.php` | Declaration file, relative to the project root or absolute |
