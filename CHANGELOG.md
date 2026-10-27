@@ -16,9 +16,10 @@ All notable changes to this project are documented here. Versions follow
 
 - **Plugin layout follows the Kirby plugin conventions; behaviour is the same.**
   Classes live in `Sayamaapps\Fude\`, loaded by a class map. The 1.x names
-  keep working: `Fude\` classes (aliases in `legacy.php`, `Fude\FudeError`
-  from the start), `fude_option()` and `fude_not_found()`, the `fude.<name>`
-  options and the `fude.<key>` translations. None of them prints a notice.
+  keep working: the `Fude\` classes (aliases in `legacy.php`, created at
+  load time so `catch` and `instanceof` see them), `fude_option()` and
+  `fude_not_found()`, the `fude.<name>` options and the `fude.<key>`
+  translations. None of them prints a notice.
   Their removal is planned for 2.0 (README, "Planned for 2.0").
 - Tests run on PHPUnit; Psalm, PHP Mess Detector and the code style are in CI.
 

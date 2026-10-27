@@ -3,7 +3,6 @@
 use Kirby\Cms\App;
 use Kirby\Cms\Helpers;
 use Kirby\Http\Response;
-use Sayamaapps\Fude\FudeError;
 use Sayamaapps\Fude\Options;
 use Sayamaapps\Fude\Service;
 
@@ -15,23 +14,22 @@ use Sayamaapps\Fude\Service;
  * turns a deprecation into an exception, which would stop a site that still
  * uses these names. The names are marked `@deprecated` instead.
  *
- * A `Fude\` class name becomes an alias when it is first used. An eager
- * class_alias() would load every class on every request. The one exception
- * is FudeError: `catch` and `instanceof` do not autoload, so the 1.x name of
- * the exception must exist before the first throw.
+ * Every 1.x class name is aliased here, eagerly. `catch` and `instanceof`
+ * do not autoload, so a lazy alias would not exist before the first use of
+ * the old name. The list is the 1.x class set; DraftContext is new in 2.x
+ * and has no 1.x name.
  */
-spl_autoload_register(static function (string $class): void {
-	if (str_starts_with($class, 'Fude\\')) {
-		$target = 'Sayamaapps\\Fude\\' . substr($class, strlen('Fude\\'));
-		if (class_exists($target)) {
-			class_alias($target, $class);
-		}
-	}
-});
-
-if (!class_exists('Fude\\FudeError', false)) {
-	class_alias(FudeError::class, 'Fude\\FudeError');
-}
+class_alias(\Sayamaapps\Fude\Blueprints::class, 'Fude\\Blueprints');
+class_alias(\Sayamaapps\Fude\Config::class, 'Fude\\Config');
+class_alias(\Sayamaapps\Fude\Content::class, 'Fude\\Content');
+class_alias(\Sayamaapps\Fude\Drafts::class, 'Fude\\Drafts');
+class_alias(\Sayamaapps\Fude\FudeError::class, 'Fude\\FudeError');
+class_alias(\Sayamaapps\Fude\I18n::class, 'Fude\\I18n');
+class_alias(\Sayamaapps\Fude\Images::class, 'Fude\\Images');
+class_alias(\Sayamaapps\Fude\Log::class, 'Fude\\Log');
+class_alias(\Sayamaapps\Fude\Options::class, 'Fude\\Options');
+class_alias(\Sayamaapps\Fude\Service::class, 'Fude\\Service');
+class_alias(\Sayamaapps\Fude\Validator::class, 'Fude\\Validator');
 
 if (Helpers::hasOverride('fude_option') === false) {
 	/**
