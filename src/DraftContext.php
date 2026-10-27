@@ -11,9 +11,10 @@ use Kirby\Cms\Page;
  * checked fields and the time. Service::draft() builds it once and hands it
  * to the draft method of the collection's kind.
  *
- * @author    Simon Räder <https://sayamaapps.de>
+ * @package   Kirby Fude
+ * @author    sayamaapps
  * @link      https://github.com/sayamaapps/kirby-fude
- * @copyright Simon Räder
+ * @copyright sayamaapps
  * @license   MIT
  */
 class DraftContext

@@ -5,8 +5,8 @@ namespace Sayamaapps\Fude;
 use Kirby\Cms\App;
 use Kirby\Cms\File;
 use Kirby\Cms\Page;
-use Kirby\Exception\Exception;
 use Kirby\Toolkit\Str;
+use RuntimeException;
 
 /**
  * Takes a photo from the chat and stores it the way the blueprint wants it.
@@ -18,9 +18,10 @@ use Kirby\Toolkit\Str;
  * original ends up on the server. Formats outside the declaration are
  * refused.
  *
- * @author    Simon Räder <https://sayamaapps.de>
+ * @package   Kirby Fude
+ * @author    sayamaapps
  * @link      https://github.com/sayamaapps/kirby-fude
- * @copyright Simon Räder
+ * @copyright sayamaapps
  * @license   MIT
  */
 class Images
@@ -83,7 +84,7 @@ class Images
 	{
 		$tmpDir = Options::directory($kirby) . '/tmp';
 		if (!is_dir($tmpDir) && !@mkdir($tmpDir, 0775, true) && !is_dir($tmpDir)) {
-			throw new Exception(message: 'Cannot create ' . $tmpDir);
+			throw new RuntimeException('Cannot create ' . $tmpDir);
 		}
 		// Capped: a key may be 500 characters, a filename must stay well
 		// under the 255-byte limit of common filesystems.
@@ -100,7 +101,7 @@ class Images
 				'quality' => 85,
 			]);
 			if (!is_file($resized)) {
-				throw new Exception(message: 'Thumb component wrote nothing');
+				throw new RuntimeException('Thumb component wrote nothing');
 			}
 			$props = [
 				'source'   => $resized,

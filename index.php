@@ -16,7 +16,6 @@ require_once __DIR__ . '/legacy.php';
 App::plugin(
 	name: 'sayamaapps/fude',
 	extends: [
-		'options'      => require __DIR__ . '/config/options.php',
 		'blueprints'   => require __DIR__ . '/config/blueprints.php',
 		'translations' => require __DIR__ . '/config/translations.php',
 		'routes'       => require __DIR__ . '/config/routes.php',

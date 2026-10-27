@@ -272,7 +272,7 @@ function fude_fixture(array $extraOptions = []): array
 		'fude.active' => true,
 		'fude.withoutHttps' => true,
 	] + $extraOptions;
-	// A plugin whose blueprint label is a translation key, as in kirby-higawari.
+	// A plugin whose blueprint label is a translation key.
 	@mkdir($tmp . '/site/plugins/labels', 0775, true);
 	file_put_contents($tmp . '/site/plugins/labels/index.php', "<?php\nKirby::plugin('test/labels', ['translations' => ['en' => ['fixture.preis.label' => 'Price'], 'de' => ['fixture.preis.label' => 'Preis']]]);\n");
 	// The optional `server` key of $request is the connection ($_SERVER as seen

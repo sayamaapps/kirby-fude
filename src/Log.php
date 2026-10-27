@@ -3,7 +3,7 @@
 namespace Sayamaapps\Fude;
 
 use Kirby\Cms\App;
-use Kirby\Exception\Exception;
+use RuntimeException;
 
 /**
  * `<storage>/fude/log.jsonl`: one JSON line per call — who (Kirby account
@@ -15,9 +15,10 @@ use Kirby\Exception\Exception;
  * Logging never breaks a request: errors are swallowed after a note in the
  * PHP error log. Starts over at 4 MB.
  *
- * @author    Simon Räder <https://sayamaapps.de>
+ * @package   Kirby Fude
+ * @author    sayamaapps
  * @link      https://github.com/sayamaapps/kirby-fude
- * @copyright Simon Räder
+ * @copyright sayamaapps
  * @license   MIT
  */
 class Log
@@ -37,13 +38,13 @@ class Log
 		try {
 			$dir = Options::directory($kirby);
 			if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
-				throw new Exception(message: 'Cannot create ' . $dir);
+				throw new RuntimeException('Cannot create ' . $dir);
 			}
 			$file = self::file($kirby);
 			$mode = is_file($file) && filesize($file) > self::MAX_BYTES ? 0 : FILE_APPEND;
 			$line = json_encode(['at' => $now->format(DATE_ATOM)] + $entry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 			if ($line === false || @file_put_contents($file, $line . "\n", $mode | LOCK_EX) === false) {
-				throw new Exception(message: 'Cannot write ' . $file);
+				throw new RuntimeException('Cannot write ' . $file);
 			}
 		} catch (\Throwable $e) {
 			error_log('Fude: log not written: ' . $e->getMessage());

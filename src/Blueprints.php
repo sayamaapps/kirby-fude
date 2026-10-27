@@ -36,9 +36,10 @@ use Kirby\Cms\Page;
  * the validation stays in one place. Blueprint types that Fude cannot map
  * are skipped inside structures and rejected when marked.
  *
- * @author    Simon Räder <https://sayamaapps.de>
+ * @package   Kirby Fude
+ * @author    sayamaapps
  * @link      https://github.com/sayamaapps/kirby-fude
- * @copyright Simon Räder
+ * @copyright sayamaapps
  * @license   MIT
  */
 class Blueprints

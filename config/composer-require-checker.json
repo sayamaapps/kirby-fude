@@ -4,7 +4,6 @@
 		"legacy.php",
 		"autoload.php",
 		"config/blueprints.php",
-		"config/options.php",
 		"config/routes.php",
 		"config/translations.php",
 		"src/*.php"
@@ -21,7 +20,6 @@
 		"Kirby\\Cms\\User",
 		"Kirby\\Content\\Field",
 		"Kirby\\Content\\Version",
-		"Kirby\\Exception\\Exception",
 		"Kirby\\Data\\Data",
 		"Kirby\\Field\\FieldOptions",
 		"Kirby\\Filesystem\\F",

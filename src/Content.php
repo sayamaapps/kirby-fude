@@ -14,9 +14,10 @@ use Kirby\Data\Data;
  * version is Fude's own draft (or a Panel editor's unsaved work) and never
  * part of the hash.
  *
- * @author    Simon Räder <https://sayamaapps.de>
+ * @package   Kirby Fude
+ * @author    sayamaapps
  * @link      https://github.com/sayamaapps/kirby-fude
- * @copyright Simon Räder
+ * @copyright sayamaapps
  * @license   MIT
  */
 class Content

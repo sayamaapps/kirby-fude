@@ -12,9 +12,10 @@ use Kirby\Text\KirbyTag;
  * when it sends something that does not arrive. Image fields are not text
  * and arrive as uploads; a text value for them is refused.
  *
- * @author    Simon Räder <https://sayamaapps.de>
+ * @package   Kirby Fude
+ * @author    sayamaapps
  * @link      https://github.com/sayamaapps/kirby-fude
- * @copyright Simon Räder
+ * @copyright sayamaapps
  * @license   MIT
  */
 class Validator

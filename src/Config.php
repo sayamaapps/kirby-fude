@@ -47,9 +47,10 @@ use Kirby\Form\Form;
  * know, or knows with an incompatible type, makes the configuration invalid
  * — loudly, at every request, not silently at publish time.
  *
- * @author    Simon Räder <https://sayamaapps.de>
+ * @package   Kirby Fude
+ * @author    sayamaapps
  * @link      https://github.com/sayamaapps/kirby-fude
- * @copyright Simon Räder
+ * @copyright sayamaapps
  * @license   MIT
  */
 class Config
@@ -1046,7 +1047,7 @@ class Config
 
 	/**
 	 * A text of a blueprint that may be a translation key (plugin blueprints,
-	 * such as `higawari.panel.date.help`): it reads as its text in the reply
+	 * such as `example.panel.date.help`): it reads as its text in the reply
 	 * language. Any other text, and a key without a text, stays as written.
 	 */
 	public static function translateKey(string $text): string

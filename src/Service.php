@@ -39,9 +39,10 @@ use Throwable;
  * Kirby's own Version::publish(), which validates against the blueprint
  * once more.
  *
- * @author    Simon Räder <https://sayamaapps.de>
+ * @package   Kirby Fude
+ * @author    sayamaapps
  * @link      https://github.com/sayamaapps/kirby-fude
- * @copyright Simon Räder
+ * @copyright sayamaapps
  * @license   MIT
  */
 class Service

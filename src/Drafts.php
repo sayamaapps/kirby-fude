@@ -3,7 +3,7 @@
 namespace Sayamaapps\Fude;
 
 use Kirby\Cms\App;
-use Kirby\Exception\Exception;
+use RuntimeException;
 
 /**
  * Draft records: one JSON file per draft in `<storage>/fude/drafts/`.
@@ -14,9 +14,10 @@ use Kirby\Exception\Exception;
  * what to remove again on discard. The content itself lives in Kirby (the
  * `changes` version, or a draft page); the record only points at it.
  *
- * @author    Simon Räder <https://sayamaapps.de>
+ * @package   Kirby Fude
+ * @author    sayamaapps
  * @link      https://github.com/sayamaapps/kirby-fude
- * @copyright Simon Räder
+ * @copyright sayamaapps
  * @license   MIT
  */
 class Drafts
@@ -45,7 +46,7 @@ class Drafts
 	{
 		$dir = self::directory($kirby);
 		if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
-			throw new Exception(message: 'Cannot create ' . $dir);
+			throw new RuntimeException('Cannot create ' . $dir);
 		}
 		$record['id'] = bin2hex(random_bytes(8));
 		$record['token'] = bin2hex(random_bytes(16));
@@ -104,7 +105,7 @@ class Drafts
 		$file = self::directory($kirby) . '/' . $record['id'] . '.json';
 		$json = json_encode($record, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 		if ($json === false || @file_put_contents($file, $json, LOCK_EX) === false) {
-			throw new Exception(message: 'Cannot write ' . $file);
+			throw new RuntimeException('Cannot write ' . $file);
 		}
 	}
 }
