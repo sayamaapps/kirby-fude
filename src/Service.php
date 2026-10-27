@@ -346,6 +346,31 @@ class Service
 		return ['id' => $record['id'], 'kept' => $kept];
 	}
 
+	/** The name of the collection's image field, or null. */
+	private static function imageField(array $collection): string|null
+	{
+		foreach ($collection['fields'] as $name => $rule) {
+			if ($rule['type'] === 'image') {
+				return $name;
+			}
+		}
+		return null;
+	}
+
+	/** What the draft shows the public, checked against the declaration: every replaced row, or the one entry. */
+	private static function checkDraftShown(App $kirby, array $collection, array $rows, int|null $index, string $action, array|null $entries, array $clean): void
+	{
+		if ($action === 'replace') {
+			$keyField = $collection['key'];
+			foreach ($entries ?? [] as $row) {
+				$published = array_values(array_filter($rows, fn ($old) => Content::sameKey($old[$keyField ?? ''] ?? '', $row[$keyField ?? ''])));
+				self::checkShown($collection, $published[0] ?? [], $row);
+			}
+		} elseif ($action !== 'delete') {
+			self::checkShown($collection, self::storedEntry($kirby, $collection, $rows, $index), $clean);
+		}
+	}
+
 	private static function draft(App $kirby, array $collections, array $input, DateTimeImmutable $now, array &$entry): array
 	{
 		$collection = self::collection($collections, $input['collection'] ?? null);
@@ -390,13 +415,7 @@ class Service
 			$clean = Validator::check($collection, $fields, $action, self::today($kirby, $now));
 		}
 
-		$imageField = null;
-		foreach ($collection['fields'] as $name => $rule) {
-			if ($rule['type'] === 'image') {
-				$imageField = $name;
-				break;
-			}
-		}
+		$imageField = self::imageField($collection);
 		if ($upload !== null && $imageField === null) {
 			throw FudeError::t('image.unexpected');
 		}
@@ -434,81 +453,92 @@ class Service
 			}
 		}
 
-		if ($action === 'replace') {
-			foreach ($entries ?? [] as $row) {
-				$published = array_values(array_filter($rows, fn ($old) => Content::sameKey($old[$keyField ?? ''] ?? '', $row[$keyField ?? ''])));
-				self::checkShown($collection, $published[0] ?? [], $row);
-			}
-		} elseif ($action !== 'delete') {
-			self::checkShown($collection, self::storedEntry($kirby, $collection, $rows, $index), $clean);
-		}
+		self::checkDraftShown($kirby, $collection, $rows, $index, $action, $entries, $clean);
 
 		if ($collection['kind'] === 'page') {
 			return self::draftSinglePage($kirby, $collection, $clean, $touch, $now, $entry);
 		}
-		return $collection['kind'] === 'structure'
-			? self::draftStructure($kirby, $collection, $page, $rows, $index, $clean, $upload, $format, $imageField, $action, $entries, $touch, $now, $entry)
-			: self::draftPage($kirby, $collection, $page, $rows, $index, $clean, $upload, $format, $imageField, $action, $now, $entry);
+		$context = new DraftContext($kirby, $collection, $page, $rows, $index, $clean, $action, $now, $entry);
+		$context->upload = $upload;
+		$context->format = $format;
+		$context->imageField = $imageField;
+		$context->entries = $entries;
+		$context->touched = $touch;
+		return $collection['kind'] === 'structure' ? self::draftStructure($context) : self::draftPage($context);
 	}
 
-	private static function draftPage(
-		App $kirby,
-		array $collection,
-		Page $parent,
-		array $rows,
-		int|null $index,
-		array $clean,
-		array|null $upload,
-		string|null $format,
-		string|null $imageField,
-		string $action,
-		DateTimeImmutable $now,
-		array &$entry
-	): array {
+	/** A create: a draft page under the parent, with its image, and the blueprint checked before it is saved. */
+	private static function draftNewPage(DraftContext $ctx): array
+	{
+		$kirby = $ctx->kirby;
+		$collection = $ctx->collection;
+		$parent = $ctx->page;
+		$clean = $ctx->clean;
+		$upload = $ctx->upload;
+		$format = $ctx->format;
+		$imageField = $ctx->imageField;
+		$now = $ctx->now;
+		$entry = &$ctx->entry;
 		$file = null;
-		if ($action === 'create') {
-			$hash = Content::hash($kirby, $collection);
-			$content = self::stored($kirby, $collection, $clean);
-			$child = null;
-			try {
-				$child = Page::create([
-					'parent'   => $parent,
-					'slug'     => Str::slug($clean['title']) . '-' . bin2hex(random_bytes(2)),
-					'template' => $collection['template'],
-					'content'  => $content,
-					'isDraft'  => true,
-				]);
-				if ($upload !== null) {
-					assert($format !== null && $imageField !== null);
-					$file = self::storeImage($kirby, $child, $collection, $upload, $format, $imageField, $content);
-					$content[$imageField] = [self::fileReference($file)];
-					$child = $child->update([$imageField => $content[$imageField]]);
-				}
-				self::checkBlueprint($child, $content);
-			} catch (Throwable $e) {
-				$child?->delete(true);
-				throw $e;
+		$hash = Content::hash($kirby, $collection);
+		$content = self::stored($kirby, $collection, $clean);
+		$child = null;
+		try {
+			$child = Page::create([
+				'parent'   => $parent,
+				'slug'     => Str::slug($clean['title']) . '-' . bin2hex(random_bytes(2)),
+				'template' => $collection['template'],
+				'content'  => $content,
+				'isDraft'  => true,
+			]);
+			if ($upload !== null) {
+				assert($format !== null && $imageField !== null);
+				$file = self::storeImage($kirby, $child, $collection, $upload, $format, $imageField, $content);
+				$content[$imageField] = [self::fileReference($file)];
+				$child = $child->update([$imageField => $content[$imageField]]);
 			}
-			$record = Drafts::create($kirby, [
-				'collection'  => $collection['name'],
-				'kind'        => 'pages',
-				'action'      => 'create',
-				'page'        => $child->id(),
-				'key'         => $entry['key'],
-				'index'       => null,
-				'fields'      => $clean,
-				'file'        => $file?->filename(),
-				'filesHash'   => self::filesHash($child->files()),
-				'hash'        => $hash,
-				'changesHash' => self::changesHash($child->version('latest')),
-				'preview'     => $child->version('latest')->url(),
-				'user'        => $entry['user'],
-				'actor'       => $entry['actor'],
-			], $now);
-			$entry['draft'] = $record['id'];
-			return ['draft' => Drafts::public($record), 'token' => $record['token'], 'preview' => $record['preview']];
+			self::checkBlueprint($child, $content);
+		} catch (Throwable $e) {
+			$child?->delete(true);
+			throw $e;
 		}
+		$record = Drafts::create($kirby, [
+			'collection'  => $collection['name'],
+			'kind'        => 'pages',
+			'action'      => 'create',
+			'page'        => $child->id(),
+			'key'         => $entry['key'],
+			'index'       => null,
+			'fields'      => $clean,
+			'file'        => $file?->filename(),
+			'filesHash'   => self::filesHash($child->files()),
+			'hash'        => $hash,
+			'changesHash' => self::changesHash($child->version('latest')),
+			'preview'     => $child->version('latest')->url(),
+			'user'        => $entry['user'],
+			'actor'       => $entry['actor'],
+		], $now);
+		$entry['draft'] = $record['id'];
+		return ['draft' => Drafts::public($record), 'token' => $record['token'], 'preview' => $record['preview']];
+	}
 
+	private static function draftPage(DraftContext $ctx): array
+	{
+		if ($ctx->action === 'create') {
+			return self::draftNewPage($ctx);
+		}
+		$kirby = $ctx->kirby;
+		$collection = $ctx->collection;
+		$rows = $ctx->rows;
+		$index = $ctx->index;
+		$clean = $ctx->clean;
+		$upload = $ctx->upload;
+		$format = $ctx->format;
+		$imageField = $ctx->imageField;
+		$action = $ctx->action;
+		$now = $ctx->now;
+		$entry = &$ctx->entry;
+		$file = null;
 		assert($index !== null);
 		$child = $kirby->page($rows[$index]['_id']);
 		if (!$child instanceof Page) {
@@ -613,22 +643,22 @@ class Service
 	}
 
 	/** @param list<array<string, mixed>> $rows the published rows */
-	private static function draftStructure(
-		App $kirby,
-		array $collection,
-		Page $page,
-		array $rows,
-		int|null $index,
-		array $clean,
-		array|null $upload,
-		string|null $format,
-		string|null $imageField,
-		string $action,
-		array|null $entries,
-		array $touched,
-		DateTimeImmutable $now,
-		array &$entry
-	): array {
+	private static function draftStructure(DraftContext $ctx): array
+	{
+		$kirby = $ctx->kirby;
+		$collection = $ctx->collection;
+		$page = $ctx->page;
+		$rows = $ctx->rows;
+		$index = $ctx->index;
+		$clean = $ctx->clean;
+		$upload = $ctx->upload;
+		$format = $ctx->format;
+		$imageField = $ctx->imageField;
+		$action = $ctx->action;
+		$entries = $ctx->entries;
+		$touched = $ctx->touched;
+		$now = $ctx->now;
+		$entry = &$ctx->entry;
 		$field = $collection['field'];
 		self::checkEditable($page);
 		$hash = Content::hash($kirby, $collection);
@@ -978,31 +1008,7 @@ class Service
 				}
 				$child = $child->changeStatus($collection['status']);
 			} elseif ($record['action'] === 'delete') {
-				self::checkLock($child);
-				self::checkHash($kirby, $collection, $record, $child);
-				if ($child->version('changes')->exists()) {
-					// Someone started changing the page after the draft: not what was confirmed.
-					throw FudeError::t('draft.changed', [], 409);
-				}
-				if ($child->hasChildren() || $child->hasDrafts()) {
-					throw FudeError::t('collection.hasChildren', ['name' => $child->title()->value()], 409);
-				}
-				// Files go with the page: only those the draft saw, unchanged,
-				// and none another page uses.
-				if (!hash_equals((string)($record['filesHash'] ?? ''), self::filesHash($child->files()))) {
-					throw FudeError::t('draft.files', [], 409);
-				}
-				$elsewhere = self::elsewhere($child);
-				foreach ($child->files() as $file) {
-					if (self::usedIn($elsewhere, $file)) {
-						throw FudeError::t('collection.fileInUse', ['name' => $child->title()->value(), 'file' => $file->filename()], 409);
-					}
-				}
-				$url = $child->parent()?->url();
-				$child->delete();
-				$hash = Content::hash($kirby, $collection, null);
-				Drafts::delete($kirby, $record['id']);
-				return ['id' => $record['id'], 'url' => $url, 'hash' => $hash];
+				return self::publishDelete($kirby, $collection, $record, $child);
 			} else {
 				self::checkLock($child);
 				self::checkHash($kirby, $collection, $record, $child);
@@ -1024,6 +1030,36 @@ class Service
 			$url = $child->url();
 			$hash = Content::hash($kirby, $collection, $record['action'] === 'update' ? $child : null);
 		}
+		Drafts::delete($kirby, $record['id']);
+		return ['id' => $record['id'], 'url' => $url, 'hash' => $hash];
+	}
+
+	/** Publishes a delete draft: the page and its files go, if they are still those the draft saw. */
+	private static function publishDelete(App $kirby, array $collection, array $record, Page $child): array
+	{
+		self::checkLock($child);
+		self::checkHash($kirby, $collection, $record, $child);
+		if ($child->version('changes')->exists()) {
+			// Someone started changing the page after the draft: not what was confirmed.
+			throw FudeError::t('draft.changed', [], 409);
+		}
+		if ($child->hasChildren() || $child->hasDrafts()) {
+			throw FudeError::t('collection.hasChildren', ['name' => $child->title()->value()], 409);
+		}
+		// Files go with the page: only those the draft saw, unchanged,
+		// and none another page uses.
+		if (!hash_equals((string)($record['filesHash'] ?? ''), self::filesHash($child->files()))) {
+			throw FudeError::t('draft.files', [], 409);
+		}
+		$elsewhere = self::elsewhere($child);
+		foreach ($child->files() as $file) {
+			if (self::usedIn($elsewhere, $file)) {
+				throw FudeError::t('collection.fileInUse', ['name' => $child->title()->value(), 'file' => $file->filename()], 409);
+			}
+		}
+		$url = $child->parent()?->url();
+		$child->delete();
+		$hash = Content::hash($kirby, $collection, null);
 		Drafts::delete($kirby, $record['id']);
 		return ['id' => $record['id'], 'url' => $url, 'hash' => $hash];
 	}

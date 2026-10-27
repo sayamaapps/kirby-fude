@@ -10,6 +10,7 @@ return [
 	'sayamaapps\\fude\\blueprints' => 'src/Blueprints.php',
 	'sayamaapps\\fude\\config' => 'src/Config.php',
 	'sayamaapps\\fude\\content' => 'src/Content.php',
+	'sayamaapps\\fude\\draftcontext' => 'src/DraftContext.php',
 	'sayamaapps\\fude\\drafts' => 'src/Drafts.php',
 	'sayamaapps\\fude\\fudeerror' => 'src/FudeError.php',
 	'sayamaapps\\fude\\i18n' => 'src/I18n.php',
