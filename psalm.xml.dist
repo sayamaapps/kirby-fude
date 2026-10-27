@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<psalm
+    errorLevel="3"
+    phpVersion="8.2"
+    resolveFromConfigFile="true"
+    findUnusedBaselineEntry="false"
+    findUnusedCode="false"
+>
+    <projectFiles>
+        <directory name="src" />
+        <file name="index.php" />
+        <ignoreFiles>
+            <directory name="vendor" />
+            <directory name="tests" />
+            <!-- config/ returns closures that Kirby binds to the page or site at runtime -->
+            <directory name="config" />
+        </ignoreFiles>
+    </projectFiles>
+</psalm>

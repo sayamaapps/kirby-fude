@@ -1,0 +1,34 @@
+{
+	"scan-files": [
+		"index.php",
+		"legacy.php",
+		"autoload.php",
+		"config/blueprints.php",
+		"config/routes.php",
+		"config/translations.php",
+		"src/*.php"
+	],
+	"symbol-whitelist": [
+		"Kirby",
+		"Kirby\\Cms\\App",
+		"Kirby\\Cms\\File",
+		"Kirby\\Cms\\Helpers",
+		"Kirby\\Cms\\ModelWithContent",
+		"Kirby\\Cms\\Page",
+		"Kirby\\Cms\\Pages",
+		"Kirby\\Cms\\Site",
+		"Kirby\\Cms\\User",
+		"Kirby\\Content\\Field",
+		"Kirby\\Content\\Version",
+		"Kirby\\Data\\Data",
+		"Kirby\\Field\\FieldOptions",
+		"Kirby\\Filesystem\\F",
+		"Kirby\\Form\\Form",
+		"Kirby\\Http\\Request\\Auth\\BasicAuth",
+		"Kirby\\Http\\Response",
+		"Kirby\\Text\\KirbyTag",
+		"Kirby\\Toolkit\\I18n",
+		"Kirby\\Toolkit\\Str",
+		"Kirby\\Uuid\\Uuids"
+	]
+}

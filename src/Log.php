@@ -1,8 +1,9 @@
 <?php
 
-namespace Fude;
+namespace Sayamaapps\Fude;
 
 use Kirby\Cms\App;
+use RuntimeException;
 
 /**
  * `<storage>/fude/log.jsonl`: one JSON line per call — who (Kirby account
@@ -13,32 +14,40 @@ use Kirby\Cms\App;
  *
  * Logging never breaks a request: errors are swallowed after a note in the
  * PHP error log. Starts over at 4 MB.
+ *
+ * @package   Kirby Fude
+ * @author    sayamaapps
+ * @link      https://github.com/sayamaapps/kirby-fude
+ * @copyright sayamaapps
+ * @license   MIT
  */
-final class Log
+class Log
 {
-    public const FILE = 'log.jsonl';
-    private const MAX_BYTES = 4 * 1024 * 1024;
+	public const FILE = 'log.jsonl';
+	private const MAX_BYTES = 4 * 1024 * 1024;
 
-    public static function file(App $kirby): string
-    {
-        return Options::directory($kirby) . '/' . self::FILE;
-    }
+	/** The path of the log file. */
+	public static function file(App $kirby): string
+	{
+		return Options::directory($kirby) . '/' . self::FILE;
+	}
 
-    public static function write(App $kirby, array $entry, \DateTimeImmutable $now): void
-    {
-        try {
-            $dir = Options::directory($kirby);
-            if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
-                throw new \RuntimeException('Cannot create ' . $dir);
-            }
-            $file = self::file($kirby);
-            $mode = is_file($file) && filesize($file) > self::MAX_BYTES ? 0 : FILE_APPEND;
-            $line = json_encode(['at' => $now->format(DATE_ATOM)] + $entry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            if ($line === false || @file_put_contents($file, $line . "\n", $mode | LOCK_EX) === false) {
-                throw new \RuntimeException('Cannot write ' . $file);
-            }
-        } catch (\Throwable $e) {
-            error_log('Fude: log not written: ' . $e->getMessage());
-        }
-    }
+	/** Appends one entry as a JSON line. Failures are noted in the PHP error log only. */
+	public static function write(App $kirby, array $entry, \DateTimeImmutable $now): void
+	{
+		try {
+			$dir = Options::directory($kirby);
+			if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
+				throw new RuntimeException('Cannot create ' . $dir);
+			}
+			$file = self::file($kirby);
+			$mode = is_file($file) && filesize($file) > self::MAX_BYTES ? 0 : FILE_APPEND;
+			$line = json_encode(['at' => $now->format(DATE_ATOM)] + $entry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+			if ($line === false || @file_put_contents($file, $line . "\n", $mode | LOCK_EX) === false) {
+				throw new RuntimeException('Cannot write ' . $file);
+			}
+		} catch (\Throwable $e) {
+			error_log('Fude: log not written: ' . $e->getMessage());
+		}
+	}
 }

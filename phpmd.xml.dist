@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<ruleset name="Fude"
+	xmlns="http://pmd.sf.net/ruleset/1.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://pmd.sf.net/ruleset/1.0.0 http://pmd.sf.net/ruleset_xml_schema.xsd"
+	xsi:noNamespaceSchemaLocation="http://pmd.sf.net/ruleset_xml_schema.xsd">
+	<description>PHP Mess Detector rules for Fude. Every exclusion and raised threshold has its reason here.</description>
+
+	<rule ref="rulesets/cleancode.xml">
+		<!-- The helper classes (Options, I18n, Log, Images) are static by design, as in Kirby's own code. -->
+		<exclude name="StaticAccess" />
+		<!-- Public flags are part of the public API. -->
+		<exclude name="BooleanArgumentFlag" />
+		<!-- The assignment in a condition keeps the reading order of the checks. -->
+		<exclude name="IfStatementAssignment" />
+		<!-- Early returns are not enforced; some guards read better with else. -->
+		<exclude name="ElseExpression" />
+		<!-- The @ operator guards deliberate filesystem probes (mkdir race, unlink of a file that may be gone).
+		     Replacing them changes which error reaches the caller, so they stay. -->
+		<exclude name="ErrorControlOperator" />
+	</rule>
+
+	<!-- The domain methods branch per field type, per action and per blueprint shape. Splitting them further
+	     is a maintainer decision (see the pull request); the level is raised until then. -->
+	<rule ref="rulesets/codesize.xml/CyclomaticComplexity">
+		<properties>
+			<property name="reportLevel" value="90" />
+		</properties>
+	</rule>
+	<rule ref="rulesets/codesize.xml/ExcessiveMethodLength" />
+	<rule ref="rulesets/codesize.xml/ExcessiveParameterList" />
+
+	<rule ref="rulesets/design.xml">
+		<!-- Config and Service are the domain classes: the methods of one feature stay together in one class.
+		     Splitting the classes is a maintainer decision (see the pull request). -->
+		<exclude name="TooManyPublicMethods" />
+		<exclude name="TooManyMethods" />
+		<exclude name="CouplingBetweenObjects" />
+	</rule>
+
+	<rule ref="rulesets/naming.xml">
+		<!-- Short names are loop indices and array keys of the formats. -->
+		<exclude name="ShortVariable" />
+		<!-- t() is the translation shorthand of FudeError and I18n, as in Kirby's own helpers. -->
+		<exclude name="ShortMethodName" />
+	</rule>
+
+	<rule ref="rulesets/unusedcode.xml" />
+</ruleset>

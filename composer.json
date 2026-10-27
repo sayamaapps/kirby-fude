@@ -1,44 +1,78 @@
 {
     "name": "sayamaapps/kirby-fude",
     "description": "Change declared Kirby site content by chat message: drafts, preview links, explicit publish.",
-    "type": "kirby-plugin",
     "license": "MIT",
-    "keywords": ["kirby", "kirby-plugin", "kirby-5", "content", "bot", "chat", "drafts"],
-    "homepage": "https://github.com/sayamaapps/kirby-fude",
+    "type": "kirby-plugin",
+    "keywords": [
+        "kirby",
+        "kirby-plugin",
+        "kirby-5",
+        "content",
+        "bot",
+        "chat",
+        "drafts"
+    ],
     "authors": [
         {
             "name": "Simon Räder",
             "homepage": "https://sayamaapps.de"
         }
     ],
+    "homepage": "https://github.com/sayamaapps/kirby-fude",
     "support": {
         "issues": "https://github.com/sayamaapps/kirby-fude/issues",
         "source": "https://github.com/sayamaapps/kirby-fude"
     },
     "require": {
         "php": "^8.2",
+        "ext-ctype": "*",
+        "ext-filter": "*",
+        "ext-mbstring": "*",
         "getkirby/composer-installer": "^1.2"
     },
     "require-dev": {
-        "getkirby/cms": "^5.0"
-    },
-    "scripts": {
-        "test": "sh tests/run.sh"
+        "ergebnis/composer-normalize": "^2.54",
+        "getkirby/cms": "^5.0",
+        "icanhazstring/composer-unused": "^0.9.7",
+        "maglnet/composer-require-checker": "^4.0",
+        "phpmd/phpmd": "^2.15",
+        "phpunit/phpunit": "11.5.55",
+        "vimeo/psalm": "^6.20"
     },
     "config": {
-        "optimize-autoloader": true,
         "allow-plugins": {
+            "ergebnis/composer-normalize": true,
             "getkirby/composer-installer": true
         },
+        "optimize-autoloader": true,
         "platform": {
-            "php": "8.2.0"
-        }
+            "php": "8.2.27"
+        },
+        "sort-packages": true
     },
     "extra": {
         "installer-name": "fude",
-        "kirby-cms-path": false,
         "kirby": {
             "compatible": "^5.0"
-        }
+        },
+        "kirby-cms-path": false
+    },
+    "scripts": {
+        "analyze:phpmd": "vendor/bin/phpmd src,index.php github phpmd.xml.dist",
+        "analyze:psalm": "vendor/bin/psalm",
+        "analyze:require-checker": "vendor/bin/composer-require-checker check --config-file=config/composer-require-checker.json composer.json",
+        "analyze:unused": "vendor/bin/composer-unused --configuration=config/composer-unused.php",
+        "ci": [
+            "@composer validate --strict --no-check-version --no-check-all",
+            "@composer normalize:check",
+            "@composer analyze:require-checker",
+            "@composer analyze:unused",
+            "@composer check-platform-reqs",
+            "@composer analyze:psalm",
+            "@composer analyze:phpmd",
+            "@composer test"
+        ],
+        "normalize:check": "@composer normalize --dry-run",
+        "test": "vendor/bin/phpunit"
     }
 }

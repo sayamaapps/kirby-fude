@@ -12,17 +12,25 @@ A chat bot proposes a change, for example a new team member with a photo. Fude s
 - One log line per call: account, channel tag, route, outcome.
 - Own bot role without Panel access; HTTPS only; English and German replies.
 
-## Requirements
-
-- PHP 8.2–8.4 with `gd` (or ImageMagick) and `mbstring`; Kirby 5; a writable `storage` root (drafts and the log live in `<storage>/fude/`)
+Kirby 5 · PHP 8.2 to 8.5 · `gd` (or ImageMagick) and `mbstring` · a writable `storage` root (drafts and the log live in `<storage>/fude/`)
 
 ## Installation
+
+With Composer:
 
 ```sh
 composer require sayamaapps/kirby-fude
 ```
 
 Composer installs to `site/plugins/fude/`. Add that path to `.gitignore` and deploy it like `vendor/`.
+
+From a ZIP archive: unpack it to `site/plugins/fude/`.
+
+As a Git submodule: `git submodule add https://github.com/sayamaapps/kirby-fude.git site/plugins/fude`.
+
+## Requirements
+
+Kirby 5 is supported; PHP 8.2 to 8.5 is tested in CI.
 
 ## Usage
 
@@ -101,9 +109,18 @@ Errors: 400 malformed request, 401 login, 403 HTTPS, role, token or publish perm
 
 ## Options
 
-All keys are read as `fude.<name>`, flat or nested. `null` counts as not set.
+Options are read as `fude.<name>`, in the flat form shown below or nested (`'fude' => ['active' => true]`). `null` counts as not set.
 
-| Option | Default | Meaning |
+Example, `site/config/config.php`:
+
+```php
+return [
+    'fude.active'   => true,
+    'fude.language' => 'de',
+];
+```
+
+| Option (`fude.<name>`) | Default | Meaning |
 |---|---|---|
 | `active` | `false` | Master switch. Off: routes answer 404 and the role does not exist. |
 | `config` | `site/config/fude.php` | Declaration file, relative to the project root or absolute |
@@ -136,6 +153,27 @@ Fude processes no visitor data and stores no IP addresses, user agents or full-s
 - Proposed content as a `changes` version or draft page, until published or discarded.
 - Draft records in `storage/fude/drafts/` (field values, account, channel tag), deleted on publish or discard.
 - A log in `storage/fude/log.jsonl`: who, when, route, collection, action, key, outcome. No field values, no images; it restarts at 4 MB.
+
+## Deviations from Kirby's plugin conventions
+
+These stay as in 1.x. Each one is a choice, not an oversight.
+
+- **Role and blueprint names carry no plugin prefix.** The role `fude` and the blueprint `users/fude` are public names. Renaming them would detach existing bot accounts, so the change waits for 2.0.
+- **Drafts, the log and resized images use PHP's file functions.** Kirby's `F::write()` and `Dir::make()` throw Kirby's exception class on a path they cannot write, where 1.x throws `RuntimeException`. The plugin keeps its own calls so that the exception class and the messages stay the same.
+- **Reply texts come from `I18n::t()`, not from Kirby's translation lookup.** The replies are written in the language of the request (`fude.language`) and must also work without a Kirby app, as in 1.x. The same tables are registered as Kirby plugin translations, so the Panel reads the same text.
+
+## Planned for 2.0
+
+1.x keeps every public name, option key, translation key, exception class and route. The names below are marked `@deprecated` in the code, and 1.x prints no runtime notice for them. 2.0 is planned to:
+
+- read options as `sayamaapps.fude.<name>` only; the `fude.<name>` spelling stops being read,
+- register plugin translations as `sayamaapps.fude.<key>` only,
+- remove `fude_option()` and `fude_not_found()`: use `Sayamaapps\Fude\Options::get()` and `Sayamaapps\Fude\Service::notFound()`,
+- remove the `Fude\` class names: the classes stay in `Sayamaapps\Fude\`,
+- throw Kirby's exception class for internal failures (drafts, log, image files) instead of `RuntimeException`,
+- give the role and the blueprint a plugin prefix. Bot accounts with the role `fude` must then be switched to the new role by hand.
+
+Routes, the JSON format and the storage paths are unchanged in 1.x and planned unchanged for 2.0.
 
 Tests: `composer test`. Issues and pull requests are welcome, without a support promise. Report security problems privately through GitHub's vulnerability reporting. Changes: [CHANGELOG.md](CHANGELOG.md).
 
