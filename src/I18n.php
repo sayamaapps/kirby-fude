@@ -6,7 +6,8 @@ namespace Sayamaapps\Fude;
  * Strings of the route responses, Kirby-free.
  *
  * The tables live in translations/<language>.php and are also registered as
- * Kirby plugin translations under `fude.<key>` (index.php). Fude reads its
+ * Kirby plugin translations (config/translations.php) under `sayamaapps.fude.<key>`, and
+ * under the 1.x name `fude.<key>`. Fude reads its
  * own tables: the messages go back to a person in a chat, and a missing Kirby
  * translation must never silently turn a German reply English.
  *
@@ -36,8 +37,9 @@ class I18n
 	}
 
 	/**
-	 * The tables as Kirby plugin translations: `fude.<key>` per language. Kirby
-	 * reads them for blueprint labels; the replies use table() instead.
+	 * The tables as Kirby plugin translations, per language: `sayamaapps.fude.<key>`
+	 * and the 1.x alias `fude.<key>`. Kirby reads them for blueprint labels; the
+	 * replies use table() instead.
 	 *
 	 * @return array<string, array<string, string>>
 	 */
@@ -46,6 +48,8 @@ class I18n
 		$translations = [];
 		foreach (self::LANGUAGES as $language) {
 			foreach (self::table($language) as $key => $text) {
+				$translations[$language]['sayamaapps.fude.' . $key] = $text;
+				// The 1.x name, kept until 2.0 (README, Deprecations).
 				$translations[$language]['fude.' . $key] = $text;
 			}
 		}
