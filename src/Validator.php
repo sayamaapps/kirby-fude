@@ -11,6 +11,12 @@ use Kirby\Text\KirbyTag;
  * Unknown fields are an error, not silently dropped: the bot must notice
  * when it sends something that does not arrive. Image fields are not text
  * and arrive as uploads; a text value for them is refused.
+ *
+ * @package   Sayamaapps\Fude
+ * @author    Simon Räder <https://sayamaapps.de>
+ * @link      https://github.com/sayamaapps/kirby-fude
+ * @copyright Simon Räder
+ * @license   MIT
  */
 class Validator
 {

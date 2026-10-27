@@ -13,6 +13,12 @@ use Kirby\Data\Data;
  * Only the `latest` version counts as "published" here. The `changes`
  * version is Fude's own draft (or a Panel editor's unsaved work) and never
  * part of the hash.
+ *
+ * @package   Sayamaapps\Fude
+ * @author    Simon Räder <https://sayamaapps.de>
+ * @link      https://github.com/sayamaapps/kirby-fude
+ * @copyright Simon Räder
+ * @license   MIT
  */
 class Content
 {

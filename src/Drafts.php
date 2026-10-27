@@ -13,11 +13,18 @@ use RuntimeException;
  * caller must present, and — for drafts that created a file or a page —
  * what to remove again on discard. The content itself lives in Kirby (the
  * `changes` version, or a draft page); the record only points at it.
+ *
+ * @package   Sayamaapps\Fude
+ * @author    Simon Räder <https://sayamaapps.de>
+ * @link      https://github.com/sayamaapps/kirby-fude
+ * @copyright Simon Räder
+ * @license   MIT
  */
 class Drafts
 {
 	public const DEFAULT_LIFETIME = 48 * 3600;
 
+	/** Refuses a draft older than its lifetime (`draftLifetime`, 48 hours by default). */
 	public static function checkAge(App $kirby, array $record, \DateTimeImmutable $now): void
 	{
 		$lifetime = self::lifetime($kirby);
@@ -49,6 +56,7 @@ class Drafts
 		return $record;
 	}
 
+	/** Removes the record of a draft. A missing record is no error. */
 	public static function delete(App $kirby, string $id): void
 	{
 		$file = self::directory($kirby) . '/' . $id . '.json';
@@ -57,11 +65,13 @@ class Drafts
 		}
 	}
 
+	/** The folder of the draft records. */
 	public static function directory(App $kirby): string
 	{
 		return Options::directory($kirby) . '/drafts';
 	}
 
+	/** How long a draft stays publishable, in seconds. */
 	public static function lifetime(App $kirby): int
 	{
 		$seconds = Options::get($kirby, 'draftLifetime', self::DEFAULT_LIFETIME);
@@ -89,6 +99,7 @@ class Drafts
 		return $json;
 	}
 
+	/** Stores the record of a draft as JSON. */
 	public static function write(App $kirby, array $record): void
 	{
 		$file = self::directory($kirby) . '/' . $record['id'] . '.json';

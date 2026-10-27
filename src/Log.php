@@ -14,17 +14,25 @@ use RuntimeException;
  *
  * Logging never breaks a request: errors are swallowed after a note in the
  * PHP error log. Starts over at 4 MB.
+ *
+ * @package   Sayamaapps\Fude
+ * @author    Simon Räder <https://sayamaapps.de>
+ * @link      https://github.com/sayamaapps/kirby-fude
+ * @copyright Simon Räder
+ * @license   MIT
  */
 class Log
 {
 	public const FILE = 'log.jsonl';
 	private const MAX_BYTES = 4 * 1024 * 1024;
 
+	/** The path of the log file. */
 	public static function file(App $kirby): string
 	{
 		return Options::directory($kirby) . '/' . self::FILE;
 	}
 
+	/** Appends one entry as a JSON line. Failures are noted in the PHP error log only. */
 	public static function write(App $kirby, array $entry, \DateTimeImmutable $now): void
 	{
 		try {

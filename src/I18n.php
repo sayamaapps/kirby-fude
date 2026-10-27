@@ -12,6 +12,12 @@ namespace Sayamaapps\Fude;
  *
  * The language is set once per request (Options::language()) and defaults to
  * English. Missing keys fall back to English, then to the key.
+ *
+ * @package   Sayamaapps\Fude
+ * @author    Simon Räder <https://sayamaapps.de>
+ * @link      https://github.com/sayamaapps/kirby-fude
+ * @copyright Simon Räder
+ * @license   MIT
  */
 class I18n
 {
@@ -23,6 +29,7 @@ class I18n
 	/** @var array<string, array<string,string>> */
 	private static array $tables = [];
 
+	/** The language of the replies, `en` or `de`. */
 	public static function language(): string
 	{
 		return self::$language;
@@ -46,6 +53,7 @@ class I18n
 		return $translations;
 	}
 
+	/** Sets the reply language; anything Fude does not ship becomes English. */
 	public static function setLanguage(string $language): void
 	{
 		self::$language = in_array($language, self::LANGUAGES, true) ? $language : 'en';

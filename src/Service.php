@@ -37,6 +37,12 @@ use Throwable;
  * draft and an unchanged published state (hash), copies it over — through
  * Kirby's own Version::publish(), which validates against the blueprint
  * once more.
+ *
+ * @package   Sayamaapps\Fude
+ * @author    Simon Räder <https://sayamaapps.de>
+ * @link      https://github.com/sayamaapps/kirby-fude
+ * @copyright Simon Räder
+ * @license   MIT
  */
 class Service
 {
@@ -445,7 +451,20 @@ class Service
 			: self::draftPage($kirby, $collection, $page, $rows, $index, $clean, $upload, $format, $imageField, $action, $now, $entry);
 	}
 
-	private static function draftPage(App $kirby, array $collection, Page $parent, array $rows, int|null $index, array $clean, array|null $upload, string|null $format, string|null $imageField, string $action, DateTimeImmutable $now, array &$entry): array
+	private static function draftPage(
+		App $kirby,
+		array $collection,
+		Page $parent,
+		array $rows,
+		int|null $index,
+		array $clean,
+		array|null $upload,
+		string|null $format,
+		string|null $imageField,
+		string $action,
+		DateTimeImmutable $now,
+		array &$entry
+	): array
 	{
 		$file = null;
 		if ($action === 'create') {
@@ -591,7 +610,22 @@ class Service
 		return ['draft' => Drafts::public($record), 'token' => $record['token'], 'preview' => $record['preview']];
 	}
 
-	private static function draftStructure(App $kirby, array $collection, Page $page, array $rows, int|null $index, array $clean, array|null $upload, string|null $format, string|null $imageField, string $action, array|null $entries, array $touched, DateTimeImmutable $now, array &$entry): array
+	private static function draftStructure(
+		App $kirby,
+		array $collection,
+		Page $page,
+		array $rows,
+		int|null $index,
+		array $clean,
+		array|null $upload,
+		string|null $format,
+		string|null $imageField,
+		string $action,
+		array|null $entries,
+		array $touched,
+		DateTimeImmutable $now,
+		array &$entry
+	): array
 	{
 		$field = $collection['field'];
 		self::checkEditable($page);
@@ -848,6 +882,7 @@ class Service
 		return true;
 	}
 
+	/** A JSON reply with the headers every Fude route sends. */
 	public static function json(array $data, int $status): Response
 	{
 		$headers = ['Cache-Control' => 'no-store', 'X-Robots-Tag' => 'noindex, nofollow, noarchive'];
@@ -1085,6 +1120,7 @@ class Service
 		];
 	}
 
+	/** Serves one `/fude/*` route: checks the request, logs it and answers with JSON. */
 	public static function respond(App $kirby, DateTimeImmutable $now, string $route): Response
 	{
 		if (Options::get($kirby, 'active', false) !== true || !in_array($route, self::ROUTES, true)) {

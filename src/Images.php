@@ -17,6 +17,12 @@ use RuntimeException;
  * uses) and only the resized copy becomes a Kirby file — no full-size
  * original ends up on the server. Formats outside the declaration are
  * refused.
+ *
+ * @package   Sayamaapps\Fude
+ * @author    Simon Räder <https://sayamaapps.de>
+ * @link      https://github.com/sayamaapps/kirby-fude
+ * @copyright Simon Räder
+ * @license   MIT
  */
 class Images
 {

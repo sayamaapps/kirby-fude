@@ -14,6 +14,12 @@ use Kirby\Cms\Helpers;
  * null falls back to the next spelling and then to the default. Both
  * spellings work, flat (`'sayamaapps.fude.active' => true`) and nested
  * (`'sayamaapps' => ['fude' => ['active' => true]]`).
+ *
+ * @package   Sayamaapps\Fude
+ * @author    Simon Räder <https://sayamaapps.de>
+ * @link      https://github.com/sayamaapps/kirby-fude
+ * @copyright Simon Räder
+ * @license   MIT
  */
 class Options
 {

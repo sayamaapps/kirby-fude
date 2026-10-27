@@ -35,6 +35,12 @@ use Kirby\Cms\Page;
  * Config::load() merges them with the file and normalises every entry, so
  * the validation stays in one place. Blueprint types that Fude cannot map
  * are skipped inside structures and rejected when marked.
+ *
+ * @package   Sayamaapps\Fude
+ * @author    Simon Räder <https://sayamaapps.de>
+ * @link      https://github.com/sayamaapps/kirby-fude
+ * @copyright Simon Räder
+ * @license   MIT
  */
 class Blueprints
 {

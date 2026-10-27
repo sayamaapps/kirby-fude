@@ -46,6 +46,12 @@ use Kirby\Form\Form;
  * blueprint (Config::blueprintFields()): a field that the blueprint does not
  * know, or knows with an incompatible type, makes the configuration invalid
  * — loudly, at every request, not silently at publish time.
+ *
+ * @package   Sayamaapps\Fude
+ * @author    Simon Räder <https://sayamaapps.de>
+ * @link      https://github.com/sayamaapps/kirby-fude
+ * @copyright Simon Räder
+ * @license   MIT
  */
 class Config
 {
