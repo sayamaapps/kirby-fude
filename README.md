@@ -109,7 +109,7 @@ Errors: 400 malformed request, 401 login, 403 HTTPS, role, token or publish perm
 
 ## Options
 
-Options are read as `sayamaapps.fude.<name>`, flat or nested. `null` counts as not set. The old spelling `fude.<name>` is still read when the new key is not set; it is deprecated and will be removed in 2.0.
+Options are read as `sayamaapps.fude.<name>` in the flat form shown below; the nested form is not read for these keys. `null` counts as not set. The old spelling `fude.<name>` is still read when the new key is not set; it is deprecated and will be removed in 2.0.
 
 Example, `site/config/config.php`:
 

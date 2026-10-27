@@ -11,9 +11,9 @@ use Kirby\Cms\Helpers;
  * `fude.<key>` as a deprecated fallback.
  *
  * `null` counts as "not set", like Kirby's own option(), so a key set to
- * null falls back to the next spelling and then to the default. Both
- * spellings work, flat (`'sayamaapps.fude.active' => true`) and nested
- * (`'sayamaapps' => ['fude' => ['active' => true]]`).
+ * null falls back to the next spelling and then to the default. The new key
+ * is read in the flat form only (`'sayamaapps.fude.active' => true`); the
+ * nested form (`'sayamaapps' => ['fude' => ['active' => true]]`) is not read.
  *
  * @author    Simon Räder <https://sayamaapps.de>
  * @link      https://github.com/sayamaapps/kirby-fude
