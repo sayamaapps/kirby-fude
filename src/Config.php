@@ -294,6 +294,57 @@ class Config
 		return $collections;
 	}
 
+	/**
+	 * The options of a select field: from the blueprint, or a query over the page tree.
+	 * Null leaves the field out (a query that finds nothing, when the field is not required).
+	 */
+	private static function selectField(App $kirby, array $collection, string $name, array $definition, array $field): array|null
+	{
+		if (self::isQuery($definition)) {
+			$blueprintOptions = self::queryValues($kirby, $collection, $name, $definition);
+			if ($blueprintOptions === []) {
+				// A query that yields nothing (a site without separate areas): the field is
+				// left out, so the schema does not list it. A field that cannot be left out fails.
+				if ($field['required'] || $name === $collection['key']) {
+					throw self::invalid("collection \"{$collection['name']}\": field \"$name\" has no options");
+				}
+				if ($field['options'] !== []) {
+					throw self::invalid("collection \"{$collection['name']}\": field \"$name\" declares options the blueprint does not have");
+				}
+				return null;
+			}
+		} else {
+			$blueprintOptions = self::selectOptions($definition);
+		}
+		if ($field['options'] === []) {
+			$field['options'] = $blueprintOptions;
+		} elseif ($blueprintOptions !== [] && array_diff($field['options'], $blueprintOptions) !== []) {
+			throw self::invalid("collection \"{$collection['name']}\": field \"$name\" declares options the blueprint does not have");
+		}
+		if ($field['options'] === []) {
+			throw self::invalid("collection \"{$collection['name']}\": field \"$name\" has no options");
+		}
+		return $field;
+	}
+
+	/** The bounds of a number field: the tighter of declaration and blueprint. */
+	private static function numberField(array $collection, string $name, array $definition, array $field): array
+	{
+		// The tighter bound of declaration and blueprint wins, as with maxlength.
+		$min = $definition['min'] ?? null;
+		if (is_int($min) || is_float($min)) {
+			$field['min'] = isset($field['min']) ? max($field['min'], $min) : $min;
+		}
+		$max = $definition['max'] ?? null;
+		if (is_int($max) || is_float($max)) {
+			$field['max'] = isset($field['max']) ? min($field['max'], $max) : $max;
+		}
+		if (isset($field['min'], $field['max']) && $field['min'] > $field['max']) {
+			throw self::invalid("collection \"{$collection['name']}\": field \"$name\" min is above max (with the blueprint)");
+		}
+		return $field;
+	}
+
 	/** @param array<string, array> $blueprint */
 	private static function mergeBlueprint(App $kirby, array $collection, array $blueprint): array
 	{
@@ -342,29 +393,9 @@ class Config
 				$field['maxlength'] = isset($field['maxlength']) ? min($field['maxlength'], $definition['maxlength']) : $definition['maxlength'];
 			}
 			if ($field['type'] === 'select') {
-				if (self::isQuery($definition)) {
-					$blueprintOptions = self::queryValues($kirby, $collection, $name, $definition);
-					if ($blueprintOptions === []) {
-						// A query that yields nothing (a site without separate areas): the field is
-						// left out, so the schema does not list it. A field that cannot be left out fails.
-						if ($field['required'] || $name === $collection['key']) {
-							throw self::invalid("collection \"{$collection['name']}\": field \"$name\" has no options");
-						}
-						if ($field['options'] !== []) {
-							throw self::invalid("collection \"{$collection['name']}\": field \"$name\" declares options the blueprint does not have");
-						}
-						continue;
-					}
-				} else {
-					$blueprintOptions = self::selectOptions($definition);
-				}
-				if ($field['options'] === []) {
-					$field['options'] = $blueprintOptions;
-				} elseif ($blueprintOptions !== [] && array_diff($field['options'], $blueprintOptions) !== []) {
-					throw self::invalid("collection \"{$collection['name']}\": field \"$name\" declares options the blueprint does not have");
-				}
-				if ($field['options'] === []) {
-					throw self::invalid("collection \"{$collection['name']}\": field \"$name\" has no options");
+				$field = self::selectField($kirby, $collection, $name, $definition, $field);
+				if ($field === null) {
+					continue;
 				}
 			}
 			if ($field['type'] === 'page') {
@@ -380,18 +411,7 @@ class Config
 				$field['store'] = strtolower((string)($definition['store'] ?? 'uuid')) === 'id' ? 'id' : 'uuid';
 			}
 			if ($field['type'] === 'number') {
-				// The tighter bound of declaration and blueprint wins, as with maxlength.
-				$min = $definition['min'] ?? null;
-				if (is_int($min) || is_float($min)) {
-					$field['min'] = isset($field['min']) ? max($field['min'], $min) : $min;
-				}
-				$max = $definition['max'] ?? null;
-				if (is_int($max) || is_float($max)) {
-					$field['max'] = isset($field['max']) ? min($field['max'], $max) : $max;
-				}
-				if (isset($field['min'], $field['max']) && $field['min'] > $field['max']) {
-					throw self::invalid("collection \"{$collection['name']}\": field \"$name\" min is above max (with the blueprint)");
-				}
+				$field = self::numberField($collection, $name, $definition, $field);
 			}
 			if ($field['type'] === 'image') {
 				$uploads = $definition['uploads'] ?? null;
