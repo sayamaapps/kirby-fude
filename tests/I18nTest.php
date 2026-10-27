@@ -15,12 +15,6 @@ final class I18nTest extends TestCase
 {
 	public function testBehaviour(): void
 	{
-		require_once dirname(__DIR__) . '/src/I18n.php';
-
-		$base = dirname(__DIR__);
-
-
-
 		$n = 0;
 
 		try {
