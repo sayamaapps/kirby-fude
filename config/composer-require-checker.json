@@ -21,6 +21,7 @@
 		"Kirby\\Cms\\User",
 		"Kirby\\Content\\Field",
 		"Kirby\\Content\\Version",
+		"Kirby\\Exception\\Exception",
 		"Kirby\\Data\\Data",
 		"Kirby\\Field\\FieldOptions",
 		"Kirby\\Filesystem\\F",
