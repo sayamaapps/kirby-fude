@@ -51,102 +51,7 @@ class Validator
 			if ($rule['type'] === 'image') {
 				throw FudeError::t('fields.image', ['field' => $name]);
 			}
-			if ($value === null) {
-				$value = '';
-			}
-			if ($rule['type'] === 'toggle' && is_bool($value)) {
-				// JSON true/false: stored as Kirby's toggle field saves it.
-				$value = $value ? 'true' : 'false';
-			}
-			if (!is_string($value) && !is_int($value) && !is_float($value)) {
-				throw FudeError::t('fields.type', ['field' => $name]);
-			}
-			$value = (string)$value;
-			if (!mb_check_encoding($value, 'UTF-8')) {
-				// Invalid UTF-8 would vanish in the whitespace pass below and clear the field.
-				throw FudeError::t('fields.type', ['field' => $name]);
-			}
-			$value = trim($value);
-			if ($rule['type'] !== 'textarea') {
-				// Single-line fields: no line breaks, collapsed whitespace.
-				$value = trim((string)preg_replace('/\s+/u', ' ', $value));
-			} else {
-				$value = str_replace("\r\n", "\n", $value);
-			}
-			if ($rule['type'] === 'text' && isset($rule['format']) && $value !== '') {
-				self::checkFormat($name, $rule['format'], $value);
-			}
-			if (in_array($rule['type'], ['text', 'textarea', 'select'], true) && $value !== '') {
-				self::checkMarkup($name, $value);
-			}
-			if ($rule['type'] === 'date' && $value !== '') {
-				// A real calendar day in the form YYYY-MM-DD (checkdate rejects 2026-02-30).
-				$valid = preg_match('/^(\d{4})-(\d{2})-(\d{2})$/D', $value, $parts) === 1 &&
-					checkdate((int)$parts[2], (int)$parts[3], (int)$parts[1]);
-				if (!$valid) {
-					throw FudeError::t('fields.date', ['field' => $name]);
-				}
-				// Zero-padded Y-m-d strings compare in date order.
-				if (($rule['min'] ?? null) === 'today' && $value < $today) {
-					throw FudeError::t('fields.dateMin', ['field' => $name]);
-				}
-			}
-			if ($rule['type'] === 'time' && $value !== '') {
-				// 24 h, "H:MM" or "HH:MM", optional ":SS". Stored as Kirby's time field
-				// saves it: its save() formats the parsed time with 'H:i:s' (config/fields/time.php,
-				// config/fields/mixins/datetime.php), so 8:30 becomes "08:30:00".
-				if (preg_match('/^(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/D', $value) !== 1) {
-					throw FudeError::t('fields.time', ['field' => $name]);
-				}
-				$parts = explode(':', $value);
-				$value = sprintf('%02d:%02d:%02d', (int)$parts[0], (int)$parts[1], (int)($parts[2] ?? 0));
-			}
-			if ($rule['type'] === 'toggle' && $value !== '') {
-				// Stored as Kirby's toggle field saves it: "true" or "false" (config/fields/toggle.php, save()).
-				$value = strtolower($value);
-				if (!in_array($value, ['true', 'false'], true)) {
-					throw FudeError::t('fields.toggle', ['field' => $name]);
-				}
-			}
-			if ($rule['type'] === 'number' && $value !== '') {
-				// Decimal comma or point; stored with a point, as Kirby's number field does.
-				$value = str_replace(',', '.', $value);
-				if (preg_match('/^-?\d{1,15}(\.\d{1,15})?$/D', $value) !== 1) {
-					throw FudeError::t('fields.number', ['field' => $name]);
-				}
-				if (isset($rule['min']) && (float)$value < $rule['min']) {
-					throw FudeError::t('fields.numberMin', ['field' => $name, 'min' => (string)$rule['min']]);
-				}
-				if (isset($rule['max']) && (float)$value > $rule['max']) {
-					throw FudeError::t('fields.numberMax', ['field' => $name, 'max' => (string)$rule['max']]);
-				}
-			}
-			$max = $rule['maxlength'] ?? ($rule['type'] === 'textarea' ? 4000 : 500);
-			if (mb_strlen($value) > $max) {
-				throw FudeError::t('fields.maxlength', ['field' => $name, 'max' => $max]);
-			}
-			if ($rule['type'] === 'select' && $value !== '' && !in_array($value, $rule['options'], true)) {
-				throw FudeError::t('fields.option', ['field' => $name, 'options' => implode(', ', $rule['options'])]);
-			}
-			if ($rule['type'] === 'page' && $value !== '') {
-				// A page by its option value (the title), in any case; stored as the
-				// option's own spelling. Service turns it into the page reference.
-				$match = null;
-				foreach ($rule['options'] as $option) {
-					if (mb_strtolower($option) === mb_strtolower($value)) {
-						$match = $option;
-						break;
-					}
-				}
-				if ($match === null) {
-					throw FudeError::t('fields.option', ['field' => $name, 'options' => implode(', ', $rule['options'])]);
-				}
-				$value = $match;
-			}
-			if ($value === '' && $rule['required']) {
-				throw FudeError::t('fields.required', ['field' => $name]);
-			}
-			$clean[$name] = $value;
+			$clean[$name] = self::field($name, $rule, $value, $today);
 		}
 		if ($action === 'create') {
 			foreach ($declared as $name => $rule) {
@@ -156,6 +61,158 @@ class Validator
 			}
 		}
 		return $clean;
+	}
+
+	/** One submitted value, checked and normalised for its declared type. */
+	private static function field(string $name, array $rule, mixed $value, string $today): string
+	{
+		$value = self::text($name, $rule, self::scalar($name, $rule, $value));
+		$value = self::typed($name, $rule, $value, $today);
+		$max = $rule['maxlength'] ?? ($rule['type'] === 'textarea' ? 4000 : 500);
+		if (mb_strlen($value) > $max) {
+			throw FudeError::t('fields.maxlength', ['field' => $name, 'max' => $max]);
+		}
+		$value = self::option($name, $rule, $value);
+		if ($value === '' && $rule['required']) {
+			throw FudeError::t('fields.required', ['field' => $name]);
+		}
+		return $value;
+	}
+
+	/** The submitted value as a string: null is empty, a JSON boolean in a toggle becomes "true" or "false". */
+	private static function scalar(string $name, array $rule, mixed $value): string
+	{
+		if ($value === null) {
+			$value = '';
+		}
+		if ($rule['type'] === 'toggle' && is_bool($value)) {
+			// JSON true/false: stored as Kirby's toggle field saves it.
+			$value = $value ? 'true' : 'false';
+		}
+		if (!is_string($value) && !is_int($value) && !is_float($value)) {
+			throw FudeError::t('fields.type', ['field' => $name]);
+		}
+		$value = (string)$value;
+		if (!mb_check_encoding($value, 'UTF-8')) {
+			// Invalid UTF-8 would vanish in the whitespace pass below and clear the field.
+			throw FudeError::t('fields.type', ['field' => $name]);
+		}
+		return $value;
+	}
+
+	/** Trims the value and checks its markup and format; the type decides the whitespace. */
+	private static function text(string $name, array $rule, string $value): string
+	{
+		$value = trim($value);
+		if ($rule['type'] !== 'textarea') {
+			// Single-line fields: no line breaks, collapsed whitespace.
+			$value = trim((string)preg_replace('/\s+/u', ' ', $value));
+		} else {
+			$value = str_replace("\r\n", "\n", $value);
+		}
+		if ($rule['type'] === 'text' && isset($rule['format']) && $value !== '') {
+			self::checkFormat($name, $rule['format'], $value);
+		}
+		if (in_array($rule['type'], ['text', 'textarea', 'select'], true) && $value !== '') {
+			self::checkMarkup($name, $value);
+		}
+		return $value;
+	}
+
+	/** The typed fields: date, time, toggle and number, each stored as Kirby saves it. */
+	private static function typed(string $name, array $rule, string $value, string $today): string
+	{
+		if ($value === '') {
+			return $value;
+		}
+		return match ($rule['type']) {
+			'date'   => self::date($name, $rule, $value, $today),
+			'time'   => self::time($name, $value),
+			'toggle' => self::toggle($name, $value),
+			'number' => self::number($name, $rule, $value),
+			default  => $value,
+		};
+	}
+
+	/** A real calendar day in the form YYYY-MM-DD (checkdate rejects 2026-02-30). */
+	private static function date(string $name, array $rule, string $value, string $today): string
+	{
+		$valid = preg_match('/^(\d{4})-(\d{2})-(\d{2})$/D', $value, $parts) === 1 &&
+			checkdate((int)$parts[2], (int)$parts[3], (int)$parts[1]);
+		if (!$valid) {
+			throw FudeError::t('fields.date', ['field' => $name]);
+		}
+		// Zero-padded Y-m-d strings compare in date order.
+		if (($rule['min'] ?? null) === 'today' && $value < $today) {
+			throw FudeError::t('fields.dateMin', ['field' => $name]);
+		}
+		return $value;
+	}
+
+	/**
+	 * 24 h, "H:MM" or "HH:MM", optional ":SS". Stored as Kirby's time field
+	 * saves it: its save() formats the parsed time with 'H:i:s' (config/fields/time.php,
+	 * config/fields/mixins/datetime.php), so 8:30 becomes "08:30:00".
+	 */
+	private static function time(string $name, string $value): string
+	{
+		if (preg_match('/^(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/D', $value) !== 1) {
+			throw FudeError::t('fields.time', ['field' => $name]);
+		}
+		$parts = explode(':', $value);
+		return sprintf('%02d:%02d:%02d', (int)$parts[0], (int)$parts[1], (int)($parts[2] ?? 0));
+	}
+
+	/** Stored as Kirby's toggle field saves it: "true" or "false" (config/fields/toggle.php, save()). */
+	private static function toggle(string $name, string $value): string
+	{
+		$value = strtolower($value);
+		if (!in_array($value, ['true', 'false'], true)) {
+			throw FudeError::t('fields.toggle', ['field' => $name]);
+		}
+		return $value;
+	}
+
+	/** Decimal comma or point; stored with a point, as Kirby's number field does. */
+	private static function number(string $name, array $rule, string $value): string
+	{
+		$value = str_replace(',', '.', $value);
+		if (preg_match('/^-?\d{1,15}(\.\d{1,15})?$/D', $value) !== 1) {
+			throw FudeError::t('fields.number', ['field' => $name]);
+		}
+		if (isset($rule['min']) && (float)$value < $rule['min']) {
+			throw FudeError::t('fields.numberMin', ['field' => $name, 'min' => (string)$rule['min']]);
+		}
+		if (isset($rule['max']) && (float)$value > $rule['max']) {
+			throw FudeError::t('fields.numberMax', ['field' => $name, 'max' => (string)$rule['max']]);
+		}
+		return $value;
+	}
+
+	/** The value of a select field, or the option a page field names. */
+	private static function option(string $name, array $rule, string $value): string
+	{
+		if ($rule['type'] === 'select' && $value !== '' && !in_array($value, $rule['options'], true)) {
+			throw FudeError::t('fields.option', ['field' => $name, 'options' => implode(', ', $rule['options'])]);
+		}
+		if ($rule['type'] === 'page' && $value !== '') {
+			return self::pageOption($name, $rule, $value);
+		}
+		return $value;
+	}
+
+	/**
+	 * A page by its option value (the title), in any case; stored as the
+	 * option's own spelling. Service turns it into the page reference.
+	 */
+	private static function pageOption(string $name, array $rule, string $value): string
+	{
+		foreach ($rule['options'] as $option) {
+			if (mb_strtolower($option) === mb_strtolower($value)) {
+				return $option;
+			}
+		}
+		throw FudeError::t('fields.option', ['field' => $name, 'options' => implode(', ', $rule['options'])]);
 	}
 
 	/** The format a blueprint type gives a text field: url, email or tel. */
