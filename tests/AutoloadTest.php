@@ -46,6 +46,10 @@ final class AutoloadTest extends TestCase
 
 		foreach (require dirname(__DIR__) . '/autoload.php' as $class => $path) {
 			$short = substr($class, strlen('sayamaapps\\fude\\'));
+			// DraftContext is new in 2.x and has no 1.x name.
+			if ($short === 'draftcontext') {
+				continue;
+			}
 			$this->assertSame(
 				strtolower('Sayamaapps\\Fude\\' . $short),
 				strtolower((new ReflectionClass('Fude\\' . $short))->getName()),
