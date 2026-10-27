@@ -427,10 +427,69 @@ class Config
 
 	private static function normalise(App $kirby, string $name, array $entry): array
 	{
+		$kind = self::kind($name, $entry);
+		$actions = self::actions($name, $entry, $kind);
+		if (!is_array($entry['fields'] ?? null) || $entry['fields'] === []) {
+			throw self::invalid("collection \"$name\": no fields");
+		}
+
+		$collection = [
+			'name'         => $name,
+			'kind'         => $kind,
+			'label'        => is_string($entry['label'] ?? null) ? $entry['label'] : ucfirst($name),
+			'description'  => is_string($entry['description'] ?? null) ? $entry['description'] : '',
+			'actions'      => $actions,
+			'publishRoles' => array_values(array_map('strval', (array)($entry['publishRoles'] ?? [Service::ROLE]))),
+			'fields'       => [],
+		];
+		$collection += self::sizing($name, $entry, $kind);
+		// A declaration for the chat side: the content of an attached photo may
+		// be read by the model. The plugin itself does nothing else with it.
+		$readImages = $entry['readImages'] ?? false;
+		if (!is_bool($readImages)) {
+			throw self::invalid("collection \"$name\": readImages must be true or false");
+		}
+		$collection['readImages'] = $readImages;
+		$collection += self::location($name, $entry, $kind);
+
+		$collection['fields'] = self::declaredFields($name, $entry, $kind);
+		if ($kind === 'pages' && !isset($collection['fields']['title'])) {
+			throw self::invalid("collection \"$name\": pages collections need a \"title\" field");
+		}
+		if ($kind === 'page') {
+			$collection['key'] = null; // one page, no entries to tell apart
+		} else {
+			$collection['key'] = self::keyField($name, $entry, $collection['fields']);
+			// The key identifies an entry: without it there is no row to create
+			// or find. Forced here, so the blueprint merge can only add to it.
+			$collection['fields'][$collection['key']]['required'] = true;
+		}
+		self::checkAlt($name, $collection['fields']);
+
+		// Cross-check with the blueprint and complete options/maxlength/labels.
+		$collection['fields'] = self::mergeBlueprint($kirby, $collection, self::blueprintFields($kirby, $collection));
+		if (isset($entry['touch'])) {
+			if (!in_array($kind, ['structure', 'page'], true)) {
+				throw self::invalid("collection \"$name\": touch is only for structure and page collections");
+			}
+			$collection['touch'] = self::touch($kirby, $name, $entry['touch'], $collection);
+		}
+		return $collection;
+	}
+
+	/** The kind of a collection: structure (default), page or pages. */
+	private static function kind(string $name, array $entry): string
+	{
 		$kind = $entry['kind'] ?? 'structure';
 		if (!in_array($kind, self::KINDS, true)) {
 			throw self::invalid("collection \"$name\": unknown kind \"$kind\"");
 		}
+		return $kind;
+	}
+
+	/** The actions a collection allows, with the rules each kind has. */
+	private static function actions(string $name, array $entry, string $kind): array
+	{
 		$defaultActions = $kind === 'page' ? ['update'] : self::DEFAULT_ACTIONS;
 		$actions = array_values(array_unique(array_map('strval', (array)($entry['actions'] ?? $defaultActions))));
 		foreach ($actions as $action) {
@@ -447,19 +506,13 @@ class Config
 		if (in_array('replace', $actions, true) && $kind !== 'structure') {
 			throw self::invalid("collection \"$name\": replace is only for structure collections");
 		}
-		if (!is_array($entry['fields'] ?? null) || $entry['fields'] === []) {
-			throw self::invalid("collection \"$name\": no fields");
-		}
+		return $actions;
+	}
 
-		$collection = [
-			'name'         => $name,
-			'kind'         => $kind,
-			'label'        => is_string($entry['label'] ?? null) ? $entry['label'] : ucfirst($name),
-			'description'  => is_string($entry['description'] ?? null) ? $entry['description'] : '',
-			'actions'      => $actions,
-			'publishRoles' => array_values(array_map('strval', (array)($entry['publishRoles'] ?? [Service::ROLE]))),
-			'fields'       => [],
-		];
+	/** maxEntries and insert: both only for structure collections. */
+	private static function sizing(string $name, array $entry, string $kind): array
+	{
+		$sizing = [];
 		if (isset($entry['maxEntries'])) {
 			if ($kind !== 'structure') {
 				throw self::invalid("collection \"$name\": maxEntries is only for structure collections");
@@ -470,7 +523,7 @@ class Config
 			if ($entry['maxEntries'] > Service::MAX_REPLACE_ENTRIES) {
 				throw self::invalid("collection \"$name\": maxEntries must be at most " . Service::MAX_REPLACE_ENTRIES);
 			}
-			$collection['maxEntries'] = $entry['maxEntries'];
+			$sizing['maxEntries'] = $entry['maxEntries'];
 		}
 		if (isset($entry['insert'])) {
 			if ($kind !== 'structure') {
@@ -479,16 +532,14 @@ class Config
 			if (!in_array($entry['insert'], ['top', 'bottom'], true)) {
 				throw self::invalid("collection \"$name\": insert must be \"top\" or \"bottom\"");
 			}
-			$collection['insert'] = $entry['insert'];
+			$sizing['insert'] = $entry['insert'];
 		}
-		// A declaration for the chat side: the content of an attached photo may
-		// be read by the model. The plugin itself does nothing else with it.
-		$readImages = $entry['readImages'] ?? false;
-		if (!is_bool($readImages)) {
-			throw self::invalid("collection \"$name\": readImages must be true or false");
-		}
-		$collection['readImages'] = $readImages;
+		return $sizing;
+	}
 
+	/** Where the collection lives: its page (page, structure) or its parent and template (pages). */
+	private static function location(string $name, array $entry, string $kind): array
+	{
 		if ($kind === 'page') {
 			// The collection is one page; the page id is all it needs.
 			if (!is_string($entry['page'] ?? null) || $entry['page'] === '') {
@@ -497,133 +548,165 @@ class Config
 			if (isset($entry['key'])) {
 				throw self::invalid("collection \"$name\": kind page has no key");
 			}
-			$collection['page'] = $entry['page'];
-		} elseif ($kind === 'structure') {
+			return ['page' => $entry['page']];
+		}
+		if ($kind === 'structure') {
 			foreach (['page', 'field'] as $required) {
 				if (!is_string($entry[$required] ?? null) || $entry[$required] === '') {
 					throw self::invalid("collection \"$name\": \"$required\" missing");
 				}
 			}
-			$collection['page'] = $entry['page'];
-			$collection['field'] = strtolower($entry['field']);
-		} else {
-			foreach (['parent', 'template'] as $required) {
-				if (!is_string($entry[$required] ?? null) || $entry[$required] === '') {
-					throw self::invalid("collection \"$name\": \"$required\" missing");
-				}
-			}
-			$collection['parent'] = $entry['parent'];
-			$collection['template'] = $entry['template'];
-			$status = $entry['status'] ?? 'listed';
-			if (!in_array($status, ['listed', 'unlisted'], true)) {
-				throw self::invalid("collection \"$name\": status must be listed or unlisted");
-			}
-			$collection['status'] = $status;
+			return ['page' => $entry['page'], 'field' => strtolower($entry['field'])];
 		}
+		foreach (['parent', 'template'] as $required) {
+			if (!is_string($entry[$required] ?? null) || $entry[$required] === '') {
+				throw self::invalid("collection \"$name\": \"$required\" missing");
+			}
+		}
+		$status = $entry['status'] ?? 'listed';
+		if (!in_array($status, ['listed', 'unlisted'], true)) {
+			throw self::invalid("collection \"$name\": status must be listed or unlisted");
+		}
+		return ['parent' => $entry['parent'], 'template' => $entry['template'], 'status' => $status];
+	}
 
+	/** The declared fields of a collection, in declaration order, each checked and completed. */
+	private static function declaredFields(string $name, array $entry, string $kind): array
+	{
+		$fields = [];
 		foreach ($entry['fields'] as $fieldName => $rule) {
-			if (!is_string($fieldName) || !preg_match('/^[a-z][a-z0-9_]{0,39}$/D', $fieldName)) {
-				throw self::invalid("collection \"$name\": field name \"$fieldName\" (a-z, 0-9, _)");
-			}
-			$rule = is_array($rule) ? $rule : ['type' => (string)$rule];
-			$type = $rule['type'] ?? 'text';
-			if (!in_array($type, self::TYPES, true)) {
-				throw self::invalid("collection \"$name\": field \"$fieldName\" has unknown type \"$type\"");
-			}
-			if ($type === 'image' && $kind === 'page') {
-				throw self::invalid("collection \"$name\": image fields are not supported for kind page");
-			}
-			if (isset($rule['ask']) && !is_bool($rule['ask'])) {
-				throw self::invalid("collection \"$name\": field \"$fieldName\" ask must be true or false");
-			}
-			$field = [
-				'type'        => $type,
-				'required'    => ($rule['required'] ?? false) === true,
-				'ask'         => ($rule['ask'] ?? false) === true,
-				'description' => is_string($rule['description'] ?? null) ? $rule['description'] : '',
-			];
-			if ($type === 'select') {
-				$options = array_values(array_map('strval', (array)($rule['options'] ?? [])));
-				$field['options'] = $options; // may be filled from the blueprint
-			}
-			if (isset($rule['maxlength'])) {
-				if (!is_int($rule['maxlength']) || $rule['maxlength'] < 1) {
-					throw self::invalid("collection \"$name\": field \"$fieldName\" maxlength must be a positive integer");
-				}
-				$field['maxlength'] = $rule['maxlength'];
-			}
-			if ($type === 'image') {
-				$formats = array_values(array_unique(array_map(fn ($f) => strtolower((string)$f), (array)($rule['formats'] ?? self::DEFAULT_FORMATS))));
-				foreach ($formats as $format) {
-					if (!in_array($format, Images::FORMATS, true)) {
-						throw self::invalid("collection \"$name\": field \"$fieldName\" format \"$format\" (" . implode(', ', Images::FORMATS) . ')');
-					}
-				}
-				$maxWidth = $rule['maxWidth'] ?? self::DEFAULT_MAX_WIDTH;
-				if (!is_int($maxWidth) || $maxWidth < 16 || $maxWidth > 8000) {
-					throw self::invalid("collection \"$name\": field \"$fieldName\" maxWidth must be 16–8000");
-				}
-				$field += [
-					'formats'  => $formats,
-					'maxWidth' => $maxWidth,
-					'template' => is_string($rule['template'] ?? null) && $rule['template'] !== '' ? $rule['template'] : null,
-					'alt'      => is_string($rule['alt'] ?? null) ? $rule['alt'] : null,
-				];
-			}
-			if ($type === 'number') {
-				foreach (['min', 'max'] as $bound) {
-					if (!isset($rule[$bound])) {
-						continue;
-					}
-					if (!is_int($rule[$bound]) && !is_float($rule[$bound])) {
-						throw self::invalid("collection \"$name\": field \"$fieldName\" $bound must be a number");
-					}
-					$field[$bound] = $rule[$bound];
-				}
-				if (isset($field['min'], $field['max']) && $field['min'] > $field['max']) {
-					throw self::invalid("collection \"$name\": field \"$fieldName\" min is above max");
-				}
-			} elseif (isset($rule['min'])) {
-				if ($type !== 'date') {
-					throw self::invalid("collection \"$name\": field \"$fieldName\" min is only for date and number fields");
-				}
-				if ($rule['min'] !== 'today') {
-					throw self::invalid("collection \"$name\": field \"$fieldName\" min must be \"today\"");
-				}
-				$field['min'] = 'today';
-			}
-			if (isset($rule['max']) && $type !== 'number') {
-				throw self::invalid("collection \"$name\": field \"$fieldName\" max is only for number fields");
-			}
-			$collection['fields'][$fieldName] = $field;
+			$fields[$fieldName] = self::fieldDeclaration($name, $fieldName, $rule, $kind);
 		}
+		return $fields;
+	}
 
-		if ($kind === 'pages' && !isset($collection['fields']['title'])) {
-			throw self::invalid("collection \"$name\": pages collections need a \"title\" field");
+	/** One field of the declaration: its type and the options of that type. */
+	private static function fieldDeclaration(string $name, int|string $fieldName, mixed $rule, string $kind): array
+	{
+		if (!is_string($fieldName) || !preg_match('/^[a-z][a-z0-9_]{0,39}$/D', $fieldName)) {
+			throw self::invalid("collection \"$name\": field name \"$fieldName\" (a-z, 0-9, _)");
 		}
-		if ($kind === 'page') {
-			$collection['key'] = null; // one page, no entries to tell apart
-		} else {
-			$key = $entry['key'] ?? null;
-			if ($key === null) {
-				// The first declared text field identifies an entry.
-				foreach ($collection['fields'] as $fieldName => $field) {
-					if ($field['type'] === 'text') {
-						$key = $fieldName;
-						break;
-					}
+		$rule = is_array($rule) ? $rule : ['type' => (string)$rule];
+		$type = $rule['type'] ?? 'text';
+		if (!in_array($type, self::TYPES, true)) {
+			throw self::invalid("collection \"$name\": field \"$fieldName\" has unknown type \"$type\"");
+		}
+		if ($type === 'image' && $kind === 'page') {
+			throw self::invalid("collection \"$name\": image fields are not supported for kind page");
+		}
+		if (isset($rule['ask']) && !is_bool($rule['ask'])) {
+			throw self::invalid("collection \"$name\": field \"$fieldName\" ask must be true or false");
+		}
+		$field = [
+			'type'        => $type,
+			'required'    => ($rule['required'] ?? false) === true,
+			'ask'         => ($rule['ask'] ?? false) === true,
+			'description' => is_string($rule['description'] ?? null) ? $rule['description'] : '',
+		];
+		if ($type === 'select') {
+			$options = array_values(array_map('strval', (array)($rule['options'] ?? [])));
+			$field['options'] = $options; // may be filled from the blueprint
+		}
+		if (isset($rule['maxlength'])) {
+			if (!is_int($rule['maxlength']) || $rule['maxlength'] < 1) {
+				throw self::invalid("collection \"$name\": field \"$fieldName\" maxlength must be a positive integer");
+			}
+			$field['maxlength'] = $rule['maxlength'];
+		}
+		if ($type === 'image') {
+			$field += self::imageDeclaration($name, $fieldName, $rule);
+		}
+		if ($type === 'number') {
+			$field += self::bounds($name, $fieldName, $rule);
+		} elseif (isset($rule['min'])) {
+			$field += self::dateMin($name, $fieldName, $rule, $type);
+		}
+		if (isset($rule['max']) && $type !== 'number') {
+			throw self::invalid("collection \"$name\": field \"$fieldName\" max is only for number fields");
+		}
+		return $field;
+	}
+
+	/** The image settings of an image field: formats, maximum width, template and alt field. */
+	private static function imageDeclaration(string $name, string $fieldName, array $rule): array
+	{
+		$formats = array_values(array_unique(array_map(fn ($f) => strtolower((string)$f), (array)($rule['formats'] ?? self::DEFAULT_FORMATS))));
+		foreach ($formats as $format) {
+			if (!in_array($format, Images::FORMATS, true)) {
+				throw self::invalid("collection \"$name\": field \"$fieldName\" format \"$format\" (" . implode(', ', Images::FORMATS) . ')');
+			}
+		}
+		$maxWidth = $rule['maxWidth'] ?? self::DEFAULT_MAX_WIDTH;
+		if (!is_int($maxWidth) || $maxWidth < 16 || $maxWidth > 8000) {
+			throw self::invalid("collection \"$name\": field \"$fieldName\" maxWidth must be 16–8000");
+		}
+		return [
+			'formats'  => $formats,
+			'maxWidth' => $maxWidth,
+			'template' => is_string($rule['template'] ?? null) && $rule['template'] !== '' ? $rule['template'] : null,
+			'alt'      => is_string($rule['alt'] ?? null) ? $rule['alt'] : null,
+		];
+	}
+
+	/** The min and max of a number field, as numbers. */
+	private static function bounds(string $name, string $fieldName, array $rule): array
+	{
+		$bounds = [];
+		foreach (['min', 'max'] as $bound) {
+			if (!isset($rule[$bound])) {
+				continue;
+			}
+			if (!is_int($rule[$bound]) && !is_float($rule[$bound])) {
+				throw self::invalid("collection \"$name\": field \"$fieldName\" $bound must be a number");
+			}
+			$bounds[$bound] = $rule[$bound];
+		}
+		if (isset($bounds['min'], $bounds['max']) && $bounds['min'] > $bounds['max']) {
+			throw self::invalid("collection \"$name\": field \"$fieldName\" min is above max");
+		}
+		return $bounds;
+	}
+
+	/** The min of a date field: only "today" is allowed. */
+	private static function dateMin(string $name, string $fieldName, array $rule, string $type): array
+	{
+		if ($type !== 'date') {
+			throw self::invalid("collection \"$name\": field \"$fieldName\" min is only for date and number fields");
+		}
+		if ($rule['min'] !== 'today') {
+			throw self::invalid("collection \"$name\": field \"$fieldName\" min must be \"today\"");
+		}
+		return ['min' => 'today'];
+	}
+
+	/**
+	 * The key of an entry: the declared "key", otherwise the first text field.
+	 * It names a declared text, select or date field.
+	 *
+	 * @param array<string, array<string, mixed>> $fields the declared fields
+	 */
+	private static function keyField(string $name, array $entry, array $fields): string
+	{
+		$key = $entry['key'] ?? null;
+		if ($key === null) {
+			// The first declared text field identifies an entry.
+			foreach ($fields as $fieldName => $field) {
+				if ($field['type'] === 'text') {
+					$key = $fieldName;
+					break;
 				}
 			}
-			// A select or a date identifies a row too (opening hours by weekday, holidays by day).
-			if (!is_string($key) || !isset($collection['fields'][$key]) || !in_array($collection['fields'][$key]['type'], self::KEY_TYPES, true)) {
-				throw self::invalid("collection \"$name\": \"key\" must name a declared text, select or date field");
-			}
-			$collection['key'] = $key;
-			// The key identifies an entry: without it there is no row to create
-			// or find. Forced here, so the blueprint merge can only add to it.
-			$collection['fields'][$key]['required'] = true;
 		}
-		$declared = $collection['fields'];
+		// A select or a date identifies a row too (opening hours by weekday, holidays by day).
+		if (!is_string($key) || !isset($fields[$key]) || !in_array($fields[$key]['type'], self::KEY_TYPES, true)) {
+			throw self::invalid("collection \"$name\": \"key\" must name a declared text, select or date field");
+		}
+		return $key;
+	}
+
+	/** An image's alt must name a declared text field. */
+	private static function checkAlt(string $name, array $declared): void
+	{
 		foreach ($declared as $fieldName => $field) {
 			$alt = $field['alt'] ?? null;
 			if ($field['type'] === 'image' && $alt !== null &&
@@ -631,16 +714,6 @@ class Config
 				throw self::invalid("collection \"$name\": field \"$fieldName\" alt must name a declared text field");
 			}
 		}
-
-		// Cross-check with the blueprint and complete options/maxlength/labels.
-		$collection['fields'] = self::mergeBlueprint($kirby, $collection, self::blueprintFields($kirby, $collection));
-		if (isset($entry['touch'])) {
-			if (!in_array($kind, ['structure', 'page'], true)) {
-				throw self::invalid("collection \"$name\": touch is only for structure and page collections");
-			}
-			$collection['touch'] = self::touch($kirby, $name, $entry['touch'], $collection);
-		}
-		return $collection;
 	}
 
 	/**
