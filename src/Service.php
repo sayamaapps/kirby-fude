@@ -148,6 +148,20 @@ class Service
 		throw FudeError::t('fields.blueprint', ['errors' => implode(' · ', $parts)]);
 	}
 
+	/** What the draft shows the public, checked against the declaration: every replaced row, or the one entry. */
+	private static function checkDraftShown(App $kirby, array $collection, array $rows, int|null $index, string $action, array|null $entries, array $clean): void
+	{
+		if ($action === 'replace') {
+			$keyField = $collection['key'];
+			foreach ($entries ?? [] as $row) {
+				$published = array_values(array_filter($rows, fn ($old) => Content::sameKey($old[$keyField ?? ''] ?? '', $row[$keyField ?? ''])));
+				self::checkShown($collection, $published[0] ?? [], $row);
+			}
+		} elseif ($action !== 'delete') {
+			self::checkShown($collection, self::storedEntry($kirby, $collection, $rows, $index), $clean);
+		}
+	}
+
 	/**
 	 * A draft needs a page nobody else is working on: no active Panel lock,
 	 * and no unsaved Panel changes (they would be published together with
@@ -346,31 +360,6 @@ class Service
 		return ['id' => $record['id'], 'kept' => $kept];
 	}
 
-	/** The name of the collection's image field, or null. */
-	private static function imageField(array $collection): string|null
-	{
-		foreach ($collection['fields'] as $name => $rule) {
-			if ($rule['type'] === 'image') {
-				return $name;
-			}
-		}
-		return null;
-	}
-
-	/** What the draft shows the public, checked against the declaration: every replaced row, or the one entry. */
-	private static function checkDraftShown(App $kirby, array $collection, array $rows, int|null $index, string $action, array|null $entries, array $clean): void
-	{
-		if ($action === 'replace') {
-			$keyField = $collection['key'];
-			foreach ($entries ?? [] as $row) {
-				$published = array_values(array_filter($rows, fn ($old) => Content::sameKey($old[$keyField ?? ''] ?? '', $row[$keyField ?? ''])));
-				self::checkShown($collection, $published[0] ?? [], $row);
-			}
-		} elseif ($action !== 'delete') {
-			self::checkShown($collection, self::storedEntry($kirby, $collection, $rows, $index), $clean);
-		}
-	}
-
 	private static function draft(App $kirby, array $collections, array $input, DateTimeImmutable $now, array &$entry): array
 	{
 		$collection = self::collection($collections, $input['collection'] ?? null);
@@ -478,7 +467,6 @@ class Service
 		$format = $ctx->format;
 		$imageField = $ctx->imageField;
 		$now = $ctx->now;
-		$entry = &$ctx->entry;
 		$file = null;
 		$hash = Content::hash($kirby, $collection);
 		$content = self::stored($kirby, $collection, $clean);
@@ -507,7 +495,7 @@ class Service
 			'kind'        => 'pages',
 			'action'      => 'create',
 			'page'        => $child->id(),
-			'key'         => $entry['key'],
+			'key'         => $ctx->entry['key'],
 			'index'       => null,
 			'fields'      => $clean,
 			'file'        => $file?->filename(),
@@ -515,10 +503,10 @@ class Service
 			'hash'        => $hash,
 			'changesHash' => self::changesHash($child->version('latest')),
 			'preview'     => $child->version('latest')->url(),
-			'user'        => $entry['user'],
-			'actor'       => $entry['actor'],
+			'user'        => $ctx->entry['user'],
+			'actor'       => $ctx->entry['actor'],
 		], $now);
-		$entry['draft'] = $record['id'];
+		$ctx->entry['draft'] = $record['id'];
 		return ['draft' => Drafts::public($record), 'token' => $record['token'], 'preview' => $record['preview']];
 	}
 
@@ -537,7 +525,6 @@ class Service
 		$imageField = $ctx->imageField;
 		$action = $ctx->action;
 		$now = $ctx->now;
-		$entry = &$ctx->entry;
 		$file = null;
 		assert($index !== null);
 		$child = $kirby->page($rows[$index]['_id']);
@@ -555,7 +542,7 @@ class Service
 				'action'      => 'delete',
 				'page'        => $child->id(),
 				'uuid'        => self::pageUuid($child),
-				'key'         => $entry['key'],
+				'key'         => $ctx->entry['key'],
 				'index'       => $index,
 				'fields'      => [],
 				'file'        => null,
@@ -563,10 +550,10 @@ class Service
 				'hash'        => $hash,
 				'changesHash' => null,
 				'preview'     => $child->version('latest')->url(),
-				'user'        => $entry['user'],
-				'actor'       => $entry['actor'],
+				'user'        => $ctx->entry['user'],
+				'actor'       => $ctx->entry['actor'],
 			], $now);
-			$entry['draft'] = $record['id'];
+			$ctx->entry['draft'] = $record['id'];
 			return ['draft' => Drafts::public($record), 'token' => $record['token'], 'preview' => $record['preview']];
 		}
 		$content = self::stored($kirby, $collection, $clean);
@@ -590,7 +577,7 @@ class Service
 			'action'      => 'update',
 			'page'        => $child->id(),
 			'uuid'        => self::pageUuid($child),
-			'key'         => $entry['key'],
+			'key'         => $ctx->entry['key'],
 			'index'       => $index,
 			'fields'      => $clean,
 			'file'        => $file?->filename(),
@@ -598,10 +585,10 @@ class Service
 			'hash'        => $hash,
 			'changesHash' => self::changesHash($child->version('changes')),
 			'preview'     => $child->version('changes')->url(),
-			'user'        => $entry['user'],
-			'actor'       => $entry['actor'],
+			'user'        => $ctx->entry['user'],
+			'actor'       => $ctx->entry['actor'],
 		], $now);
-		$entry['draft'] = $record['id'];
+		$ctx->entry['draft'] = $record['id'];
 		return ['draft' => Drafts::public($record), 'token' => $record['token'], 'preview' => $record['preview']];
 	}
 
@@ -658,7 +645,6 @@ class Service
 		$entries = $ctx->entries;
 		$touched = $ctx->touched;
 		$now = $ctx->now;
-		$entry = &$ctx->entry;
 		$field = $collection['field'];
 		self::checkEditable($page);
 		$hash = Content::hash($kirby, $collection);
@@ -723,7 +709,7 @@ class Service
 			'kind'        => 'structure',
 			'action'      => $action,
 			'page'        => $page->id(),
-			'key'         => $entry['key'],
+			'key'         => $ctx->entry['key'],
 			'index'       => $action === 'replace' ? null : ($position ?? count($rows) - 1),
 			'fields'      => $clean,
 			'replace'     => $replace,
@@ -733,10 +719,10 @@ class Service
 			'hash'        => $hash,
 			'changesHash' => self::changesHash($page->version('changes')),
 			'preview'     => $page->version('changes')->url(),
-			'user'        => $entry['user'],
-			'actor'       => $entry['actor'],
+			'user'        => $ctx->entry['user'],
+			'actor'       => $ctx->entry['actor'],
 		], $now);
-		$entry['draft'] = $record['id'];
+		$ctx->entry['draft'] = $record['id'];
 		return ['draft' => Drafts::public($record), 'token' => $record['token'], 'preview' => $record['preview']];
 	}
 
@@ -840,6 +826,17 @@ class Service
 	public static function fromTrustedProxy(App $kirby): bool
 	{
 		return Options::isTrustedProxy($kirby, $kirby->environment()->get('REMOTE_ADDR'));
+	}
+
+	/** The name of the collection's image field, or null. */
+	private static function imageField(array $collection): string|null
+	{
+		foreach ($collection['fields'] as $name => $rule) {
+			if ($rule['type'] === 'image') {
+				return $name;
+			}
+		}
+		return null;
 	}
 
 	/** The request body as an array: JSON object or form fields. */

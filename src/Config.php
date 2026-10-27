@@ -85,6 +85,28 @@ class Config
 	/** Days an editable touch may default to instead of today (option `default`), Monday first. */
 	public const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
+	/** The actions a collection allows, with the rules each kind has. */
+	private static function actions(string $name, array $entry, string $kind): array
+	{
+		$defaultActions = $kind === 'page' ? ['update'] : self::DEFAULT_ACTIONS;
+		$actions = array_values(array_unique(array_map('strval', (array)($entry['actions'] ?? $defaultActions))));
+		foreach ($actions as $action) {
+			if (!in_array($action, self::ACTIONS, true)) {
+				throw self::invalid("collection \"$name\": unknown action \"$action\"");
+			}
+		}
+		if ($actions === []) {
+			throw self::invalid("collection \"$name\": no actions");
+		}
+		if ($kind === 'page' && $actions !== ['update']) {
+			throw self::invalid("collection \"$name\": kind page allows only the action update");
+		}
+		if (in_array('replace', $actions, true) && $kind !== 'structure') {
+			throw self::invalid("collection \"$name\": replace is only for structure collections");
+		}
+		return $actions;
+	}
+
 	/**
 	 * The blueprint fields behind a collection: the structure field's
 	 * sub-fields, or the page blueprint's fields for a page or pages collection.
@@ -113,6 +135,37 @@ class Config
 			$fields['title'] ??= ['type' => 'text', 'required' => true, 'label' => 'Title'];
 		}
 		return $fields;
+	}
+
+	/** The min and max of a number field, as numbers. */
+	private static function bounds(string $name, string $fieldName, array $rule): array
+	{
+		$bounds = [];
+		foreach (['min', 'max'] as $bound) {
+			if (!isset($rule[$bound])) {
+				continue;
+			}
+			if (!is_int($rule[$bound]) && !is_float($rule[$bound])) {
+				throw self::invalid("collection \"$name\": field \"$fieldName\" $bound must be a number");
+			}
+			$bounds[$bound] = $rule[$bound];
+		}
+		if (isset($bounds['min'], $bounds['max']) && $bounds['min'] > $bounds['max']) {
+			throw self::invalid("collection \"$name\": field \"$fieldName\" min is above max");
+		}
+		return $bounds;
+	}
+
+	/** An image's alt must name a declared text field. */
+	private static function checkAlt(string $name, array $declared): void
+	{
+		foreach ($declared as $fieldName => $field) {
+			$alt = $field['alt'] ?? null;
+			if ($field['type'] === 'image' && $alt !== null &&
+				(!isset($declared[$alt]) || $declared[$alt]['type'] === 'image')) {
+				throw self::invalid("collection \"$name\": field \"$fieldName\" alt must name a declared text field");
+			}
+		}
 	}
 
 	/**
@@ -151,6 +204,28 @@ class Config
 		return $depends === [] ? true : $depends;
 	}
 
+	/** The min of a date field: only "today" is allowed. */
+	private static function dateMin(string $name, string $fieldName, array $rule, string $type): array
+	{
+		if ($type !== 'date') {
+			throw self::invalid("collection \"$name\": field \"$fieldName\" min is only for date and number fields");
+		}
+		if ($rule['min'] !== 'today') {
+			throw self::invalid("collection \"$name\": field \"$fieldName\" min must be \"today\"");
+		}
+		return ['min' => 'today'];
+	}
+
+	/** The declared fields of a collection, in declaration order, each checked and completed. */
+	private static function declaredFields(string $name, array $entry, string $kind): array
+	{
+		$fields = [];
+		foreach ($entry['fields'] as $fieldName => $rule) {
+			$fields[$fieldName] = self::fieldDeclaration($name, $fieldName, $rule, $kind);
+		}
+		return $fields;
+	}
+
 	/**
 	 * The published entries of a collection, reduced to the declared text
 	 * fields. Images appear as `true`/`false` (present or not).
@@ -178,6 +253,53 @@ class Config
 		return $entries;
 	}
 
+	/** One field of the declaration: its type and the options of that type. */
+	private static function fieldDeclaration(string $name, int|string $fieldName, mixed $rule, string $kind): array
+	{
+		if (!is_string($fieldName) || !preg_match('/^[a-z][a-z0-9_]{0,39}$/D', $fieldName)) {
+			throw self::invalid("collection \"$name\": field name \"$fieldName\" (a-z, 0-9, _)");
+		}
+		$rule = is_array($rule) ? $rule : ['type' => (string)$rule];
+		$type = $rule['type'] ?? 'text';
+		if (!in_array($type, self::TYPES, true)) {
+			throw self::invalid("collection \"$name\": field \"$fieldName\" has unknown type \"$type\"");
+		}
+		if ($type === 'image' && $kind === 'page') {
+			throw self::invalid("collection \"$name\": image fields are not supported for kind page");
+		}
+		if (isset($rule['ask']) && !is_bool($rule['ask'])) {
+			throw self::invalid("collection \"$name\": field \"$fieldName\" ask must be true or false");
+		}
+		$field = [
+			'type'        => $type,
+			'required'    => ($rule['required'] ?? false) === true,
+			'ask'         => ($rule['ask'] ?? false) === true,
+			'description' => is_string($rule['description'] ?? null) ? $rule['description'] : '',
+		];
+		if ($type === 'select') {
+			$options = array_values(array_map('strval', (array)($rule['options'] ?? [])));
+			$field['options'] = $options; // may be filled from the blueprint
+		}
+		if (isset($rule['maxlength'])) {
+			if (!is_int($rule['maxlength']) || $rule['maxlength'] < 1) {
+				throw self::invalid("collection \"$name\": field \"$fieldName\" maxlength must be a positive integer");
+			}
+			$field['maxlength'] = $rule['maxlength'];
+		}
+		if ($type === 'image') {
+			$field += self::imageDeclaration($name, $fieldName, $rule);
+		}
+		if ($type === 'number') {
+			$field += self::bounds($name, $fieldName, $rule);
+		} elseif (isset($rule['min'])) {
+			$field += self::dateMin($name, $fieldName, $rule, $type);
+		}
+		if (isset($rule['max']) && $type !== 'number') {
+			throw self::invalid("collection \"$name\": field \"$fieldName\" max is only for number fields");
+		}
+		return $field;
+	}
+
 	/**
 	 * The help text of a blueprint field, as plain text on one line. A
 	 * translation array or a translation key is read in the reply language,
@@ -195,6 +317,27 @@ class Config
 		return trim((string)preg_replace('/\s+/u', ' ', strip_tags(self::translateKey($help))));
 	}
 
+	/** The image settings of an image field: formats, maximum width, template and alt field. */
+	private static function imageDeclaration(string $name, string $fieldName, array $rule): array
+	{
+		$formats = array_values(array_unique(array_map(fn ($f) => strtolower((string)$f), (array)($rule['formats'] ?? self::DEFAULT_FORMATS))));
+		foreach ($formats as $format) {
+			if (!in_array($format, Images::FORMATS, true)) {
+				throw self::invalid("collection \"$name\": field \"$fieldName\" format \"$format\" (" . implode(', ', Images::FORMATS) . ')');
+			}
+		}
+		$maxWidth = $rule['maxWidth'] ?? self::DEFAULT_MAX_WIDTH;
+		if (!is_int($maxWidth) || $maxWidth < 16 || $maxWidth > 8000) {
+			throw self::invalid("collection \"$name\": field \"$fieldName\" maxWidth must be 16–8000");
+		}
+		return [
+			'formats'  => $formats,
+			'maxWidth' => $maxWidth,
+			'template' => is_string($rule['template'] ?? null) && $rule['template'] !== '' ? $rule['template'] : null,
+			'alt'      => is_string($rule['alt'] ?? null) ? $rule['alt'] : null,
+		];
+	}
+
 	private static function invalid(string $reason): FudeError
 	{
 		return FudeError::t('config.invalid', ['reason' => $reason], 500);
@@ -204,6 +347,41 @@ class Config
 	private static function isQuery(array $definition): bool
 	{
 		return (FieldOptions::polyfill($definition)['options']['type'] ?? null) === 'query';
+	}
+
+	/**
+	 * The key of an entry: the declared "key", otherwise the first text field.
+	 * It names a declared text, select or date field.
+	 *
+	 * @param array<string, array<string, mixed>> $fields the declared fields
+	 */
+	private static function keyField(string $name, array $entry, array $fields): string
+	{
+		$key = $entry['key'] ?? null;
+		if ($key === null) {
+			// The first declared text field identifies an entry.
+			foreach ($fields as $fieldName => $field) {
+				if ($field['type'] === 'text') {
+					$key = $fieldName;
+					break;
+				}
+			}
+		}
+		// A select or a date identifies a row too (opening hours by weekday, holidays by day).
+		if (!is_string($key) || !isset($fields[$key]) || !in_array($fields[$key]['type'], self::KEY_TYPES, true)) {
+			throw self::invalid("collection \"$name\": \"key\" must name a declared text, select or date field");
+		}
+		return $key;
+	}
+
+	/** The kind of a collection: structure (default), page or pages. */
+	private static function kind(string $name, array $entry): string
+	{
+		$kind = $entry['kind'] ?? 'structure';
+		if (!in_array($kind, self::KINDS, true)) {
+			throw self::invalid("collection \"$name\": unknown kind \"$kind\"");
+		}
+		return $kind;
 	}
 
 	/**
@@ -294,55 +472,37 @@ class Config
 		return $collections;
 	}
 
-	/**
-	 * The options of a select field: from the blueprint, or a query over the page tree.
-	 * Null leaves the field out (a query that finds nothing, when the field is not required).
-	 */
-	private static function selectField(App $kirby, array $collection, string $name, array $definition, array $field): array|null
+	/** Where the collection lives: its page (page, structure) or its parent and template (pages). */
+	private static function location(string $name, array $entry, string $kind): array
 	{
-		if (self::isQuery($definition)) {
-			$blueprintOptions = self::queryValues($kirby, $collection, $name, $definition);
-			if ($blueprintOptions === []) {
-				// A query that yields nothing (a site without separate areas): the field is
-				// left out, so the schema does not list it. A field that cannot be left out fails.
-				if ($field['required'] || $name === $collection['key']) {
-					throw self::invalid("collection \"{$collection['name']}\": field \"$name\" has no options");
-				}
-				if ($field['options'] !== []) {
-					throw self::invalid("collection \"{$collection['name']}\": field \"$name\" declares options the blueprint does not have");
-				}
-				return null;
+		if ($kind === 'page') {
+			// The collection is one page; the page id is all it needs.
+			if (!is_string($entry['page'] ?? null) || $entry['page'] === '') {
+				throw self::invalid("collection \"$name\": \"page\" missing");
 			}
-		} else {
-			$blueprintOptions = self::selectOptions($definition);
+			if (isset($entry['key'])) {
+				throw self::invalid("collection \"$name\": kind page has no key");
+			}
+			return ['page' => $entry['page']];
 		}
-		if ($field['options'] === []) {
-			$field['options'] = $blueprintOptions;
-		} elseif ($blueprintOptions !== [] && array_diff($field['options'], $blueprintOptions) !== []) {
-			throw self::invalid("collection \"{$collection['name']}\": field \"$name\" declares options the blueprint does not have");
+		if ($kind === 'structure') {
+			foreach (['page', 'field'] as $required) {
+				if (!is_string($entry[$required] ?? null) || $entry[$required] === '') {
+					throw self::invalid("collection \"$name\": \"$required\" missing");
+				}
+			}
+			return ['page' => $entry['page'], 'field' => strtolower($entry['field'])];
 		}
-		if ($field['options'] === []) {
-			throw self::invalid("collection \"{$collection['name']}\": field \"$name\" has no options");
+		foreach (['parent', 'template'] as $required) {
+			if (!is_string($entry[$required] ?? null) || $entry[$required] === '') {
+				throw self::invalid("collection \"$name\": \"$required\" missing");
+			}
 		}
-		return $field;
-	}
-
-	/** The bounds of a number field: the tighter of declaration and blueprint. */
-	private static function numberField(array $collection, string $name, array $definition, array $field): array
-	{
-		// The tighter bound of declaration and blueprint wins, as with maxlength.
-		$min = $definition['min'] ?? null;
-		if (is_int($min) || is_float($min)) {
-			$field['min'] = isset($field['min']) ? max($field['min'], $min) : $min;
+		$status = $entry['status'] ?? 'listed';
+		if (!in_array($status, ['listed', 'unlisted'], true)) {
+			throw self::invalid("collection \"$name\": status must be listed or unlisted");
 		}
-		$max = $definition['max'] ?? null;
-		if (is_int($max) || is_float($max)) {
-			$field['max'] = isset($field['max']) ? min($field['max'], $max) : $max;
-		}
-		if (isset($field['min'], $field['max']) && $field['min'] > $field['max']) {
-			throw self::invalid("collection \"{$collection['name']}\": field \"$name\" min is above max (with the blueprint)");
-		}
-		return $field;
+		return ['parent' => $entry['parent'], 'template' => $entry['template'], 'status' => $status];
 	}
 
 	/** @param array<string, array> $blueprint */
@@ -497,243 +657,22 @@ class Config
 		return $collection;
 	}
 
-	/** The kind of a collection: structure (default), page or pages. */
-	private static function kind(string $name, array $entry): string
+	/** The bounds of a number field: the tighter of declaration and blueprint. */
+	private static function numberField(array $collection, string $name, array $definition, array $field): array
 	{
-		$kind = $entry['kind'] ?? 'structure';
-		if (!in_array($kind, self::KINDS, true)) {
-			throw self::invalid("collection \"$name\": unknown kind \"$kind\"");
+		// The tighter bound of declaration and blueprint wins, as with maxlength.
+		$min = $definition['min'] ?? null;
+		if (is_int($min) || is_float($min)) {
+			$field['min'] = isset($field['min']) ? max($field['min'], $min) : $min;
 		}
-		return $kind;
-	}
-
-	/** The actions a collection allows, with the rules each kind has. */
-	private static function actions(string $name, array $entry, string $kind): array
-	{
-		$defaultActions = $kind === 'page' ? ['update'] : self::DEFAULT_ACTIONS;
-		$actions = array_values(array_unique(array_map('strval', (array)($entry['actions'] ?? $defaultActions))));
-		foreach ($actions as $action) {
-			if (!in_array($action, self::ACTIONS, true)) {
-				throw self::invalid("collection \"$name\": unknown action \"$action\"");
-			}
+		$max = $definition['max'] ?? null;
+		if (is_int($max) || is_float($max)) {
+			$field['max'] = isset($field['max']) ? min($field['max'], $max) : $max;
 		}
-		if ($actions === []) {
-			throw self::invalid("collection \"$name\": no actions");
-		}
-		if ($kind === 'page' && $actions !== ['update']) {
-			throw self::invalid("collection \"$name\": kind page allows only the action update");
-		}
-		if (in_array('replace', $actions, true) && $kind !== 'structure') {
-			throw self::invalid("collection \"$name\": replace is only for structure collections");
-		}
-		return $actions;
-	}
-
-	/** maxEntries and insert: both only for structure collections. */
-	private static function sizing(string $name, array $entry, string $kind): array
-	{
-		$sizing = [];
-		if (isset($entry['maxEntries'])) {
-			if ($kind !== 'structure') {
-				throw self::invalid("collection \"$name\": maxEntries is only for structure collections");
-			}
-			if (!is_int($entry['maxEntries']) || $entry['maxEntries'] < 1) {
-				throw self::invalid("collection \"$name\": maxEntries must be a positive integer");
-			}
-			if ($entry['maxEntries'] > Service::MAX_REPLACE_ENTRIES) {
-				throw self::invalid("collection \"$name\": maxEntries must be at most " . Service::MAX_REPLACE_ENTRIES);
-			}
-			$sizing['maxEntries'] = $entry['maxEntries'];
-		}
-		if (isset($entry['insert'])) {
-			if ($kind !== 'structure') {
-				throw self::invalid("collection \"$name\": insert is only for structure collections");
-			}
-			if (!in_array($entry['insert'], ['top', 'bottom'], true)) {
-				throw self::invalid("collection \"$name\": insert must be \"top\" or \"bottom\"");
-			}
-			$sizing['insert'] = $entry['insert'];
-		}
-		return $sizing;
-	}
-
-	/** Where the collection lives: its page (page, structure) or its parent and template (pages). */
-	private static function location(string $name, array $entry, string $kind): array
-	{
-		if ($kind === 'page') {
-			// The collection is one page; the page id is all it needs.
-			if (!is_string($entry['page'] ?? null) || $entry['page'] === '') {
-				throw self::invalid("collection \"$name\": \"page\" missing");
-			}
-			if (isset($entry['key'])) {
-				throw self::invalid("collection \"$name\": kind page has no key");
-			}
-			return ['page' => $entry['page']];
-		}
-		if ($kind === 'structure') {
-			foreach (['page', 'field'] as $required) {
-				if (!is_string($entry[$required] ?? null) || $entry[$required] === '') {
-					throw self::invalid("collection \"$name\": \"$required\" missing");
-				}
-			}
-			return ['page' => $entry['page'], 'field' => strtolower($entry['field'])];
-		}
-		foreach (['parent', 'template'] as $required) {
-			if (!is_string($entry[$required] ?? null) || $entry[$required] === '') {
-				throw self::invalid("collection \"$name\": \"$required\" missing");
-			}
-		}
-		$status = $entry['status'] ?? 'listed';
-		if (!in_array($status, ['listed', 'unlisted'], true)) {
-			throw self::invalid("collection \"$name\": status must be listed or unlisted");
-		}
-		return ['parent' => $entry['parent'], 'template' => $entry['template'], 'status' => $status];
-	}
-
-	/** The declared fields of a collection, in declaration order, each checked and completed. */
-	private static function declaredFields(string $name, array $entry, string $kind): array
-	{
-		$fields = [];
-		foreach ($entry['fields'] as $fieldName => $rule) {
-			$fields[$fieldName] = self::fieldDeclaration($name, $fieldName, $rule, $kind);
-		}
-		return $fields;
-	}
-
-	/** One field of the declaration: its type and the options of that type. */
-	private static function fieldDeclaration(string $name, int|string $fieldName, mixed $rule, string $kind): array
-	{
-		if (!is_string($fieldName) || !preg_match('/^[a-z][a-z0-9_]{0,39}$/D', $fieldName)) {
-			throw self::invalid("collection \"$name\": field name \"$fieldName\" (a-z, 0-9, _)");
-		}
-		$rule = is_array($rule) ? $rule : ['type' => (string)$rule];
-		$type = $rule['type'] ?? 'text';
-		if (!in_array($type, self::TYPES, true)) {
-			throw self::invalid("collection \"$name\": field \"$fieldName\" has unknown type \"$type\"");
-		}
-		if ($type === 'image' && $kind === 'page') {
-			throw self::invalid("collection \"$name\": image fields are not supported for kind page");
-		}
-		if (isset($rule['ask']) && !is_bool($rule['ask'])) {
-			throw self::invalid("collection \"$name\": field \"$fieldName\" ask must be true or false");
-		}
-		$field = [
-			'type'        => $type,
-			'required'    => ($rule['required'] ?? false) === true,
-			'ask'         => ($rule['ask'] ?? false) === true,
-			'description' => is_string($rule['description'] ?? null) ? $rule['description'] : '',
-		];
-		if ($type === 'select') {
-			$options = array_values(array_map('strval', (array)($rule['options'] ?? [])));
-			$field['options'] = $options; // may be filled from the blueprint
-		}
-		if (isset($rule['maxlength'])) {
-			if (!is_int($rule['maxlength']) || $rule['maxlength'] < 1) {
-				throw self::invalid("collection \"$name\": field \"$fieldName\" maxlength must be a positive integer");
-			}
-			$field['maxlength'] = $rule['maxlength'];
-		}
-		if ($type === 'image') {
-			$field += self::imageDeclaration($name, $fieldName, $rule);
-		}
-		if ($type === 'number') {
-			$field += self::bounds($name, $fieldName, $rule);
-		} elseif (isset($rule['min'])) {
-			$field += self::dateMin($name, $fieldName, $rule, $type);
-		}
-		if (isset($rule['max']) && $type !== 'number') {
-			throw self::invalid("collection \"$name\": field \"$fieldName\" max is only for number fields");
+		if (isset($field['min'], $field['max']) && $field['min'] > $field['max']) {
+			throw self::invalid("collection \"{$collection['name']}\": field \"$name\" min is above max (with the blueprint)");
 		}
 		return $field;
-	}
-
-	/** The image settings of an image field: formats, maximum width, template and alt field. */
-	private static function imageDeclaration(string $name, string $fieldName, array $rule): array
-	{
-		$formats = array_values(array_unique(array_map(fn ($f) => strtolower((string)$f), (array)($rule['formats'] ?? self::DEFAULT_FORMATS))));
-		foreach ($formats as $format) {
-			if (!in_array($format, Images::FORMATS, true)) {
-				throw self::invalid("collection \"$name\": field \"$fieldName\" format \"$format\" (" . implode(', ', Images::FORMATS) . ')');
-			}
-		}
-		$maxWidth = $rule['maxWidth'] ?? self::DEFAULT_MAX_WIDTH;
-		if (!is_int($maxWidth) || $maxWidth < 16 || $maxWidth > 8000) {
-			throw self::invalid("collection \"$name\": field \"$fieldName\" maxWidth must be 16–8000");
-		}
-		return [
-			'formats'  => $formats,
-			'maxWidth' => $maxWidth,
-			'template' => is_string($rule['template'] ?? null) && $rule['template'] !== '' ? $rule['template'] : null,
-			'alt'      => is_string($rule['alt'] ?? null) ? $rule['alt'] : null,
-		];
-	}
-
-	/** The min and max of a number field, as numbers. */
-	private static function bounds(string $name, string $fieldName, array $rule): array
-	{
-		$bounds = [];
-		foreach (['min', 'max'] as $bound) {
-			if (!isset($rule[$bound])) {
-				continue;
-			}
-			if (!is_int($rule[$bound]) && !is_float($rule[$bound])) {
-				throw self::invalid("collection \"$name\": field \"$fieldName\" $bound must be a number");
-			}
-			$bounds[$bound] = $rule[$bound];
-		}
-		if (isset($bounds['min'], $bounds['max']) && $bounds['min'] > $bounds['max']) {
-			throw self::invalid("collection \"$name\": field \"$fieldName\" min is above max");
-		}
-		return $bounds;
-	}
-
-	/** The min of a date field: only "today" is allowed. */
-	private static function dateMin(string $name, string $fieldName, array $rule, string $type): array
-	{
-		if ($type !== 'date') {
-			throw self::invalid("collection \"$name\": field \"$fieldName\" min is only for date and number fields");
-		}
-		if ($rule['min'] !== 'today') {
-			throw self::invalid("collection \"$name\": field \"$fieldName\" min must be \"today\"");
-		}
-		return ['min' => 'today'];
-	}
-
-	/**
-	 * The key of an entry: the declared "key", otherwise the first text field.
-	 * It names a declared text, select or date field.
-	 *
-	 * @param array<string, array<string, mixed>> $fields the declared fields
-	 */
-	private static function keyField(string $name, array $entry, array $fields): string
-	{
-		$key = $entry['key'] ?? null;
-		if ($key === null) {
-			// The first declared text field identifies an entry.
-			foreach ($fields as $fieldName => $field) {
-				if ($field['type'] === 'text') {
-					$key = $fieldName;
-					break;
-				}
-			}
-		}
-		// A select or a date identifies a row too (opening hours by weekday, holidays by day).
-		if (!is_string($key) || !isset($fields[$key]) || !in_array($fields[$key]['type'], self::KEY_TYPES, true)) {
-			throw self::invalid("collection \"$name\": \"key\" must name a declared text, select or date field");
-		}
-		return $key;
-	}
-
-	/** An image's alt must name a declared text field. */
-	private static function checkAlt(string $name, array $declared): void
-	{
-		foreach ($declared as $fieldName => $field) {
-			$alt = $field['alt'] ?? null;
-			if ($field['type'] === 'image' && $alt !== null &&
-				(!isset($declared[$alt]) || $declared[$alt]['type'] === 'image')) {
-				throw self::invalid("collection \"$name\": field \"$fieldName\" alt must name a declared text field");
-			}
-		}
 	}
 
 	/**
@@ -907,6 +846,39 @@ class Config
 	}
 
 	/**
+	 * The options of a select field: from the blueprint, or a query over the page tree.
+	 * Null leaves the field out (a query that finds nothing, when the field is not required).
+	 */
+	private static function selectField(App $kirby, array $collection, string $name, array $definition, array $field): array|null
+	{
+		if (self::isQuery($definition)) {
+			$blueprintOptions = self::queryValues($kirby, $collection, $name, $definition);
+			if ($blueprintOptions === []) {
+				// A query that yields nothing (a site without separate areas): the field is
+				// left out, so the schema does not list it. A field that cannot be left out fails.
+				if ($field['required'] || $name === $collection['key']) {
+					throw self::invalid("collection \"{$collection['name']}\": field \"$name\" has no options");
+				}
+				if ($field['options'] !== []) {
+					throw self::invalid("collection \"{$collection['name']}\": field \"$name\" declares options the blueprint does not have");
+				}
+				return null;
+			}
+		} else {
+			$blueprintOptions = self::selectOptions($definition);
+		}
+		if ($field['options'] === []) {
+			$field['options'] = $blueprintOptions;
+		} elseif ($blueprintOptions !== [] && array_diff($field['options'], $blueprintOptions) !== []) {
+			throw self::invalid("collection \"{$collection['name']}\": field \"$name\" declares options the blueprint does not have");
+		}
+		if ($field['options'] === []) {
+			throw self::invalid("collection \"{$collection['name']}\": field \"$name\" has no options");
+		}
+		return $field;
+	}
+
+	/**
 	 * Static option values of a select/radio/toggles blueprint field. Options of
 	 * type api are not resolved (values declared in fude.php are the allowed
 	 * set then); queries are resolved by queryValues().
@@ -961,6 +933,34 @@ class Config
 			];
 		}
 		return $shown;
+	}
+
+	/** maxEntries and insert: both only for structure collections. */
+	private static function sizing(string $name, array $entry, string $kind): array
+	{
+		$sizing = [];
+		if (isset($entry['maxEntries'])) {
+			if ($kind !== 'structure') {
+				throw self::invalid("collection \"$name\": maxEntries is only for structure collections");
+			}
+			if (!is_int($entry['maxEntries']) || $entry['maxEntries'] < 1) {
+				throw self::invalid("collection \"$name\": maxEntries must be a positive integer");
+			}
+			if ($entry['maxEntries'] > Service::MAX_REPLACE_ENTRIES) {
+				throw self::invalid("collection \"$name\": maxEntries must be at most " . Service::MAX_REPLACE_ENTRIES);
+			}
+			$sizing['maxEntries'] = $entry['maxEntries'];
+		}
+		if (isset($entry['insert'])) {
+			if ($kind !== 'structure') {
+				throw self::invalid("collection \"$name\": insert is only for structure collections");
+			}
+			if (!in_array($entry['insert'], ['top', 'bottom'], true)) {
+				throw self::invalid("collection \"$name\": insert must be \"top\" or \"bottom\"");
+			}
+			$sizing['insert'] = $entry['insert'];
+		}
+		return $sizing;
 	}
 
 	/** A blueprint value as the content stores it: toggles as "true"/"false". */

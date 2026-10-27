@@ -67,19 +67,19 @@ final class OptionsPrefixTest extends TestCase
 		cleanup($tmp);
 	}
 
-	public function testTheNewKeyWinsOverTheOldOne(): void
-	{
-		[$tmp, $app] = fude_fixture();
-		$kirby = $app(options: ['fude.language' => 'en', 'sayamaapps.fude.language' => 'de']);
-		same('de', Options::get($kirby, 'language'), 'New key set: it wins');
-		cleanup($tmp);
-	}
-
 	public function testTheNewKeyIsReadWhenTheOldOneIsNull(): void
 	{
 		[$tmp, $app] = fude_fixture();
 		$kirby = $app(options: ['fude.language' => null, 'sayamaapps.fude.language' => 'de']);
 		same('de', Options::get($kirby, 'language'), 'Old key null counts as not set');
+		cleanup($tmp);
+	}
+
+	public function testTheNewKeyWinsOverTheOldOne(): void
+	{
+		[$tmp, $app] = fude_fixture();
+		$kirby = $app(options: ['fude.language' => 'en', 'sayamaapps.fude.language' => 'de']);
+		same('de', Options::get($kirby, 'language'), 'New key set: it wins');
 		cleanup($tmp);
 	}
 

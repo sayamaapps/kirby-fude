@@ -18,19 +18,19 @@ use Kirby\Cms\Page;
  */
 class DraftContext
 {
-	/** The uploaded image, its checked format and the image field (null without an image). */
-	public array|null $upload = null;
-	public string|null $format = null;
-	public string|null $imageField = null;
-
 	/** The list a replace sets (null for the other actions). */
 	public array|null $entries = null;
+
+	/** The entry the draft names; the caller's array, filled in by the draft methods. */
+	public array $entry;
+	public string|null $format = null;
+	public string|null $imageField = null;
 
 	/** The values a touch collection sets with the draft. */
 	public array $touched = [];
 
-	/** The entry the draft names; the caller's array, filled in by the draft methods. */
-	public array $entry;
+	/** The uploaded image, its checked format and the image field (null without an image). */
+	public array|null $upload = null;
 
 	/**
 	 * @param list<array<string, mixed>> $rows the published rows
