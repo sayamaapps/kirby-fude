@@ -7,7 +7,7 @@
  */
 return [
 	'auth.https' => 'Nur über HTTPS: Diese Anfrage kam per einfachem HTTP an.',
-	'auth.httpsProxy' => 'Nur über HTTPS: Die Anfrage kam über einen Proxy, der HTTPS meldet (X-Forwarded-Proto), und dieser Proxy steht nicht in fude.trustedProxies. Ist es der eigene TLS-Proxy, dessen Adresse dort eintragen (siehe README).',
+	'auth.httpsProxy' => 'Nur über HTTPS: Die Anfrage kam über einen Proxy, der HTTPS meldet (X-Forwarded-Proto), und dieser Proxy steht nicht in {key}. Ist es der eigene TLS-Proxy, dessen Adresse dort eintragen (siehe README).',
 	'auth.required' => 'Anmeldung erforderlich.',
 	'auth.failed' => 'Anmeldung fehlgeschlagen.',
 	'auth.role' => 'Dieses Konto darf diesen Weg nicht benutzen.',
@@ -19,8 +19,8 @@ return [
 
 	'config.missing' => 'Diese Seite hat keine site/config/fude.php.',
 	'config.invalid' => 'Die Fude-Konfiguration (Markierungen in den Blueprints, site/config/fude.php) ist ungültig: {reason}',
-	'config.timezone' => 'Die Option fude.timezone ist keine Zeitzone: {value}',
-	'config.trustedProxies' => 'Die Option fude.trustedProxies muss eine Liste von IP-Adressen oder CIDR-Bereichen sein, nicht: {value}',
+	'config.timezone' => 'Die Option {key} ist keine Zeitzone: {value}',
+	'config.trustedProxies' => 'Die Option {key} muss eine Liste von IP-Adressen oder CIDR-Bereichen sein, nicht: {value}',
 
 	'collection.unknown' => 'Unbekannte Sammlung „{name}“.',
 	'collection.action' => 'Die Sammlung „{name}“ erlaubt die Aktion „{action}“ nicht.',

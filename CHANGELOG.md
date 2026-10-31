@@ -10,6 +10,14 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## [1.10.0] — 2026-10-31
+
+### Changed
+
+- **Options are read as `sayamaapps.fude.<name>`.** The 1.x names `fude.<name>`
+  keep working and are read without a warning. If both are set, the new one wins.
+- `Options::OPTION_PREFIX` is new. `Options::PREFIX` keeps its 1.x value.
+
 ## [1.9.0] — 2026-10-27
 
 ### Changed

@@ -17,6 +17,7 @@ App::plugin(
 	name: 'sayamaapps/fude',
 	extends: [
 		'blueprints'   => require __DIR__ . '/config/blueprints.php',
+		'options'      => require __DIR__ . '/config/options.php',
 		'translations' => require __DIR__ . '/config/translations.php',
 		'routes'       => require __DIR__ . '/config/routes.php',
 	],

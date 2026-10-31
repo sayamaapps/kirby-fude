@@ -73,7 +73,7 @@ The key stays unique: an update to a key another entry has is a 409, at draft ti
 | `text` | one line | `url`: `http(s)://` only; `email`; `tel`: optional leading `+`, digits, spaces, `/ - ( )`, at least three digits |
 | `textarea` | text or Markdown | |
 | `select` | a listed value | values from declaration, blueprint or query |
-| `date` | `YYYY-MM-DD`, a real day | `min: 'today'` refuses earlier days; today in `fude.timezone` |
+| `date` | `YYYY-MM-DD`, a real day | `min: 'today'` refuses earlier days; today in `sayamaapps.fude.timezone` |
 | `number` | decimal comma or point | up to 15 digits each side; stored with a point |
 | `time` | `H:MM` or `HH:MM`, 24 h, optional `:SS` | stored as `HH:MM:SS` |
 | `toggle` | `true` or `false` (JSON or text) | stored as `"true"` / `"false"` |

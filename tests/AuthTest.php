@@ -21,6 +21,7 @@ final class AuthTest extends TestCase
 			[$code, , , $body] = fude_call($app, 'schema', options: ['fude.active' => false]);
 			same([404, 'Fixture 404'], [$code, $body], 'Off: real 404');
 			same(404, fude_call($app, 'schema', options: ['fude.active' => 'yes'])[0], 'Only true switches on');
+			same(401, fude_call($app, 'schema', who: null, options: ['sayamaapps.fude.active' => true])[0], 'New spelling switches on: login challenge, not 404');
 
 			// Login
 			[$code, $json, $headers] = fude_call($app, 'schema', who: null);
