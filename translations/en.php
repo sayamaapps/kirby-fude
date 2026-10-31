@@ -8,7 +8,7 @@
  */
 return [
 	'auth.https' => 'HTTPS only: this request reached the site over plain HTTP.',
-	'auth.httpsProxy' => 'HTTPS only: the request came through a proxy that announces HTTPS (X-Forwarded-Proto), and that proxy is not in fude.trustedProxies. If it is your proxy, list its address there (see README).',
+	'auth.httpsProxy' => 'HTTPS only: the request came through a proxy that announces HTTPS (X-Forwarded-Proto), and that proxy is not in {key}. If it is your proxy, list its address there (see README).',
 	'auth.required' => 'Authentication required.',
 	'auth.failed' => 'Authentication failed.',
 	'auth.role' => 'This account may not use this route.',
@@ -20,8 +20,8 @@ return [
 
 	'config.missing' => 'This site has no site/config/fude.php.',
 	'config.invalid' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: {reason}',
-	'config.timezone' => 'The option fude.timezone is not a time zone: {value}',
-	'config.trustedProxies' => 'The option fude.trustedProxies must be a list of IP addresses or CIDR ranges, not: {value}',
+	'config.timezone' => 'The option {key} is not a time zone: {value}',
+	'config.trustedProxies' => 'The option {key} must be a list of IP addresses or CIDR ranges, not: {value}',
 
 	'collection.unknown' => 'Unknown collection "{name}".',
 	'collection.action' => 'Collection "{name}" does not allow the action "{action}".',

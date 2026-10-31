@@ -457,10 +457,10 @@ class Config
 		}
 		$max = Options::get($kirby, 'maxCollections', 30);
 		if (!is_int($max) || $max < 1) {
-			throw self::invalid('fude.maxCollections must be a positive integer');
+			throw self::invalid(Options::setKey($kirby, 'maxCollections') . ' must be a positive integer');
 		}
 		if (count($entries) > $max) {
-			throw self::invalid(count($entries) . ' collections, at most ' . $max . ' (fude.maxCollections; the bot reads them all)');
+			throw self::invalid(count($entries) . ' collections, at most ' . $max . ' (' . Options::setKey($kirby, 'maxCollections') . '; the bot reads them all)');
 		}
 
 		$collections = [];

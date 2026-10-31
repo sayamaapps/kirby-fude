@@ -6,11 +6,19 @@ use DateTimeZone;
 use Kirby\Cms\App;
 
 /**
- * Reads `fude.*` options.
+ * Reads Fude's options: `sayamaapps.fude.<key>`, falling back to the 1.x
+ * name `sayamaapps.fude.<key>`.
  *
  * `null` counts as "not set", like Kirby's own option(), so a key set to
- * null falls back to the default. Both spellings work, flat
- * (`'fude.active' => true`) and nested (`'fude' => ['active' => true]`).
+ * null falls back to the default. The flat form is the one to use
+ * (`'sayamaapps.fude.active' => true`). The nested form
+ * (`'fude' => ['active' => true]`) works for the 1.x prefix only: Kirby
+ * resolves `sayamaapps.fude.*` through the plugin's own options block first,
+ * which shadows a nested `sayamaapps` array.
+ *
+ * Defaults are given here and at the call sites. The `options` block of the
+ * plugin (config/options.php) lists the keys with null: a default there would
+ * hide the 1.x spelling.
  *
  * @package   Kirby Fude
  * @author    sayamaapps
@@ -22,7 +30,14 @@ class Options
 {
 	public const DEFAULT_TIMEZONE = 'Europe/Berlin';
 
-	/** The option namespace of the plugin: `fude.<key>`. */
+	/** Option prefix since 1.10: `sayamaapps.fude.<key>`. */
+	public const OPTION_PREFIX = 'sayamaapps.fude.';
+
+	/**
+	 * Option prefix of 1.x (`sayamaapps.fude.<key>`). Still read as a fallback until 2.0.
+	 *
+	 * @deprecated 1.10 use OPTION_PREFIX; removal planned for 2.0
+	 */
 	public const PREFIX = 'fude.';
 
 	/** The declaration of what the bot may change: `site/config/fude.php`. */
@@ -41,13 +56,22 @@ class Options
 		return $kirby->root('storage') . '/fude';
 	}
 
-	/** Reads one option; a null value counts as not set and gives $default. */
+	/**
+	 * Reads one option under the sayamaapps.fude.* spelling, then under the
+	 * 1.x fude.* spelling, which is read silently. Returns $default when
+	 * neither is set.
+	 */
 	public static function get(App $kirby, string $key, mixed $default = null): mixed
 	{
+		$value = $kirby->option(self::OPTION_PREFIX . $key);
+		if ($value !== null) {
+			return $value;
+		}
+
 		return $kirby->option(self::PREFIX . $key) ?? $default;
 	}
 
-	/** Whether $address (the connection's REMOTE_ADDR) lies in `fude.trustedProxies`. */
+	/** Whether $address (the connection's REMOTE_ADDR) lies in `sayamaapps.fude.trustedProxies`. */
 	public static function isTrustedProxy(App $kirby, mixed $address): bool
 	{
 		if (!is_string($address) || ($ip = @inet_pton($address)) === false) {
@@ -80,7 +104,7 @@ class Options
 	}
 
 	/**
-	 * Language of the replies: `fude.language`, otherwise the site's default
+	 * Language of the replies: `sayamaapps.fude.language`, otherwise the site's default
 	 * language, otherwise the first two letters of Kirby's `locale` option,
 	 * otherwise English. Only languages Fude ships are returned.
 	 */
@@ -134,7 +158,19 @@ class Options
 	}
 
 	/**
-	 * Site identifier in the schema: `fude.siteId`, otherwise the hostname.
+	 * The option name as the site spelled it, for messages: the 1.x fude.*
+	 * name only when the site sets no sayamaapps.fude.* value for it.
+	 */
+	public static function setKey(App $kirby, string $key): string
+	{
+		if ($kirby->option(self::OPTION_PREFIX . $key) === null && $kirby->option(self::PREFIX . $key) !== null) {
+			return self::PREFIX . $key;
+		}
+		return self::OPTION_PREFIX . $key;
+	}
+
+	/**
+	 * Site identifier in the schema: `sayamaapps.fude.siteId`, otherwise the hostname.
 	 */
 	public static function siteId(App $kirby): string
 	{
@@ -147,7 +183,7 @@ class Options
 
 	/**
 	 * The time zone that decides what "today" is (touch, `min: today`):
-	 * `fude.timezone`, otherwise Europe/Berlin. Not PHP's default, which on
+	 * `sayamaapps.fude.timezone`, otherwise Europe/Berlin. Not PHP's default, which on
 	 * a hoster is often UTC — at 00:30 in Berlin that is still yesterday.
 	 *
 	 * @throws FudeError 500 when the option is not a time zone
@@ -156,13 +192,13 @@ class Options
 	{
 		$zone = self::get($kirby, 'timezone', self::DEFAULT_TIMEZONE);
 		if (!is_string($zone) || $zone === '' || !in_array($zone, DateTimeZone::listIdentifiers(), true)) {
-			throw FudeError::t('config.timezone', ['value' => is_string($zone) ? $zone : get_debug_type($zone)], 500);
+			throw FudeError::t('config.timezone', ['key' => self::setKey($kirby, 'timezone'), 'value' => is_string($zone) ? $zone : get_debug_type($zone)], 500);
 		}
 		return new DateTimeZone($zone);
 	}
 
 	/**
-	 * `fude.trustedProxies`: the reverse proxies in front of PHP that terminate
+	 * `sayamaapps.fude.trustedProxies`: the reverse proxies in front of PHP that terminate
 	 * TLS, as IPv4 or IPv6 addresses and CIDR ranges. Default: none. Only a
 	 * request from one of them may pass on its `X-Forwarded-Proto` header.
 	 *
@@ -173,11 +209,11 @@ class Options
 	{
 		$list = self::get($kirby, 'trustedProxies', []);
 		if (!is_array($list) || !array_is_list($list)) {
-			throw FudeError::t('config.trustedProxies', ['value' => get_debug_type($list)], 500);
+			throw FudeError::t('config.trustedProxies', ['key' => self::setKey($kirby, 'trustedProxies'), 'value' => get_debug_type($list)], 500);
 		}
 		foreach ($list as $entry) {
 			if (!is_string($entry) || self::parseRange($entry) === null) {
-				throw FudeError::t('config.trustedProxies', ['value' => is_string($entry) ? $entry : get_debug_type($entry)], 500);
+				throw FudeError::t('config.trustedProxies', ['key' => self::setKey($kirby, 'trustedProxies'), 'value' => is_string($entry) ? $entry : get_debug_type($entry)], 500);
 			}
 		}
 		return $list;

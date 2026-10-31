@@ -54,7 +54,7 @@ return [
 ];
 ```
 
-Enable Fude with `'fude.active' => true` in `site/config/config.php`, then create a Panel account with the role **Fude (bot)** and a long random password.
+Enable Fude with `'sayamaapps.fude.active' => true` in `site/config/config.php`, then create a Panel account with the role **Fude (bot)** and a long random password.
 
 ### Collections
 
@@ -109,18 +109,18 @@ Errors: 400 malformed request, 401 login, 403 HTTPS, role, token or publish perm
 
 ## Options
 
-Options are read as `fude.<name>`, in the flat form shown below or nested (`'fude' => ['active' => true]`). `null` counts as not set.
+Every option is `sayamaapps.fude.<name>`, written flat: `'sayamaapps.fude.active' => true`. The nested form `'fude' => ['active' => true]` works for the 1.x name only (see [Deprecations](#deprecations)). `null` means "not set". The 1.x name `fude.<name>` still works as a fallback until 2.0, flat or nested, and is read without a warning. If both names are set, the new one wins.
 
 Example, `site/config/config.php`:
 
 ```php
 return [
-    'fude.active'   => true,
-    'fude.language' => 'de',
+    'sayamaapps.fude.active'   => true,
+    'sayamaapps.fude.language' => 'de',
 ];
 ```
 
-| Option (`fude.<name>`) | Default | Meaning |
+| Option (`sayamaapps.fude.<name>`) | Default | Meaning |
 |---|---|---|
 | `active` | `false` | Master switch. Off: routes answer 404 and the role does not exist. |
 | `config` | `site/config/fude.php` | Declaration file, relative to the project root or absolute |
@@ -138,7 +138,7 @@ return [
 
 ## HTTPS
 
-Routes answer 403 unless the connection itself is TLS. Behind a TLS-terminating proxy, list it in `fude.trustedProxies` and have it send `X-Forwarded-Proto: https`; the header counts only from a listed address. Check a site with `curl -s -o /dev/null -w '%{http_code}\n' https://example.com/fude/schema`: 401 means the check passed; a 403 names the cause in `error`.
+Routes answer 403 unless the connection itself is TLS. Behind a TLS-terminating proxy, list it in `sayamaapps.fude.trustedProxies` and have it send `X-Forwarded-Proto: https`; the header counts only from a listed address. Check a site with `curl -s -o /dev/null -w '%{http_code}\n' https://example.com/fude/schema`: 401 means the check passed; a 403 names the cause in `error`.
 
 ## What happens on the page
 
@@ -160,13 +160,18 @@ These stay as in 1.x. Each one is a choice, not an oversight.
 
 - **Role and blueprint names carry no plugin prefix.** The role `fude` and the blueprint `users/fude` are public names. Renaming them would detach existing bot accounts, so the change waits for 2.0.
 - **Drafts, the log and resized images use PHP's file functions.** Kirby's `F::write()` and `Dir::make()` throw Kirby's exception class on a path they cannot write, where 1.x throws `RuntimeException`. The plugin keeps its own calls so that the exception class and the messages stay the same.
-- **Reply texts come from `I18n::t()`, not from Kirby's translation lookup.** The replies are written in the language of the request (`fude.language`) and must also work without a Kirby app, as in 1.x. The same tables are registered as Kirby plugin translations, so the Panel reads the same text.
+- **Reply texts come from `I18n::t()`, not from Kirby's translation lookup.** The replies are written in the language of the request (`sayamaapps.fude.language`) and must also work without a Kirby app, as in 1.x. The same tables are registered as Kirby plugin translations, so the Panel reads the same text.
+
+## Deprecations
+
+| 1.x name | Since 1.10 | Note |
+|---|---|---|
+| `fude.<option>` in `config.php` | `sayamaapps.fude.<option>` | Still read as fallback. Rename the keys in your site config. |
 
 ## Planned for 2.0
 
 1.x keeps every public name, option key, translation key, exception class and route. The names below are marked `@deprecated` in the code, and 1.x prints no runtime notice for them. 2.0 is planned to:
 
-- read options as `sayamaapps.fude.<name>` only; the `fude.<name>` spelling stops being read,
 - register plugin translations as `sayamaapps.fude.<key>` only,
 - remove `fude_option()` and `fude_not_found()`: use `Sayamaapps\Fude\Options::get()` and `Sayamaapps\Fude\Service::notFound()`,
 - remove the `Fude\` class names: the classes stay in `Sayamaapps\Fude\`,

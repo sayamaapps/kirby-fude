@@ -28,9 +28,9 @@ use Throwable;
  *   POST /fude/publish  {id, token, actor?}  → the changes go live
  *   POST /fude/discard  {id, token, actor?}  → the changes are removed
  *
- * Off by default: without `fude.active` the routes answer with Kirby's real
+ * Off by default: without `sayamaapps.fude.active` the routes answer with Kirby's real
  * 404. Login via Basic Auth against a Kirby account with the role `fude`
- * (or a role from `fude.roles`), HTTPS only — `fude.withoutHttps` is for
+ * (or a role from `sayamaapps.fude.roles`), HTTPS only — `sayamaapps.fude.withoutHttps` is for
  * local tests. Every call is logged (src/Log.php).
  *
  * Nothing here writes the published (`latest`) version directly. A draft
@@ -81,7 +81,7 @@ class Service
 	/**
 	 * Basic Auth against a Kirby account with an allowed role (default: the
 	 * bundled role `fude`). HTTPS only (see connectionIsSecure());
-	 * `fude.withoutHttps` is for local tests. Kirby's own password check, with
+	 * `sayamaapps.fude.withoutHttps` is for local tests. Kirby's own password check, with
 	 * its lockout after failed attempts, without the global option api.basicAuth.
 	 *
 	 * @throws FudeError
@@ -93,7 +93,7 @@ class Service
 			// Says why, so an operator behind a proxy knows which option to set.
 			throw FudeError::t(
 				self::announcesHttps($kirby) ? 'auth.httpsProxy' : 'auth.https',
-				[],
+				['key' => Options::setKey($kirby, 'trustedProxies')],
 				403
 			);
 		}
@@ -260,7 +260,7 @@ class Service
 	 *
 	 * Direct: the server's own HTTPS flag, or port 443. Behind a reverse proxy
 	 * that terminates TLS, only when the connection comes from an address in
-	 * `fude.trustedProxies` and carries `X-Forwarded-Proto: https`. Any other
+	 * `sayamaapps.fude.trustedProxies` and carries `X-Forwarded-Proto: https`. Any other
 	 * sender's header is ignored.
 	 */
 	public static function connectionIsSecure(App $kirby): bool
@@ -807,7 +807,7 @@ class Service
 		return is_string($uuid) && $uuid !== '' ? 'file://' . $uuid : null;
 	}
 
-	/** Whether the connection comes from a listed proxy (`fude.trustedProxies`, by REMOTE_ADDR). */
+	/** Whether the connection comes from a listed proxy (`sayamaapps.fude.trustedProxies`, by REMOTE_ADDR). */
 	public static function fromTrustedProxy(App $kirby): bool
 	{
 		return Options::isTrustedProxy($kirby, $kirby->environment()->get('REMOTE_ADDR'));
@@ -1278,7 +1278,7 @@ class Service
 		return Images::store($kirby, $page, $upload, $rule, $format, $base !== '' ? $base : $imageField, $alt);
 	}
 
-	/** The draft's day as Y-m-d, in the time zone of `fude.timezone`. */
+	/** The draft's day as Y-m-d, in the time zone of `sayamaapps.fude.timezone`. */
 	private static function today(App $kirby, DateTimeImmutable $now): string
 	{
 		return $now->setTimezone(Options::timezone($kirby))->format('Y-m-d');
@@ -1286,7 +1286,7 @@ class Service
 
 	/**
 	 * The page field a collection's `touch` sets on every draft: today's
-	 * date in the time zone of `fude.timezone`, as Y-m-d. With `editable`
+	 * date in the time zone of `sayamaapps.fude.timezone`, as Y-m-d. With `editable`
 	 * the draft may name another day (`touch` in the request), not before
 	 * today; without one it is the touch's `default`: today, or the next
 	 * named weekday (today included).

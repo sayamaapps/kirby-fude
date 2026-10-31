@@ -6,9 +6,8 @@ use PHPUnit\Framework\TestCase;
 use Sayamaapps\Fude\Options;
 
 /**
- * Options are read as fude.<key>, as in 1.x. The key sayamaapps.fude.<key> is
- * not read in 1.x (it is planned for 2.0), and no runtime notice is printed
- * in debug mode.
+ * Options are read as sayamaapps.fude.<key>, falling back to the 1.x name
+ * fude.<key>, which is read without a runtime notice in debug mode.
  */
 #[CoversClass(Options::class)]
 #[RunTestsInSeparateProcesses]
@@ -17,7 +16,7 @@ final class OptionsPrefixTest extends TestCase
 	public function testNullCountsAsNotSet(): void
 	{
 		[$tmp, $app] = fude_fixture();
-		$kirby = $app(options: ['fude.language' => null]);
+		$kirby = $app(options: ['sayamaapps.fude.language' => null, 'fude.language' => null]);
 		same('en', Options::get($kirby, 'language', 'en'), 'A null value gives the default');
 		cleanup($tmp);
 	}
@@ -43,22 +42,56 @@ final class OptionsPrefixTest extends TestCase
 		}
 	}
 
+	public function testSetKeyNamesTheSpellingTheSiteUsed(): void
+	{
+		[$tmp, $app] = fude_fixture();
+		try {
+			same('sayamaapps.fude.language', Options::setKey($app(), 'language'), 'Nothing set: the new name');
+			same('fude.language', Options::setKey($app(options: ['fude.language' => 'de']), 'language'), 'Only the 1.x key set: the 1.x name');
+			same('sayamaapps.fude.language', Options::setKey($app(options: ['fude.language' => 'de', 'sayamaapps.fude.language' => 'en']), 'language'), 'Both set: the new name');
+		} finally {
+			cleanup($tmp);
+		}
+	}
+
 	public function testTheDefaultAppliesWhenNotSet(): void
 	{
 		[$tmp, $app] = fude_fixture();
-		$kirby = $app(options: ['fude.active' => null]);
+		$kirby = $app(options: ['sayamaapps.fude.active' => null]);
 		same('fallback', Options::get($kirby, 'nothing', 'fallback'), 'Not set: the default');
 		same(null, Options::get($kirby, 'nothing'), 'Not set, no default: null');
 		cleanup($tmp);
 	}
 
-	public function testTheNewKeyIsNotRead(): void
+	public function testTheLegacyWrapperReadsTheNewKey(): void
 	{
 		[$tmp, $app] = fude_fixture();
 		try {
-			$kirby = $app(options: ['fude.language' => null, 'sayamaapps.fude.language' => 'de']);
-			same(null, Options::get($kirby, 'language'), 'sayamaapps.fude.language is not read in 1.x');
-			same('en', Options::get($kirby, 'language', 'en'), 'The default applies');
+			$app(options: ['sayamaapps.fude.language' => 'de']);
+			same('de', fude_option('language'), 'fude_option() reads sayamaapps.fude.language');
+		} finally {
+			cleanup($tmp);
+		}
+	}
+
+	public function testTheNewKeyIsRead(): void
+	{
+		[$tmp, $app] = fude_fixture();
+		try {
+			$kirby = $app(options: ['sayamaapps.fude.language' => 'de', 'sayamaapps.fude.active' => true]);
+			same('de', Options::get($kirby, 'language'), 'Key sayamaapps.fude.language is read');
+			same(true, Options::get($kirby, 'active', false), 'Key sayamaapps.fude.active is read');
+		} finally {
+			cleanup($tmp);
+		}
+	}
+
+	public function testTheNewKeyWinsWhenBothAreSet(): void
+	{
+		[$tmp, $app] = fude_fixture();
+		try {
+			$kirby = $app(options: ['fude.language' => 'en', 'sayamaapps.fude.language' => 'de']);
+			same('de', Options::get($kirby, 'language'), 'The new key wins over the 1.x key');
 		} finally {
 			cleanup($tmp);
 		}
