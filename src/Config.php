@@ -819,6 +819,10 @@ class Config
 			if (isset($collection['maxEntries'])) {
 				$entry['maxEntries'] = $collection['maxEntries'];
 			}
+			// A list that takes several new entries in one draft (create with `entries`, one image each).
+			if ($collection['kind'] === 'structure' && in_array('create', $collection['actions'], true)) {
+				$entry['createMany'] = true;
+			}
 			// What a draft does beyond the fields: the bot says so in its preview.
 			if (isset($collection['touch'])) {
 				$entry['touch'] = $collection['touch']['field'];

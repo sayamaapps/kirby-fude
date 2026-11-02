@@ -10,6 +10,28 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## [1.11.0] — 2026-11-02
+
+### Added
+
+- **Several new entries in one draft.** `POST /fude/draft` with `action: create`
+  and `entries` (a JSON list, as with `replace`) adds every entry of the list
+  to a structure collection in one `changes` version; the image of entry n
+  comes as form part `image<n>` (`image0`, `image1`, …). Every row is checked
+  like a create, the keys must be free and distinct, `maxEntries` counts the
+  published rows plus the new ones, `insert: top` puts them first in their
+  order. The record lists `keys`, `entries` and `files`, and discard removes
+  every file the draft stored. The schema marks such collections with
+  `createMany: true`. For a chat where several photos arrive as one message.
+  A `pages` collection, `fields` or a single `image` next to `entries`, and an
+  `image<n>` that names no entry are refused (422).
+- Reach: unchanged. The same collections and fields; a create may add several
+  entries at once where it could add one.
+
+### Changed
+
+- The reply to a malformed `entries` names the action (`create` or `replace`).
+
 ## [1.10.0] — 2026-10-31
 
 ### Changed

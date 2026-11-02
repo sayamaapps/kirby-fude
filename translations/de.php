@@ -37,8 +37,12 @@ return [
 	'collection.replaceFields' => 'Die Aktion „replace“ nimmt nur „entries“, keine Felder.',
 	'collection.replaceImage' => 'Die Aktion „replace“ nimmt kein Bild.',
 	'collection.maxEntries' => 'Die Liste hat höchstens {max} Einträge.',
-	'collection.entries' => 'Die Aktion „replace“ braucht „entries“: eine JSON-Liste von Einträgen.',
+	'collection.entries' => 'Die Aktion „{action}“ braucht „entries“: eine JSON-Liste von Einträgen.',
 	'collection.duplicate' => 'Zwei Einträge haben denselben {field} „{key}“.',
+	'collection.createEntries' => 'Mehrere Einträge in einem create („entries“) brauchen eine Liste (structure); „{name}“ ist keine.',
+	'collection.createFields' => 'Ein create mit „entries“ nimmt keine „fields“.',
+	'collection.createImage' => 'Ein create mit „entries“ nimmt seine Bilder als „image0“, „image1“, … (eins je Eintrag), nicht als „image“.',
+	'collection.createEmpty' => '„entries“ eines create braucht mindestens einen Eintrag.',
 
 	'touch.none' => 'Die Sammlung „{name}“ setzt kein Datum: „touch“ ist hier nicht erlaubt.',
 	'touch.fixed' => 'Die Sammlung „{name}“ setzt ihr Datum auf heute; ein Entwurf kann kein anderes wählen.',
@@ -76,6 +80,7 @@ return [
 	'image.unreadable' => 'Die Datei ist kein lesbares Bild.',
 	'image.pixels' => 'Das Bild hat mehr als {max} Pixel.',
 	'image.unexpected' => 'Diese Sammlung nimmt kein Bild.',
+	'image.index' => 'Der Upload „{name}“ gehört zu keinem Eintrag in „entries“.',
 
 	'draft.locked' => 'Die Seite ist gerade im Panel geöffnet. Dort speichern oder verwerfen, dann noch einmal versuchen.',
 	'draft.pending' => 'Die Seite hat ungespeicherte Panel-Änderungen. Erst im Panel speichern oder verwerfen.',
