@@ -9,6 +9,7 @@ A chat bot proposes a change, for example a new team member with a photo. Fude s
 - Declarative and validated: only declared collections and fields are reachable, checked against the blueprint too.
 - Drafts are Kirby `changes` versions; publishing needs a token and an unchanged page.
 - Photos are resized to the declared width and get alt text.
+- Several new entries in one draft: `create` with `entries`, one photo each, for photos that arrive as one message.
 - One log line per call: account, channel tag, route, outcome.
 - Own bot role without Panel access; HTTPS only; English and German replies.
 
@@ -94,6 +95,14 @@ curl -u fude@example.com:… -H 'Content-Type: application/json' \
      -d '{"id":"…","token":"…"}' https://example.com/fude/publish
 ```
 
+Several new entries in one draft, each with its photo (`image<n>` for entry n, counted from 0):
+
+```sh
+curl -u fude@example.com:… -F collection=team -F action=create \
+     -F 'entries=[{"name":"Max Muster"},{"name":"Erika Beispiel"}]' \
+     -F image0=@max.jpg -F image1=@erika.jpg https://example.com/fude/draft
+```
+
 ## Routes
 
 All routes need Basic Auth. Replies are JSON with `ok`, `format` (currently 1) and the data, or `error`.
@@ -101,7 +110,7 @@ All routes need Basic Auth. Replies are JSON with `ok`, `format` (currently 1) a
 | Route | Request | Reply |
 |---|---|---|
 | `GET /fude/schema` | — | `site`, `language`, `collections` (declarations and published entries) |
-| `POST /fude/draft` | `collection`, `action`, `fields`, `key` (update, delete), `entries` (replace), `touch`, `actor` (log tag), upload `image` | `draft`, `token`, `preview` |
+| `POST /fude/draft` | `collection`, `action`, `fields`, `key` (update, delete), `entries` (replace; or create: several new entries of a structure collection), `touch`, `actor` (log tag), upload `image` (or `image0`, `image1`, … for the entries of a create) | `draft`, `token`, `preview` |
 | `POST /fude/publish` | `id`, `token`, `actor` | `id`, `url`, `hash` |
 | `POST /fude/discard` | `id`, `token`, `actor` | `id`, `kept` (`true` if a Panel editor's work stays) |
 

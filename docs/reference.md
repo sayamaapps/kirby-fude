@@ -77,7 +77,7 @@ The key stays unique: an update to a key another entry has is a 409, at draft ti
 | `number` | decimal comma or point | up to 15 digits each side; stored with a point |
 | `time` | `H:MM` or `HH:MM`, 24 h, optional `:SS` | stored as `HH:MM:SS` |
 | `toggle` | `true` or `false` (JSON or text) | stored as `"true"` / `"false"` |
-| `image` | upload form part `image` | see Image fields |
+| `image` | upload form part `image`; `image<n>` for entry n of a create with `entries` | see Image fields |
 | `page` | a title from the query | see Select and page fields |
 
 `text`, `textarea` and `select` refuse HTML tags, comments, `javascript:`, `vbscript:` and `data:` schemes and `&#` entities. Of the KirbyTags, they refuse `(gist: …)` (a script) and a `style:` attribute in any tag (inline CSS); the other tags pass. A plain `<` in prose is fine.
@@ -101,6 +101,7 @@ The key stays unique: an update to a key another entry has is a 409, at draft ti
 
 - Declared as `image` on a `structure` or `pages` collection.
 - The upload (form part `image`) goes to the collection's first image field in declaration order. A second image field cannot be filled through the bot, a text value for any image field is refused, and an upload to a collection without one is a 422. **Rule: one image field per collection.**
+- A create with `entries` (several new entries of a structure collection in one draft) takes one upload per entry: form part `image<n>` for entry n, counted from 0 (`image0`, `image1`, …); an entry without a part gets no image. A part that names no entry, or a single `image` next to `entries`, is a 422. The schema marks such collections with `createMany: true`.
 - `formats`: `jpg`, `png`, `webp`, `gif`; default `jpg`, `png`, `webp`. The format is read from the file content, not its name.
 - `maxWidth`: 16–8000, default 1600. The photo is resized and only the copy is stored.
 - `alt`: a declared text field (not an image) whose value becomes the alt text; default: the key.

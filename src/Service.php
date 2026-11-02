@@ -149,7 +149,7 @@ class Service
 		throw FudeError::t('fields.blueprint', ['errors' => implode(' · ', $parts)]);
 	}
 
-	/** What the draft shows the public, checked against the declaration: every replaced row, or the one entry. */
+	/** What the draft shows the public, checked against the declaration: every replaced or added row, or the one entry. */
 	private static function checkDraftShown(App $kirby, array $collection, array $rows, int|null $index, string $action, array|null $entries, array $clean): void
 	{
 		if ($action === 'replace') {
@@ -157,6 +157,10 @@ class Service
 			foreach ($entries ?? [] as $row) {
 				$published = array_values(array_filter($rows, fn ($old) => Content::sameKey($old[$keyField ?? ''] ?? '', $row[$keyField ?? ''])));
 				self::checkShown($collection, $published[0] ?? [], $row);
+			}
+		} elseif ($action === 'create' && $entries !== null) {
+			foreach ($entries as $row) {
+				self::checkShown($collection, [], $row);
 			}
 		} elseif ($action !== 'delete') {
 			self::checkShown($collection, self::storedEntry($kirby, $collection, $rows, $index), $clean);
@@ -320,7 +324,7 @@ class Service
 			}
 			// No changes version: the draft was published in the Panel, and
 			// its image is live now. It stays.
-			$kept = self::removeFile($page, $record, $removed) || $kept;
+			$kept = self::removeFiles($page, $record, $removed) || $kept;
 		} elseif ($record['kind'] === 'page') {
 			$page = Content::page($kirby, $collection);
 			$changes = $page->version('changes');
@@ -353,7 +357,7 @@ class Service
 							$kept = true;
 						}
 					}
-					$kept = self::removeFile($child, $record, $removed) || $kept;
+					$kept = self::removeFiles($child, $record, $removed) || $kept;
 				}
 			}
 		}
@@ -401,47 +405,22 @@ class Service
 			}
 			$clean = [];
 			$entries = self::entries($collection, $input['entries'] ?? null, self::today($kirby, $now));
+		} elseif ($action === 'create' && ($input['entries'] ?? null) !== null) {
+			$clean = [];
+			$entries = self::createEntries($collection, $input['entries'], $fields, $upload, self::today($kirby, $now));
 		} else {
 			$clean = Validator::check($collection, $fields, $action, self::today($kirby, $now));
 		}
-
-		$imageField = self::imageField($collection);
-		if ($upload !== null && $imageField === null) {
-			throw FudeError::t('image.unexpected');
-		}
-		$format = $upload !== null ? Images::check($kirby, $upload, $collection['fields'][$imageField]) : null;
-		if (in_array($action, ['create', 'update'], true) && $clean === [] && $upload === null) {
+		// The images of several new entries, `image<n>` for entry n; refused for every other draft.
+		$uploads = self::uploads($kirby, $action === 'create' ? count($entries ?? []) : 0);
+		[$imageField, $format, $formats] = self::checkUploads($kirby, $collection, $upload, $uploads);
+		if (in_array($action, ['create', 'update'], true) && $clean === [] && $upload === null && $entries === null) {
 			throw FudeError::t('fields.empty');
 		}
 
 		$page = Content::page($kirby, $collection);
 		$rows = Content::rows($kirby, $collection);
-		$keyField = $collection['key'];
-		$keyLabel = $keyField === null ? '' : $collection['fields'][$keyField]['label'];
-		$index = null;
-		if ($collection['kind'] === 'page') {
-			$entry['key'] = null; // the page itself: no entry to name
-		} elseif ($action === 'replace') {
-			$entry['key'] = null; // the whole list, no single entry
-		} elseif ($action === 'create') {
-			foreach ($rows as $row) {
-				if (Content::sameKey($row[$keyField ?? ''] ?? '', $clean[$keyField ?? ''])) {
-					throw FudeError::t('collection.exists', ['field' => $keyLabel, 'key' => $clean[$keyField ?? '']], 409);
-				}
-			}
-			$entry['key'] = $clean[$keyField ?? ''];
-		} else {
-			// update and delete both name an existing entry.
-			$key = $input['key'] ?? null;
-			if (!is_string($key) || trim($key) === '') {
-				throw FudeError::t($action === 'delete' ? 'collection.deleteKey' : 'collection.key', ['field' => $keyLabel]);
-			}
-			$index = Content::find($collection, $rows, $key);
-			$entry['key'] = trim($key);
-			if ($action === 'update' && isset($clean[$keyField ?? ''])) {
-				self::checkKeyFree($collection, $rows, $clean[$keyField ?? ''], $index);
-			}
-		}
+		[$entry['key'], $index] = self::draftKey($collection, $rows, $action, $clean, $entries, $input);
 
 		self::checkDraftShown($kirby, $collection, $rows, $index, $action, $entries, $clean);
 
@@ -451,10 +430,99 @@ class Service
 		$context = new DraftContext($kirby, $collection, $page, $rows, $index, $clean, $action, $now, $entry);
 		$context->upload = $upload;
 		$context->format = $format;
+		$context->uploads = $uploads;
+		$context->formats = $formats;
 		$context->imageField = $imageField;
 		$context->entries = $entries;
 		$context->touched = $touch;
 		return $collection['kind'] === 'structure' ? self::draftStructure($context) : self::draftPage($context);
+	}
+
+	/**
+	 * The entry a draft names and where it is: a new key (or several) must
+	 * be free, an update or delete names an existing entry by `key`.
+	 *
+	 * @param list<array<string, mixed>> $rows the published rows
+	 * @return array{0: string|null, 1: int|null} the key for the record and the log, and the row index (update, delete)
+	 * @throws FudeError
+	 */
+	private static function draftKey(array $collection, array $rows, string $action, array $clean, array|null $entries, array $input): array
+	{
+		$keyField = $collection['key'];
+		$keyLabel = $keyField === null ? '' : $collection['fields'][$keyField]['label'];
+		if ($collection['kind'] === 'page' || $action === 'replace') {
+			return [null, null]; // the page itself, or the whole list: no single entry to name
+		}
+		if ($action === 'create') {
+			// One new entry, or several: every new key must be free.
+			foreach ($entries ?? [$clean] as $new) {
+				foreach ($rows as $row) {
+					if (Content::sameKey($row[$keyField ?? ''] ?? '', $new[$keyField ?? ''])) {
+						throw FudeError::t('collection.exists', ['field' => $keyLabel, 'key' => $new[$keyField ?? '']], 409);
+					}
+				}
+			}
+			return [$entries === null ? $clean[$keyField ?? ''] : null, null]; // several entries: the record lists their keys
+		}
+		// update and delete both name an existing entry.
+		$key = $input['key'] ?? null;
+		if (!is_string($key) || trim($key) === '') {
+			throw FudeError::t($action === 'delete' ? 'collection.deleteKey' : 'collection.key', ['field' => $keyLabel]);
+		}
+		$index = Content::find($collection, $rows, $key);
+		if ($action === 'update' && isset($clean[$keyField ?? ''])) {
+			self::checkKeyFree($collection, $rows, $clean[$keyField ?? ''], $index);
+		}
+		return [trim($key), $index];
+	}
+
+	/**
+	 * The image field and the checked format of every upload: the single
+	 * `image`, and `image<n>` of several new entries.
+	 *
+	 * @param array<int, array> $uploads
+	 * @return array{0: string|null, 1: string|null, 2: array<int, string>}
+	 * @throws FudeError
+	 */
+	private static function checkUploads(App $kirby, array $collection, array|null $upload, array $uploads): array
+	{
+		$imageField = self::imageField($collection);
+		if (($upload !== null || $uploads !== []) && $imageField === null) {
+			throw FudeError::t('image.unexpected');
+		}
+		$format = $upload !== null ? Images::check($kirby, $upload, $collection['fields'][$imageField]) : null;
+		$formats = [];
+		foreach ($uploads as $position => $one) {
+			assert($imageField !== null);
+			$formats[$position] = Images::check($kirby, $one, $collection['fields'][$imageField]);
+		}
+		return [$imageField, $format, $formats];
+	}
+
+	/**
+	 * The rows of a create with `entries`: several new entries in one draft
+	 * (a structure collection only), every row checked like a create, no
+	 * `fields` and no single `image` next to them.
+	 *
+	 * @return list<array<string, string>>
+	 * @throws FudeError
+	 */
+	private static function createEntries(array $collection, mixed $entries, array $fields, array|null $upload, string $today): array
+	{
+		if ($collection['kind'] !== 'structure') {
+			throw FudeError::t('collection.createEntries', ['name' => $collection['name']]);
+		}
+		if ($fields !== []) {
+			throw FudeError::t('collection.createFields');
+		}
+		if ($upload !== null) {
+			throw FudeError::t('collection.createImage');
+		}
+		$rows = self::entries($collection, $entries, $today, 'create');
+		if ($rows === []) {
+			throw FudeError::t('collection.createEmpty');
+		}
+		return $rows;
 	}
 
 	/** A create: a draft page under the parent, with its image, and the blueprint checked before it is saved. */
@@ -635,18 +703,15 @@ class Service
 		$touched = $ctx->touched;
 		$now = $ctx->now;
 		$field = $collection['field'];
+		$many = $action === 'create' && $entries !== null; // several new entries in one draft
 		self::checkEditable($page);
 		$hash = Content::hash($kirby, $collection);
 
 		// Checked before anything is stored: a refused draft leaves no file behind.
-		if (isset($collection['maxEntries']) && in_array($action, ['create', 'replace'], true)) {
-			$total = $action === 'replace' ? count($entries ?? []) : count($rows) + ($index === null ? 1 : 0);
-			if ($total > $collection['maxEntries']) {
-				throw FudeError::t('collection.maxEntries', ['max' => $collection['maxEntries']]);
-			}
-		}
+		self::checkMaxEntries($collection, $action, $rows, $entries);
 
 		$file = null;
+		$files = [];        // the images of several new entries, in entry order
 		$position = $index; // where the row sits after the draft; null = appended
 		$replace = null;    // what a replace changes, for the reply and the record
 		if ($action === 'delete') {
@@ -660,6 +725,8 @@ class Service
 			$merged = self::replaced($rows, $stored, $collection['key'], $imageField, $collection['fields']);
 			$rows = $merged['rows'];
 			$replace = $merged['summary'];
+		} elseif ($many) {
+			[$rows, $files, $position] = self::createRows($ctx);
 		} else {
 			$row = $index === null ? [] : $rows[$index];
 			foreach (self::stored($kirby, $collection, $clean) as $name => $value) {
@@ -688,8 +755,11 @@ class Service
 			$base = $changes->exists() ? [] : ($page->version('latest')->read() ?? []);
 			$changes->save([...$base, $field => $rows, ...$touched]);
 		} catch (Throwable $e) {
-			// Nothing half-done: the uploaded file goes again.
+			// Nothing half-done: the uploaded files go again.
 			$file?->delete();
+			foreach ($files as $image) {
+				$image->delete();
+			}
 			throw $e;
 		}
 
@@ -699,16 +769,68 @@ class Service
 			'action'      => $action,
 			'page'        => $page->id(),
 			'key'         => $ctx->entry['key'],
-			'index'       => $action === 'replace' ? null : ($position ?? count($rows) - 1),
+			'index'       => $action === 'replace' || $many ? null : ($position ?? count($rows) - 1),
 			'fields'      => $clean,
 			'replace'     => $replace,
 			'touch'       => self::touchRecord($touched),
 			'file'        => $file?->filename(),
 			'fileHash'    => $file === null ? null : self::filesHash([$file]),
+			// Several new entries: their keys, the checked rows and every uploaded file (discard removes them).
+			...($many ? [
+				'keys'    => array_values(array_map(fn (array $row): string => (string)$row[$collection['key']], $entries)),
+				'entries' => $entries,
+				'files'   => array_map(fn (File $image): array => ['name' => $image->filename(), 'hash' => self::filesHash([$image])], $files),
+			] : []),
 			'hash'        => $hash,
 			'changesHash' => self::changesHash($page->version('changes')),
 			'preview'     => $page->version('changes')->url(),
 		], $now);
+	}
+
+	/** A list holds at most `maxEntries` rows: after a replace, or after a create adds its rows. */
+	private static function checkMaxEntries(array $collection, string $action, array $rows, array|null $entries): void
+	{
+		if (!isset($collection['maxEntries']) || !in_array($action, ['create', 'replace'], true)) {
+			return;
+		}
+		$total = $action === 'replace' ? count($entries ?? []) : count($rows) + ($entries === null ? 1 : count($entries));
+		if ($total > $collection['maxEntries']) {
+			throw FudeError::t('collection.maxEntries', ['max' => $collection['maxEntries']]);
+		}
+	}
+
+	/**
+	 * The list after a create with several entries: the new rows, as stored
+	 * and each with its image (`image<n>`) as a Kirby file, first (`insert:
+	 * top`) or last. A failure removes the files stored so far.
+	 *
+	 * @return array{0: list<array<string, mixed>>, 1: list<File>, 2: int|null} the rows, the files, the position of the first new row (null = appended)
+	 */
+	private static function createRows(DraftContext $ctx): array
+	{
+		$new = [];
+		$files = [];
+		try {
+			foreach ($ctx->entries ?? [] as $position => $values) {
+				$row = self::stored($ctx->kirby, $ctx->collection, $values);
+				if (isset($ctx->uploads[$position])) {
+					assert($ctx->imageField !== null);
+					$image = self::storeImage($ctx->kirby, $ctx->page, $ctx->collection, $ctx->uploads[$position], $ctx->formats[$position], $ctx->imageField, $row);
+					$files[] = $image;
+					$row[$ctx->imageField] = [self::fileReference($image)];
+				}
+				$new[] = $row;
+			}
+		} catch (Throwable $e) {
+			foreach ($files as $image) {
+				$image->delete();
+			}
+			throw $e;
+		}
+		if (($ctx->collection['insert'] ?? 'bottom') === 'top') {
+			return [[...$new, ...$ctx->rows], $files, 0];
+		}
+		return [[...$ctx->rows, ...$new], $files, null];
 	}
 
 	/**
@@ -737,17 +859,17 @@ class Service
 	 * @return list<array<string, string>>
 	 * @throws FudeError
 	 */
-	private static function entries(array $collection, mixed $entries, string $today): array
+	private static function entries(array $collection, mixed $entries, string $today, string $action = 'replace'): array
 	{
 		if (is_string($entries)) {
 			// Size and depth first: decoding a huge string is the expensive part.
 			if (strlen($entries) > self::MAX_ENTRIES_JSON_BYTES) {
-				throw FudeError::t('collection.entries');
+				throw FudeError::t('collection.entries', ['action' => $action]);
 			}
 			$entries = json_decode($entries, true, self::MAX_ENTRIES_JSON_DEPTH);
 		}
 		if (!is_array($entries) || !array_is_list($entries)) {
-			throw FudeError::t('collection.entries');
+			throw FudeError::t('collection.entries', ['action' => $action]);
 		}
 		// The count is refused before any row is validated.
 		if (count($entries) > self::MAX_REPLACE_ENTRIES) {
@@ -757,7 +879,7 @@ class Service
 		$rows = [];
 		foreach ($entries as $entry) {
 			if (!is_array($entry) || ($entry !== [] && array_is_list($entry))) {
-				throw FudeError::t('collection.entries');
+				throw FudeError::t('collection.entries', ['action' => $action]);
 			}
 			$row = Validator::check($collection, $entry, 'create', $today);
 			foreach ($rows as $other) {
@@ -1069,27 +1191,46 @@ class Service
 	 * stays. So it does without our changes version: the file may be live, or
 	 * an editor dropped the draft.
 	 *
+	 * @param string $hash the file's hash when the draft stored it
 	 * @return bool true when the file stays because it is used or was edited
 	 */
-	private static function removeFile(Page $page, array $record, bool $removed): bool
+	private static function removeFile(Page $page, string $name, string $hash, bool $removed): bool
 	{
-		if (empty($record['file'])) {
-			return false;
-		}
-		$file = $page->file($record['file']);
+		$file = $page->file($name);
 		if (!$file instanceof File) {
 			return false;
 		}
 		if (self::isReferenced($page, $file)) {
 			return true;
 		}
-		if (!hash_equals((string)($record['fileHash'] ?? ''), self::filesHash([$file]))) {
+		if (!hash_equals($hash, self::filesHash([$file]))) {
 			return true;
 		}
 		if ($removed) {
 			$file->delete();
 		}
 		return false;
+	}
+
+	/**
+	 * Removes every file a discarded draft uploaded (removeFile): the one of
+	 * a single entry (`file`), those of several new entries (`files`).
+	 *
+	 * @return bool true when at least one file stays
+	 */
+	private static function removeFiles(Page $page, array $record, bool $removed): bool
+	{
+		$kept = false;
+		$files = empty($record['file']) ? [] : [['name' => (string)$record['file'], 'hash' => (string)($record['fileHash'] ?? '')]];
+		foreach ((array)($record['files'] ?? []) as $one) {
+			if (is_array($one) && !empty($one['name'])) {
+				$files[] = ['name' => (string)$one['name'], 'hash' => (string)($one['hash'] ?? '')];
+			}
+		}
+		foreach ($files as $one) {
+			$kept = self::removeFile($page, $one['name'], $one['hash'], $removed) || $kept;
+		}
+		return $kept;
 	}
 
 	/**
@@ -1348,7 +1489,12 @@ class Service
 	/** The upload named "image", or null when none was sent. */
 	private static function upload(App $kirby): array|null
 	{
-		$upload = $kirby->request()->files()->get('image');
+		return self::oneUpload($kirby->request()->files()->get('image'));
+	}
+
+	/** One entry of $_FILES as Kirby hands it over (a list means the first), or null for no upload. */
+	private static function oneUpload(mixed $upload): array|null
+	{
 		if (!is_array($upload) || ($upload === [])) {
 			return null;
 		}
@@ -1359,6 +1505,35 @@ class Service
 			return null;
 		}
 		return $upload;
+	}
+
+	/**
+	 * The images of a create with several entries: form part `image<n>` is
+	 * the image of entry n, counted from 0. A part that names no entry of
+	 * this draft (a number too high, or any such part in another draft) is
+	 * refused.
+	 *
+	 * @param int $count how many entries the draft adds
+	 * @return array<int, array> the uploads by entry index, in order
+	 */
+	private static function uploads(App $kirby, int $count): array
+	{
+		$out = [];
+		foreach ($kirby->request()->files()->data() as $name => $upload) {
+			if (!preg_match('/^image(0|[1-9][0-9]*)$/D', (string)$name, $match)) {
+				continue;
+			}
+			$one = self::oneUpload($upload);
+			if ($one === null) {
+				continue;
+			}
+			if ((int)$match[1] >= $count) {
+				throw FudeError::t('image.index', ['name' => (string)$name]);
+			}
+			$out[(int)$match[1]] = $one;
+		}
+		ksort($out);
+		return $out;
 	}
 
 	/**

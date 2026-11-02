@@ -34,6 +34,16 @@ class DraftContext
 	public array|null $upload = null;
 
 	/**
+	 * A create with several entries: the uploads and their checked formats by entry index.
+	 *
+	 * @var array<int, array>
+	 */
+	public array $uploads = [];
+
+	/** @var array<int, string> */
+	public array $formats = [];
+
+	/**
 	 * @param list<array<string, mixed>> $rows the published rows
 	 * @param array<string, mixed> $clean the checked fields
 	 * @param array<string, mixed> $entry the caller's entry, shared by reference

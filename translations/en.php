@@ -38,8 +38,12 @@ return [
 	'collection.replaceFields' => 'Action "replace" takes "entries" only, not fields.',
 	'collection.replaceImage' => 'Action "replace" takes no image.',
 	'collection.maxEntries' => 'The list holds at most {max} entries.',
-	'collection.entries' => 'Action "replace" needs "entries": a JSON array of entries.',
+	'collection.entries' => 'Action "{action}" needs "entries": a JSON array of entries.',
 	'collection.duplicate' => 'Two entries have the same {field} "{key}".',
+	'collection.createEntries' => 'Several entries in one create ("entries") need a structure collection; "{name}" is not one.',
+	'collection.createFields' => 'A create with "entries" takes no "fields".',
+	'collection.createImage' => 'A create with "entries" takes its images as "image0", "image1", … (one per entry), not as "image".',
+	'collection.createEmpty' => '"entries" of a create needs at least one entry.',
 
 	'touch.none' => 'Collection "{name}" sets no date: "touch" is not allowed here.',
 	'touch.fixed' => 'Collection "{name}" sets its date to today; a draft cannot choose another one.',
@@ -77,6 +81,7 @@ return [
 	'image.unreadable' => 'The file is not a readable image.',
 	'image.pixels' => 'The image has more than {max} pixels.',
 	'image.unexpected' => 'This collection takes no image.',
+	'image.index' => 'The upload "{name}" matches no entry in "entries".',
 
 	'draft.locked' => 'The page is open in the Panel right now. Save or discard there, then try again.',
 	'draft.pending' => 'The page has unsaved Panel changes. Save or discard them in the Panel first.',
