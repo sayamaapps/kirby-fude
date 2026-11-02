@@ -25,6 +25,9 @@ class DraftContext
 	/** The entry the draft names; the caller's array, filled in by the draft methods. */
 	public array $entry;
 	public string|null $format = null;
+
+	/** @var array<int, string> */
+	public array $formats = [];
 	public string|null $imageField = null;
 
 	/** The values a touch collection sets with the draft. */
@@ -39,9 +42,6 @@ class DraftContext
 	 * @var array<int, array>
 	 */
 	public array $uploads = [];
-
-	/** @var array<int, string> */
-	public array $formats = [];
 
 	/**
 	 * @param list<array<string, mixed>> $rows the published rows

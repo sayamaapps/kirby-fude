@@ -213,6 +213,18 @@ class Service
 		}
 	}
 
+	/** A list holds at most `maxEntries` rows: after a replace, or after a create adds its rows. */
+	private static function checkMaxEntries(array $collection, string $action, array $rows, array|null $entries): void
+	{
+		if (!isset($collection['maxEntries']) || !in_array($action, ['create', 'replace'], true)) {
+			return;
+		}
+		$total = $action === 'replace' ? count($entries ?? []) : count($rows) + ($entries === null ? 1 : count($entries));
+		if ($total > $collection['maxEntries']) {
+			throw FudeError::t('collection.maxEntries', ['max' => $collection['maxEntries']]);
+		}
+	}
+
 	/**
 	 * A value for a field the blueprint hides on this entry (`when`) would
 	 * change nothing anyone sees: the Panel hides the field, and the site
@@ -244,6 +256,29 @@ class Service
 				throw FudeError::t(isset($collection['fields'][$other]) ? 'fields.hidden' : 'fields.hiddenFixed', $params);
 			}
 		}
+	}
+
+	/**
+	 * The image field and the checked format of every upload: the single
+	 * `image`, and `image<n>` of several new entries.
+	 *
+	 * @param array<int, array> $uploads
+	 * @return array{0: string|null, 1: string|null, 2: array<int, string>}
+	 * @throws FudeError
+	 */
+	private static function checkUploads(App $kirby, array $collection, array|null $upload, array $uploads): array
+	{
+		$imageField = self::imageField($collection);
+		if (($upload !== null || $uploads !== []) && $imageField === null) {
+			throw FudeError::t('image.unexpected');
+		}
+		$format = $upload !== null ? Images::check($kirby, $upload, $collection['fields'][$imageField]) : null;
+		$formats = [];
+		foreach ($uploads as $position => $one) {
+			assert($imageField !== null);
+			$formats[$position] = Images::check($kirby, $one, $collection['fields'][$imageField]);
+		}
+		return [$imageField, $format, $formats];
 	}
 
 	// --- Helpers -------------------------------------------------------------
@@ -298,6 +333,66 @@ class Service
 			}
 		}
 		return $contents;
+	}
+
+	/**
+	 * The rows of a create with `entries`: several new entries in one draft
+	 * (a structure collection only), every row checked like a create, no
+	 * `fields` and no single `image` next to them.
+	 *
+	 * @return list<array<string, string>>
+	 * @throws FudeError
+	 */
+	private static function createEntries(array $collection, mixed $entries, array $fields, array|null $upload, string $today): array
+	{
+		if ($collection['kind'] !== 'structure') {
+			throw FudeError::t('collection.createEntries', ['name' => $collection['name']]);
+		}
+		if ($fields !== []) {
+			throw FudeError::t('collection.createFields');
+		}
+		if ($upload !== null) {
+			throw FudeError::t('collection.createImage');
+		}
+		$rows = self::entries($collection, $entries, $today, 'create');
+		if ($rows === []) {
+			throw FudeError::t('collection.createEmpty');
+		}
+		return $rows;
+	}
+
+	/**
+	 * The list after a create with several entries: the new rows, as stored
+	 * and each with its image (`image<n>`) as a Kirby file, first (`insert:
+	 * top`) or last. A failure removes the files stored so far.
+	 *
+	 * @return array{0: list<array<string, mixed>>, 1: list<File>, 2: int|null} the rows, the files, the position of the first new row (null = appended)
+	 */
+	private static function createRows(DraftContext $ctx): array
+	{
+		$new = [];
+		$files = [];
+		try {
+			foreach ($ctx->entries ?? [] as $position => $values) {
+				$row = self::stored($ctx->kirby, $ctx->collection, $values);
+				if (isset($ctx->uploads[$position])) {
+					assert($ctx->imageField !== null);
+					$image = self::storeImage($ctx->kirby, $ctx->page, $ctx->collection, $ctx->uploads[$position], $ctx->formats[$position], $ctx->imageField, $row);
+					$files[] = $image;
+					$row[$ctx->imageField] = [self::fileReference($image)];
+				}
+				$new[] = $row;
+			}
+		} catch (Throwable $e) {
+			foreach ($files as $image) {
+				$image->delete();
+			}
+			throw $e;
+		}
+		if (($ctx->collection['insert'] ?? 'bottom') === 'top') {
+			return [[...$new, ...$ctx->rows], $files, 0];
+		}
+		return [[...$ctx->rows, ...$new], $files, null];
 	}
 
 	/** @SuppressWarnings(PHPMD.UnusedFormalParameter) the time stays in the signature shared with draft() and publish(). */
@@ -474,55 +569,6 @@ class Service
 			self::checkKeyFree($collection, $rows, $clean[$keyField ?? ''], $index);
 		}
 		return [trim($key), $index];
-	}
-
-	/**
-	 * The image field and the checked format of every upload: the single
-	 * `image`, and `image<n>` of several new entries.
-	 *
-	 * @param array<int, array> $uploads
-	 * @return array{0: string|null, 1: string|null, 2: array<int, string>}
-	 * @throws FudeError
-	 */
-	private static function checkUploads(App $kirby, array $collection, array|null $upload, array $uploads): array
-	{
-		$imageField = self::imageField($collection);
-		if (($upload !== null || $uploads !== []) && $imageField === null) {
-			throw FudeError::t('image.unexpected');
-		}
-		$format = $upload !== null ? Images::check($kirby, $upload, $collection['fields'][$imageField]) : null;
-		$formats = [];
-		foreach ($uploads as $position => $one) {
-			assert($imageField !== null);
-			$formats[$position] = Images::check($kirby, $one, $collection['fields'][$imageField]);
-		}
-		return [$imageField, $format, $formats];
-	}
-
-	/**
-	 * The rows of a create with `entries`: several new entries in one draft
-	 * (a structure collection only), every row checked like a create, no
-	 * `fields` and no single `image` next to them.
-	 *
-	 * @return list<array<string, string>>
-	 * @throws FudeError
-	 */
-	private static function createEntries(array $collection, mixed $entries, array $fields, array|null $upload, string $today): array
-	{
-		if ($collection['kind'] !== 'structure') {
-			throw FudeError::t('collection.createEntries', ['name' => $collection['name']]);
-		}
-		if ($fields !== []) {
-			throw FudeError::t('collection.createFields');
-		}
-		if ($upload !== null) {
-			throw FudeError::t('collection.createImage');
-		}
-		$rows = self::entries($collection, $entries, $today, 'create');
-		if ($rows === []) {
-			throw FudeError::t('collection.createEmpty');
-		}
-		return $rows;
 	}
 
 	/** A create: a draft page under the parent, with its image, and the blueprint checked before it is saved. */
@@ -787,52 +833,6 @@ class Service
 		], $now);
 	}
 
-	/** A list holds at most `maxEntries` rows: after a replace, or after a create adds its rows. */
-	private static function checkMaxEntries(array $collection, string $action, array $rows, array|null $entries): void
-	{
-		if (!isset($collection['maxEntries']) || !in_array($action, ['create', 'replace'], true)) {
-			return;
-		}
-		$total = $action === 'replace' ? count($entries ?? []) : count($rows) + ($entries === null ? 1 : count($entries));
-		if ($total > $collection['maxEntries']) {
-			throw FudeError::t('collection.maxEntries', ['max' => $collection['maxEntries']]);
-		}
-	}
-
-	/**
-	 * The list after a create with several entries: the new rows, as stored
-	 * and each with its image (`image<n>`) as a Kirby file, first (`insert:
-	 * top`) or last. A failure removes the files stored so far.
-	 *
-	 * @return array{0: list<array<string, mixed>>, 1: list<File>, 2: int|null} the rows, the files, the position of the first new row (null = appended)
-	 */
-	private static function createRows(DraftContext $ctx): array
-	{
-		$new = [];
-		$files = [];
-		try {
-			foreach ($ctx->entries ?? [] as $position => $values) {
-				$row = self::stored($ctx->kirby, $ctx->collection, $values);
-				if (isset($ctx->uploads[$position])) {
-					assert($ctx->imageField !== null);
-					$image = self::storeImage($ctx->kirby, $ctx->page, $ctx->collection, $ctx->uploads[$position], $ctx->formats[$position], $ctx->imageField, $row);
-					$files[] = $image;
-					$row[$ctx->imageField] = [self::fileReference($image)];
-				}
-				$new[] = $row;
-			}
-		} catch (Throwable $e) {
-			foreach ($files as $image) {
-				$image->delete();
-			}
-			throw $e;
-		}
-		if (($ctx->collection['insert'] ?? 'bottom') === 'top') {
-			return [[...$new, ...$ctx->rows], $files, 0];
-		}
-		return [[...$ctx->rows, ...$new], $files, null];
-	}
-
 	/**
 	 * What the site and every page except this one store (drafts included,
 	 * published and unsaved Panel changes, every language), one text per
@@ -1041,6 +1041,21 @@ class Service
 		return new Response($page?->render() ?? '', 'text/html', 404);
 	}
 
+	/** One entry of $_FILES as Kirby hands it over (a list means the first), or null for no upload. */
+	private static function oneUpload(mixed $upload): array|null
+	{
+		if (!is_array($upload) || ($upload === [])) {
+			return null;
+		}
+		if (array_is_list($upload)) {
+			$upload = $upload[0] ?? null;
+		}
+		if (!is_array($upload) || (int)($upload['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+			return null;
+		}
+		return $upload;
+	}
+
 	/**
 	 * The UUID stored in the page's published content, or null when it has
 	 * none. Only read: $page->uuid() would create one and write it to the
@@ -1191,7 +1206,7 @@ class Service
 	 * stays. So it does without our changes version: the file may be live, or
 	 * an editor dropped the draft.
 	 *
-	 * @param string $hash the file's hash when the draft stored it
+	 * @param $hash the file's hash when the draft stored it
 	 * @return bool true when the file stays because it is used or was edited
 	 */
 	private static function removeFile(Page $page, string $name, string $hash, bool $removed): bool
@@ -1492,28 +1507,13 @@ class Service
 		return self::oneUpload($kirby->request()->files()->get('image'));
 	}
 
-	/** One entry of $_FILES as Kirby hands it over (a list means the first), or null for no upload. */
-	private static function oneUpload(mixed $upload): array|null
-	{
-		if (!is_array($upload) || ($upload === [])) {
-			return null;
-		}
-		if (array_is_list($upload)) {
-			$upload = $upload[0] ?? null;
-		}
-		if (!is_array($upload) || (int)($upload['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
-			return null;
-		}
-		return $upload;
-	}
-
 	/**
 	 * The images of a create with several entries: form part `image<n>` is
 	 * the image of entry n, counted from 0. A part that names no entry of
 	 * this draft (a number too high, or any such part in another draft) is
 	 * refused.
 	 *
-	 * @param int $count how many entries the draft adds
+	 * @param $count how many entries the draft adds
 	 * @return array<int, array> the uploads by entry index, in order
 	 */
 	private static function uploads(App $kirby, int $count): array

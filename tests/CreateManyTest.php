@@ -57,8 +57,10 @@ final class CreateManyTest extends TestCase
 			$files = fn () => array_map('basename', glob($tmp . '/content/home/*.{png,jpg,gif}', GLOB_BRACE) ?: []);
 
 			// Two entries, each with its image, in one draft.
-			[$code, $json] = $draft(['actor' => 'telegram:42', 'entries' => [['titel' => 'Tomaten', 'text' => 'Rot.'], ['titel' => 'Gurken', 'text' => 'Grün.']]],
-				['image0' => fude_upload($tmp, 300, 200, 'png', 'eins'), 'image1' => fude_upload($tmp, 300, 200, 'jpg', 'zwei')]);
+			[$code, $json] = $draft(
+				['actor' => 'telegram:42', 'entries' => [['titel' => 'Tomaten', 'text' => 'Rot.'], ['titel' => 'Gurken', 'text' => 'Grün.']]],
+				['image0' => fude_upload($tmp, 300, 200, 'png', 'eins'), 'image1' => fude_upload($tmp, 300, 200, 'jpg', 'zwei')]
+			);
 			same(200, $code, 'Create with two entries', $json);
 			$record = $json['draft'];
 			same(['structure', 'create', 'home', null, null, [], ['Tomaten', 'Gurken']], [$record['kind'], $record['action'], $record['page'], $record['key'], $record['index'], $record['fields'], $record['keys']], 'Record: the keys, no single key or index');
@@ -96,8 +98,11 @@ final class CreateManyTest extends TestCase
 			same([200, false, 2], [fude_call($app, 'discard', ['id' => $json['draft']['id'], 'token' => $json['token']], options: $options)[0], $app()->page('home')->version('changes')->exists(), count($files())], 'Discard without files');
 
 			// insert: top puts the new rows first, in their order; discard removes every file of the draft.
-			[$code, $json] = $draft(['entries' => [['titel' => 'Erstes', 'text' => '1'], ['titel' => 'Zweites', 'text' => '2']]],
-				['image1' => fude_upload($tmp, 300, 200, 'png', 'nur-zwei')], 'oben');
+			[$code, $json] = $draft(
+				['entries' => [['titel' => 'Erstes', 'text' => '1'], ['titel' => 'Zweites', 'text' => '2']]],
+				['image1' => fude_upload($tmp, 300, 200, 'png', 'nur-zwei')],
+				'oben'
+			);
 			same(200, $code, 'Create on top', $json);
 			$rows = createManyRows($app, 'changes');
 			same(['Erstes', 'Zweites', 'Tomaten', 'Gurken'], array_column($rows, 'titel'), 'New rows first, in order');
@@ -116,8 +121,10 @@ final class CreateManyTest extends TestCase
 				same([2, false, []], [count($files()), $app()->page('home')->version('changes')->exists(), glob($tmp . '/storage/fude/tmp/*') ?: []], 'Nothing stored by the refusal');
 				return $j['error'];
 			};
-			same('Image format "gif" is not allowed. Allowed: jpg, png, webp.', $refused(['entries' => [['titel' => 'Eins', 'text' => '1'], ['titel' => 'Zwei', 'text' => '2']]],
-				['image0' => fude_upload($tmp, 300, 200, 'png'), 'image1' => fude_upload($tmp, 300, 200, 'gif')]), 'Every image is checked before anything is stored');
+			same('Image format "gif" is not allowed. Allowed: jpg, png, webp.', $refused(
+				['entries' => [['titel' => 'Eins', 'text' => '1'], ['titel' => 'Zwei', 'text' => '2']]],
+				['image0' => fude_upload($tmp, 300, 200, 'png'), 'image1' => fude_upload($tmp, 300, 200, 'gif')]
+			), 'Every image is checked before anything is stored');
 			same('Two entries have the same Überschrift "tomatensalat".', $refused(['entries' => [['titel' => 'Tomatensalat', 'text' => '1'], ['titel' => 'tomatensalat', 'text' => '2']]]), 'Duplicate key in the list');
 			same('Field "titel" is required.', $refused(['entries' => [['text' => 'ohne Titel']]]), 'Row without the key field');
 			same('Field "preis" is not allowed here. Allowed: titel, text.', $refused(['entries' => [['titel' => 'Pilze', 'preis' => '9']]]), 'Unknown field in a row');
