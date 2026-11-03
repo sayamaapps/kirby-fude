@@ -12,6 +12,7 @@ use Sayamaapps\Fude\Images;
 use Sayamaapps\Fude\Log;
 use Sayamaapps\Fude\Options;
 use Sayamaapps\Fude\Service;
+use Sayamaapps\Fude\StoredFileError;
 use Sayamaapps\Fude\Validator;
 use Sayamaapps\Fude\WriteLock;
 
@@ -29,6 +30,7 @@ use Sayamaapps\Fude\WriteLock;
 #[CoversClass(Log::class)]
 #[CoversClass(Options::class)]
 #[CoversClass(Service::class)]
+#[CoversClass(StoredFileError::class)]
 #[CoversClass(Validator::class)]
 #[CoversClass(WriteLock::class)]
 final class AutoloadTest extends TestCase
@@ -48,8 +50,8 @@ final class AutoloadTest extends TestCase
 
 		foreach (require dirname(__DIR__) . '/autoload.php' as $class => $path) {
 			$short = substr($class, strlen('sayamaapps\\fude\\'));
-			// DraftContext and WriteLock are new in 2.x and have no 1.x name.
-			if (in_array($short, ['draftcontext', 'writelock'], true)) {
+			// DraftContext, StoredFileError and WriteLock are new in 2.x and have no 1.x name.
+			if (in_array($short, ['draftcontext', 'storedfileerror', 'writelock'], true)) {
 				continue;
 			}
 			$this->assertSame(

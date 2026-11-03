@@ -10,6 +10,25 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## [1.11.2] — 2026-11-03
+
+### Fixed
+
+- **A draft whose page or image was already stored when a Kirby `after` hook
+  threw is undone too.** Kirby runs `page.create:after` and `file.create:after`
+  once the page or the image is on disk and before it hands it back, so a hook
+  that threw (a site's own hook, a plugin's) left a draft page in `_drafts/`, or
+  an image with its content file on the page, while the answer said "Internal
+  error, nothing changed." and no draft record existed. The draft now keeps the
+  name of the page or image before it calls Kirby and removes what it finds
+  stored under that name, as 1.11.1 does for the rest. A draft page that was
+  there before is never touched. If the undo fails, the answer is the 500 that
+  says so (check the page in the Panel), and both errors go to the PHP error log.
+  A `page.update:after` that threw while the image was attached to a new draft
+  page removed the page but answered that the undo had failed; it now answers
+  "nothing changed".
+- Reach: unchanged. Route JSON `format` unchanged.
+
 ## [1.11.1] — 2026-11-03
 
 ### Fixed

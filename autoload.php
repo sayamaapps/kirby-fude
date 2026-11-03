@@ -18,6 +18,7 @@ return [
 	'sayamaapps\\fude\\log' => 'src/Log.php',
 	'sayamaapps\\fude\\options' => 'src/Options.php',
 	'sayamaapps\\fude\\service' => 'src/Service.php',
+	'sayamaapps\\fude\\storedfileerror' => 'src/StoredFileError.php',
 	'sayamaapps\\fude\\validator' => 'src/Validator.php',
 	'sayamaapps\\fude\\writelock' => 'src/WriteLock.php',
 ];
