@@ -364,35 +364,29 @@ class Service
 	/**
 	 * The list after a create with several entries: the new rows, as stored
 	 * and each with its image (`image<n>`) as a Kirby file, first (`insert:
-	 * top`) or last. A failure removes the files stored so far.
+	 * top`) or last. Every file is added to $files as soon as it is stored, so
+	 * that a failure leaves the files stored so far to the caller's rollback().
 	 *
-	 * @return array{0: list<array<string, mixed>>, 1: list<File>, 2: int|null} the rows, the files, the position of the first new row (null = appended)
+	 * @param list<File> $files the files stored, in entry order
+	 * @return array{0: list<array<string, mixed>>, 1: int|null} the rows, the position of the first new row (null = appended)
 	 */
-	private static function createRows(DraftContext $ctx): array
+	private static function createRows(DraftContext $ctx, array &$files): array
 	{
 		$new = [];
-		$files = [];
-		try {
-			foreach ($ctx->entries ?? [] as $position => $values) {
-				$row = self::stored($ctx->kirby, $ctx->collection, $values);
-				if (isset($ctx->uploads[$position])) {
-					assert($ctx->imageField !== null);
-					$image = self::storeImage($ctx->kirby, $ctx->page, $ctx->collection, $ctx->uploads[$position], $ctx->formats[$position], $ctx->imageField, $row);
-					$files[] = $image;
-					$row[$ctx->imageField] = [self::fileReference($image)];
-				}
-				$new[] = $row;
+		foreach ($ctx->entries ?? [] as $position => $values) {
+			$row = self::stored($ctx->kirby, $ctx->collection, $values);
+			if (isset($ctx->uploads[$position])) {
+				assert($ctx->imageField !== null);
+				$image = self::storeImage($ctx->kirby, $ctx->page, $ctx->collection, $ctx->uploads[$position], $ctx->formats[$position], $ctx->imageField, $row);
+				$files[] = $image;
+				$row[$ctx->imageField] = [self::fileReference($image)];
 			}
-		} catch (Throwable $e) {
-			foreach ($files as $image) {
-				$image->delete();
-			}
-			throw $e;
+			$new[] = $row;
 		}
 		if (($ctx->collection['insert'] ?? 'bottom') === 'top') {
-			return [[...$new, ...$ctx->rows], $files, 0];
+			return [[...$new, ...$ctx->rows], 0];
 		}
-		return [[...$ctx->rows, ...$new], $files, null];
+		return [[...$ctx->rows, ...$new], null];
 	}
 
 	/** @SuppressWarnings(PHPMD.UnusedFormalParameter) the time stays in the signature shared with draft() and publish(). */
@@ -593,11 +587,17 @@ class Service
 		$file = null;
 		$hash = Content::hash($kirby, $collection);
 		$content = self::stored($kirby, $collection, $clean);
+		// The slug is ours before Kirby is called: a draft stored under it can be
+		// found and undone, though Page::create() threw before it returned it.
+		// A draft that was there before is not ours to delete (Kirby refuses a
+		// duplicate slug, a published page of that slug included, without storing).
+		$slug = Str::slug($clean['title']) . '-' . bin2hex(random_bytes(2));
+		$taken = self::draftOnDisk($parent, $collection, $slug) !== null;
 		$child = null;
 		try {
 			$child = Page::create([
 				'parent'   => $parent,
-				'slug'     => Str::slug($clean['title']) . '-' . bin2hex(random_bytes(2)),
+				'slug'     => $slug,
 				'template' => $collection['template'],
 				'content'  => $content,
 				'isDraft'  => true,
@@ -624,9 +624,23 @@ class Service
 				'preview'     => $child->version('latest')->url(),
 			], $now);
 		} catch (Throwable $e) {
-			// The page goes with its files.
-			self::rollback($e, [], created: $child);
+			// The page goes with its files. It is looked up by its slug, fresh:
+			// Kirby runs page.create:after once the page is stored, before create()
+			// returns it ($child is null then), and a page.update:after that throws
+			// leaves $child as the old object, whose storage is immutable by then.
+			self::rollback($e, [], created: $taken ? null : (self::draftOnDisk($parent, $collection, $slug) ?? $child));
 		}
+	}
+
+	/**
+	 * The draft page of that slug under the parent as the disk has it now, or
+	 * null. Not looked up in the parent's children and drafts: Kirby caches
+	 * those collections and does not know a page stored since.
+	 */
+	private static function draftOnDisk(Page $parent, array $collection, string $slug): Page|null
+	{
+		$draft = Page::factory(['slug' => $slug, 'parent' => $parent, 'isDraft' => true, 'template' => $collection['template']]);
+		return $draft->exists() ? $draft : null;
 	}
 
 	private static function draftPage(DraftContext $ctx): array
@@ -793,7 +807,7 @@ class Service
 				$rows = $merged['rows'];
 				$replace = $merged['summary'];
 			} elseif ($many) {
-				[$rows, $files, $position] = self::createRows($ctx);
+				[$rows, $position] = self::createRows($ctx, $files);
 			} else {
 				$row = $index === null ? [] : $rows[$index];
 				foreach (self::stored($kirby, $collection, $clean) as $name => $value) {
@@ -1430,6 +1444,10 @@ class Service
 	 *
 	 * Only the default language is touched, the one a draft writes.
 	 *
+	 * A $failure that is a StoredFileError says Kirby stored an image and
+	 * then threw (an `after` hook), so that the caller never got the file. The
+	 * file is removed with the others, and the reply is about the original failure.
+	 *
 	 * @param list<File|null> $files the files this attempt uploaded
 	 * @param $changes the page's changes version, only if this attempt began to write it; null otherwise and for a created page
 	 * @param array<string, mixed>|null $prior its fields before the attempt (priorChanges()), null = there were none
@@ -1438,6 +1456,12 @@ class Service
 	 */
 	private static function rollback(Throwable $failure, array $files, Version|null $changes = null, array|null $prior = null, Page|null $created = null): never
 	{
+		if ($failure instanceof StoredFileError) {
+			if ($created === null) {
+				$files[] = $failure->stored;
+			}
+			$failure = $failure->failure;
+		}
 		$errors = [];
 		$undo = static function (callable $step) use (&$errors): void {
 			try {

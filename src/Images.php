@@ -7,6 +7,7 @@ use Kirby\Cms\File;
 use Kirby\Cms\Page;
 use Kirby\Toolkit\Str;
 use RuntimeException;
+use Throwable;
 
 /**
  * Takes a photo from the chat and stores it the way the blueprint wants it.
@@ -75,10 +76,17 @@ class Images
 		return $format;
 	}
 
+	/** The file of that name on the page as the disk has it now; it may not exist. */
+	private static function named(Page $page, string $filename): File
+	{
+		return new File(['filename' => $filename, 'parent' => $page]);
+	}
+
 	/**
 	 * Resizes the upload and creates the Kirby file on the page.
 	 *
 	 * @param $baseName text the filename is derived from (the entry's key)
+	 * @throws StoredFileError when Kirby stored the file and then threw (an `after` hook): the file is on the page, and the exception carries it
 	 */
 	public static function store(App $kirby, Page $page, array $upload, array $rule, string $format, string $baseName, string $alt): File
 	{
@@ -91,6 +99,9 @@ class Images
 		$slug = rtrim(mb_substr(Str::slug($baseName), 0, 60), '-') ?: 'bild';
 		$filename = $slug . '-' . date('Ymd') . '-' . bin2hex(random_bytes(3)) . '.' . $format;
 		$resized = $tmpDir . '/' . $filename;
+		// The name is ours before Kirby is called. A file stored under it is
+		// looked up on disk afterwards, not in the page's cached file list.
+		$existed = self::named($page, $filename)->exists();
 		try {
 			// Thumb options: only `width`, so the aspect ratio stays; Kirby
 			// never upscales a smaller image. `format` keeps the format of
@@ -111,7 +122,16 @@ class Images
 			if ($rule['template'] !== null) {
 				$props['template'] = $rule['template'];
 			}
-			return $page->createFile($props, true);
+			try {
+				return $page->createFile($props, true);
+			} catch (Throwable $e) {
+				// An `after` hook that throws does so with the file and its content file stored.
+				$stored = self::named($page, $filename);
+				if (!$existed && $stored->exists()) {
+					throw new StoredFileError($stored, $e);
+				}
+				throw $e;
+			}
 		} finally {
 			if (is_file($resized)) {
 				@unlink($resized);
