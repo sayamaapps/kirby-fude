@@ -1,5 +1,6 @@
 <?php
 
+use Kirby\Cms\File;
 use Kirby\Cms\ModelWithContent;
 use Kirby\Cms\Page;
 use Kirby\Filesystem\Dir;
@@ -63,8 +64,8 @@ final class DraftRollbackTest extends TestCase
 	}
 
 	/**
-	 * Every scenario: [request, uploads, options, whether a changes version
-	 * identical to the published page exists before the draft].
+	 * Every scenario: [request, uploads, options, the id of the page whose
+	 * changes version the draft writes (null: a new page)].
 	 *
 	 * @return array<string, array{0: array, 1: callable, 2: array, 3: string|null}>
 	 */
@@ -250,6 +251,76 @@ final class DraftRollbackTest extends TestCase
 				same($before, $this->tree($tmp), 'Folder without write permission: nothing stored');
 			}
 			chmod($drafts, 0775);
+		} finally {
+			cleanup($tmp);
+		}
+	}
+
+	public function testRefusedDraftLeavesAChangesVersionItDidNotWrite(): void
+	{
+		[$tmp, $app] = fude_fixture(seam: true);
+		try {
+			// The blueprint refuses what the declaration lets through: a title and a text that are too short.
+			file_put_contents($tmp . '/site/blueprints/pages/kurz.yml', "title: Kurz\nfields:\n  text:\n    type: textarea\n    minlength: 20\n  bild:\n    type: files\n    multiple: false\n    uploads:\n      template: bild\n");
+			$kirby = $app();
+			$kirby->impersonate('kirby');
+			Page::create(['parent' => $kirby->page('aktuelles'), 'slug' => 'kurz', 'template' => 'kurz', 'isDraft' => true, 'content' => ['title' => 'Kurznotiz', 'text' => 'Ein ausreichend langer Text.']])->changeStatus('listed');
+			$options = fude_declare($tmp, 'refused', <<<'PHP'
+            ['collections' => [
+                'meldung' => [
+                    'kind' => 'structure', 'page' => 'home', 'field' => 'meldungen', 'key' => 'titel',
+                    'fields' => ['titel' => ['type' => 'text', 'required' => true], 'text' => ['type' => 'textarea'], 'bild' => ['type' => 'image']],
+                ],
+                'notiz' => [
+                    'kind' => 'pages', 'parent' => 'aktuelles', 'template' => 'kurz', 'key' => 'title', 'actions' => ['update'],
+                    'fields' => ['title' => ['type' => 'text', 'required' => true], 'text' => ['type' => 'textarea'], 'bild' => ['type' => 'image']],
+                ],
+            ]]
+            PHP);
+			// While the draft processes its image, an editor starts working on the page in the Panel.
+			$editorStarts = function (string $page, array $edit) {
+				$started = false;
+				return ['test.storage' => function (string $when, string $operation, string $version, ModelWithContent $model) use (&$started, $page, $edit): void {
+					if ($started || $when !== 'before' || $operation !== 'write' || !$model instanceof File) {
+						return;
+					}
+					$started = true;
+					$target = $model->kirby()->page($page);
+					$target->version('changes')->save([...$target->version('latest')->read(), ...$edit]);
+				}];
+			};
+			$scenarios = [
+				'structure create with an image' => [
+					['collection' => 'meldung', 'fields' => ['titel' => 'Ab', 'text' => 'x']],
+					fn () => ['image' => fude_upload($tmp, 300, 200)],
+					'home',
+					'leitsatz',
+				],
+				'structure create with two entries' => [
+					['collection' => 'meldung', 'action' => 'create', 'entries' => [['titel' => 'Ab', 'text' => '1'], ['titel' => 'Gurken', 'text' => '2']]],
+					fn () => ['image0' => fude_upload($tmp, 300, 200, 'png', 'eins'), 'image1' => fude_upload($tmp, 300, 200, 'jpg', 'zwei')],
+					'home',
+					'leitsatz',
+				],
+				'pages update with an image' => [
+					['collection' => 'notiz', 'action' => 'update', 'key' => 'Kurznotiz', 'fields' => ['text' => 'kurz']],
+					fn () => ['image' => fude_upload($tmp, 900, 600, 'jpg')],
+					'aktuelles/kurz',
+					'text',
+				],
+			];
+			foreach ($scenarios as $label => [$body, $uploads, $page, $field]) {
+				$before = $this->tree($tmp);
+				[$code, $json] = fude_call($app, 'draft', $body, options: $options + $editorStarts($page, [$field => 'Redaktion tippt']), files: $uploads());
+				ok($code === 422 && str_contains($json['error'] ?? '', 'blueprint'), $label . ': refused by the blueprint', [$code, $json]);
+				$changes = $app()->page($page)->version('changes');
+				same([true, 'Redaktion tippt'], [$changes->exists(), $changes->read()[$field] ?? null], $label . ': the editor\'s changes version is still there, unchanged');
+				$content = array_filter($this->tree($tmp), fn (string $path) => !str_contains($path, '/_changes/'), ARRAY_FILTER_USE_KEY);
+				same($before, $content, $label . ': the images of the refused draft are gone, nothing else was touched');
+				$kirby = $app();
+				$kirby->impersonate('kirby');
+				$kirby->page($page)->version('changes')->delete();
+			}
 		} finally {
 			cleanup($tmp);
 		}

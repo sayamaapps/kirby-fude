@@ -403,12 +403,13 @@ class Service
 		Drafts::checkToken($record, $input['token'] ?? null);
 		$collection = self::collection($collections, $record['collection']);
 		$kept = false;   // a Panel editor's work on top of the draft stays, so does a draft the Panel used
-		$removed = false; // our draft's changes version went: its file may go with it
+		$removed = false; // our draft's changes version went: its files may go with it
 
 		if ($record['kind'] === 'structure') {
 			$page = Content::page($kirby, $collection);
 			$changes = $page->version('changes');
-			if ($changes->exists()) {
+			$gone = !$changes->exists();
+			if (!$gone) {
 				// Only our own draft goes; a Panel editor's work on top stays.
 				if (hash_equals($record['changesHash'], self::changesHash($changes))) {
 					$changes->delete();
@@ -417,9 +418,10 @@ class Service
 					$kept = true;
 				}
 			}
-			// No changes version: the draft was published in the Panel, and
-			// its image is live now. It stays.
-			$kept = self::removeFiles($page, $record, $removed) || $kept;
+			// No changes version: the draft was dropped in the Panel, or published
+			// there. Its files go with it unless something uses them (an image the
+			// published page references is live now and stays: removeFile()).
+			$kept = self::removeFiles($page, $record, $removed || $gone) || $kept;
 		} elseif ($record['kind'] === 'page') {
 			$page = Content::page($kirby, $collection);
 			$changes = $page->version('changes');
@@ -444,7 +446,8 @@ class Service
 					}
 				} elseif ($record['action'] === 'update') {
 					$changes = $child->version('changes');
-					if ($changes->exists()) {
+					$gone = !$changes->exists(); // dropped or published in the Panel: see structure
+					if (!$gone) {
 						if (hash_equals($record['changesHash'], self::changesHash($changes))) {
 							$changes->delete();
 							$removed = true;
@@ -452,11 +455,12 @@ class Service
 							$kept = true;
 						}
 					}
-					$kept = self::removeFiles($child, $record, $removed) || $kept;
+					$kept = self::removeFiles($child, $record, $removed || $gone) || $kept;
 				}
 			}
 		}
 		Drafts::delete($kirby, $record['id']);
+		$entry['kept'] = $kept;
 		return ['id' => $record['id'], 'kept' => $kept];
 	}
 
@@ -670,6 +674,7 @@ class Service
 		$content = self::stored($kirby, $collection, $clean);
 		$changes = $child->version('changes');
 		$prior = self::priorChanges($changes);
+		$written = false; // whether this attempt began to write the changes version
 		try {
 			if ($upload !== null) {
 				assert($format !== null && $imageField !== null);
@@ -678,6 +683,7 @@ class Service
 			}
 			$base = $changes->exists() ? [] : ($child->version('latest')->read() ?? []);
 			self::checkBlueprint($child, [...$base, ...$content]);
+			$written = true;
 			$changes->save([...$base, ...$content]);
 			return self::recordDraft($ctx, [
 				'collection'  => $collection['name'],
@@ -695,7 +701,7 @@ class Service
 				'preview'     => $child->version('changes')->url(),
 			], $now);
 		} catch (Throwable $e) {
-			self::rollback($e, [$file], $changes, $prior);
+			self::rollback($e, [$file], $written ? $changes : null, $prior);
 		}
 	}
 
@@ -712,10 +718,12 @@ class Service
 
 		$changes = $page->version('changes');
 		$prior = self::priorChanges($changes);
+		$written = false; // whether this attempt began to write the changes version
 		try {
 			$base = $changes->exists() ? [] : ($page->version('latest')->read() ?? []);
 			$full = [...$base, ...self::stored($kirby, $collection, $clean), ...$touched];
 			self::checkBlueprint($page, $full);
+			$written = true;
 			$changes->save($full);
 
 			$record = Drafts::create($kirby, [
@@ -737,7 +745,7 @@ class Service
 			$entry['draft'] = $record['id'];
 			return ['draft' => Drafts::public($record), 'token' => $record['token'], 'preview' => $record['preview']];
 		} catch (Throwable $e) {
-			self::rollback($e, [], $changes, $prior);
+			self::rollback($e, [], $written ? $changes : null, $prior);
 		}
 	}
 
@@ -767,6 +775,7 @@ class Service
 
 		$changes = $page->version('changes');
 		$prior = self::priorChanges($changes);
+		$written = false;   // whether this attempt began to write the changes version
 		$file = null;
 		$files = [];        // the images of several new entries, in entry order
 		$position = $index; // where the row sits after the draft; null = appended
@@ -809,6 +818,7 @@ class Service
 			// A changes version must carry the WHOLE content: publish() sets
 			// every field missing from it to null. The Panel does the same.
 			$base = $changes->exists() ? [] : ($page->version('latest')->read() ?? []);
+			$written = true;
 			$changes->save([...$base, $field => $rows, ...$touched]);
 
 			return self::recordDraft($ctx, [
@@ -834,7 +844,7 @@ class Service
 				'preview'     => $page->version('changes')->url(),
 			], $now);
 		} catch (Throwable $e) {
-			self::rollback($e, [$file, ...$files], $changes, $prior);
+			self::rollback($e, [$file, ...$files], $written ? $changes : null, $prior);
 		}
 	}
 
@@ -1220,13 +1230,13 @@ class Service
 
 	/**
 	 * Removes the file a discarded draft uploaded — but only when the draft
-	 * owned it alone: its changes version just went ($removed), the file is
-	 * as the draft left it (no replaced binary, no edited metadata), and
+	 * owned it alone: its changes version just went or was gone already
+	 * ($removed; an editor's changes version on top keeps it false), the file
+	 * is as the draft left it (no replaced binary, no edited metadata), and
 	 * nothing else uses it: neither the published content of its page nor any
 	 * other page or the site. A file in use means the draft was consumed
 	 * (published in the Panel, or the reference written there otherwise): it
-	 * stays. So it does without our changes version: the file may be live, or
-	 * an editor dropped the draft.
+	 * stays.
 	 *
 	 * @param $hash the file's hash when the draft stored it
 	 * @return bool true when the file stays because it is used or was edited
@@ -1391,8 +1401,8 @@ class Service
 	/**
 	 * Puts a changes version back as priorChanges() found it: deleted when it
 	 * did not exist, otherwise its previous fields written again (replace(),
-	 * not save(), which would merge the draft's fields back in). A version
-	 * the draft never got to write is left alone.
+	 * not save(), which would merge the draft's fields back in). A write that
+	 * changed nothing is not repeated.
 	 *
 	 * @param array<string, mixed>|null $prior
 	 */
@@ -1411,15 +1421,17 @@ class Service
 	 * Undoes what a failed draft stored, then throws the failure again: the
 	 * page's `changes` version goes back to what it held (gone, when there was
 	 * none), the uploaded files and a draft page created for it go. Only what
-	 * belongs to this attempt; every step runs even if another fails. If a
-	 * step fails, the page is in a state nobody knows: both errors go to the
-	 * PHP error log, and the reply is a 500 that does not say "nothing
-	 * changed".
+	 * belongs to this attempt: a changes version is touched only if the
+	 * attempt began to write it, never one an editor created in the meantime
+	 * (a refused draft is rolled back too, and image processing takes
+	 * seconds). Every step runs even if another fails. If a step fails, the
+	 * page is in a state nobody knows: both errors go to the PHP error log,
+	 * and the reply is a 500 that does not say "nothing changed".
 	 *
 	 * Only the default language is touched, the one a draft writes.
 	 *
 	 * @param list<File|null> $files the files this attempt uploaded
-	 * @param $changes the page's changes version, null for a created page
+	 * @param $changes the page's changes version, only if this attempt began to write it; null otherwise and for a created page
 	 * @param array<string, mixed>|null $prior its fields before the attempt (priorChanges()), null = there were none
 	 * @param $created the draft page this attempt created, which takes its files with it
 	 * @throws FudeError 500 when the undo itself fails
