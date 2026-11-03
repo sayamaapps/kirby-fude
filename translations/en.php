@@ -17,6 +17,7 @@ return [
 	'request.json' => 'Expected a JSON object (Content-Type: application/json) or a multipart form.',
 	'request.fieldsJson' => '"fields" must be a JSON object.',
 	'request.actor' => '"actor" must be a short text.',
+	'request.internal' => 'Internal error. Check the page in the Panel before trying again.',
 
 	'config.missing' => 'This site has no site/config/fude.php.',
 	'config.invalid' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: {reason}',
@@ -93,4 +94,6 @@ return [
 	'draft.files' => 'Files on the page changed since this draft was made (added, replaced or edited). Create a new draft.',
 	'draft.gone' => 'The draft no longer exists on the page.',
 	'draft.internal' => 'Internal error, nothing changed.',
+	'draft.rollback' => 'The draft could not be saved, and undoing it failed. Check the page in the Panel before trying again.',
+	'draft.busy' => 'Another change is being saved right now. Try again in a moment.',
 ];

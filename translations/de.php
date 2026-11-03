@@ -16,6 +16,7 @@ return [
 	'request.json' => 'Erwarte ein JSON-Objekt (Content-Type: application/json) oder ein Multipart-Formular.',
 	'request.fieldsJson' => '„fields“ muss ein JSON-Objekt sein.',
 	'request.actor' => '„actor“ muss ein kurzer Text sein.',
+	'request.internal' => 'Interner Fehler. Die Seite im Panel prüfen, bevor es noch einmal versucht wird.',
 
 	'config.missing' => 'Diese Seite hat keine site/config/fude.php.',
 	'config.invalid' => 'Die Fude-Konfiguration (Markierungen in den Blueprints, site/config/fude.php) ist ungültig: {reason}',
@@ -92,4 +93,6 @@ return [
 	'draft.files' => 'Die Dateien der Seite haben sich seit dem Entwurf geändert (neu, ersetzt oder bearbeitet). Neuen Entwurf anlegen.',
 	'draft.gone' => 'Der Entwurf existiert auf der Seite nicht mehr.',
 	'draft.internal' => 'Interner Fehler, nichts geändert.',
+	'draft.rollback' => 'Der Entwurf konnte nicht gespeichert werden, und das Rückgängigmachen ist fehlgeschlagen. Die Seite im Panel prüfen, bevor es noch einmal versucht wird.',
+	'draft.busy' => 'Gerade wird eine andere Änderung gespeichert. Gleich noch einmal versuchen.',
 ];

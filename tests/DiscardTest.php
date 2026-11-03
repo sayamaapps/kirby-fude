@@ -9,7 +9,10 @@ use Sayamaapps\Fude\Service;
  * POST /fude/discard: removes the changes version and the uploaded file,
  * deletes the record, needs the token, is idempotent per record (second
  * call 404). A changes version edited in the Panel meanwhile is kept, and so
- * is a created page the Panel has worked on since.
+ * is a created page the Panel has worked on since. When the changes version
+ * is gone already (dropped in the Panel), the draft's unused images go; an
+ * image the published page uses (published in the Panel) stays. The reply's
+ * `kept` is in the log.
  */
 #[CoversClass(Service::class)]
 #[RunTestsInSeparateProcesses]
@@ -64,13 +67,28 @@ final class DiscardTest extends TestCase
 			same(true, is_file($tmp . '/content/standort/' . $liveFile), 'Image of a published structure draft stays');
 			same(3, $app()->page('standort')->team()->toStructure()->count(), 'Published row still there');
 
-			// The changes version is gone (dropped in the Panel): the image stays too.
+			// The changes version is gone (dropped in the Panel) and nothing uses the image:
+			// the image goes with the draft.
 			[, $json] = fude_call($app, 'draft', ['collection' => 'team', 'fields' => ['name' => 'Verworfen']], files: ['image' => fude_upload($tmp, 900, 600)]);
 			$droppedFile = $json['draft']['file'];
 			$app()->page('standort')->version('changes')->delete();
 			[$code, $j] = fude_call($app, 'discard', ['id' => $json['draft']['id'], 'token' => $json['token']]);
 			same([200, false], [$code, $j['kept']], 'Discard after the changes were dropped in the Panel');
-			same(true, is_file($tmp . '/content/standort/' . $droppedFile), 'Image stays when the changes are gone');
+			same(false, is_file($tmp . '/content/standort/' . $droppedFile), 'Unused image goes when the changes are gone');
+			same(false, is_file($tmp . '/content/standort/' . $droppedFile . '.txt'), 'File meta goes too');
+
+			// An editor's changes version on top of the draft (another fingerprint): the
+			// version and the draft's image stay, the reply says kept.
+			[, $json] = fude_call($app, 'draft', ['collection' => 'team', 'fields' => ['name' => 'Mit Redaktion']], files: ['image' => fude_upload($tmp, 900, 600)]);
+			$editedFile = $json['draft']['file'];
+			$kirby = $app();
+			$kirby->impersonate('kirby');
+			$kirby->page('standort')->version('changes')->update(['einleitung' => 'Redaktion tippt noch']);
+			[$code, $j] = fude_call($app, 'discard', ['id' => $json['draft']['id'], 'token' => $json['token']]);
+			same([200, true], [$code, $j['kept']], 'Discard of a draft an editor changed in the Panel');
+			same(true, is_file($tmp . '/content/standort/' . $editedFile), 'Its image stays');
+			same('Redaktion tippt noch', $app()->page('standort')->version('changes')->read()['einleitung'] ?? null, 'The editor\'s changes version stays');
+			$kirby->page('standort')->version('changes')->delete();
 
 			// Pages update: the child's changes version is discarded, its image goes;
 			// once the Panel has published them, the image stays.
@@ -117,6 +135,26 @@ final class DiscardTest extends TestCase
 			[$code, $j] = fude_call($app, 'discard', ['id' => $json['draft']['id'], 'token' => $json['token']]);
 			same([200, true], [$code, $j['kept']], 'Pages update: discard with an image the published page references');
 			same(true, $app()->page($child)->file($usedPageFile) !== null, 'Pages update: referenced image stays');
+
+			// Pages update, the changes version dropped in the Panel first: the unused image goes.
+			[, $json] = fude_call($app, 'draft', ['collection' => 'news', 'action' => 'update', 'key' => 'Foto Fall', 'fields' => ['text' => 'Neu 4']], files: ['image' => fude_upload($tmp, 1800, 1200, 'jpg')]);
+			$droppedPageFile = $json['draft']['file'];
+			$app()->page($child)->version('changes')->delete();
+			[$code, $j] = fude_call($app, 'discard', ['id' => $json['draft']['id'], 'token' => $json['token']]);
+			same([200, false], [$code, $j['kept']], 'Pages update discarded after the changes were dropped in the Panel');
+			same(null, $app()->page($child)->file($droppedPageFile), 'Pages update: unused image goes when the changes are gone');
+
+			// Pages update with an editor's changes version on top: the version and the image stay.
+			[, $json] = fude_call($app, 'draft', ['collection' => 'news', 'action' => 'update', 'key' => 'Foto Fall', 'fields' => ['text' => 'Neu 5']], files: ['image' => fude_upload($tmp, 1800, 1200, 'jpg')]);
+			$editedPageFile = $json['draft']['file'];
+			$kirby = $app();
+			$kirby->impersonate('kirby');
+			$kirby->page($child)->version('changes')->update(['text' => 'Redaktion tippt noch']);
+			[$code, $j] = fude_call($app, 'discard', ['id' => $json['draft']['id'], 'token' => $json['token']]);
+			same([200, true], [$code, $j['kept']], 'Pages update: discard of a draft an editor changed in the Panel');
+			same(true, $app()->page($child)->file($editedPageFile) !== null, 'Pages update: its image stays');
+			same('Redaktion tippt noch', $app()->page($child)->version('changes')->read()['text'] ?? null, 'Pages update: the editor\'s changes version stays');
+			$kirby->page($child)->version('changes')->delete();
 
 			// Pages create: the discard deletes the draft page only while it is
 			// still what the draft left. isDraft() alone is no licence.
@@ -178,6 +216,8 @@ final class DiscardTest extends TestCase
 			$log = fude_log($tmp);
 			$discards = array_values(array_filter($log, fn ($l) => $l['route'] === 'discard' && $l['status'] === 200));
 			same(['telegram:42', 'team', 'Anna Neu', $id], [$discards[0]['actor'], $discards[0]['collection'], $discards[0]['key'], $discards[0]['draft']], 'Discard log line');
+			same(false, $discards[0]['kept'], 'Discard log line: the outcome, nothing kept');
+			ok(in_array(true, array_column($discards, 'kept'), true), 'Discard log: a discard that kept something says so');
 		} finally {
 			cleanup($tmp);
 		}

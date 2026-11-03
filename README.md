@@ -13,7 +13,7 @@ A chat bot proposes a change, for example a new team member with a photo. Fude s
 - One log line per call: account, channel tag, route, outcome.
 - Own bot role without Panel access; HTTPS only; English and German replies.
 
-Kirby 5 · PHP 8.2 to 8.5 · `gd` (or ImageMagick) and `mbstring` · a writable `storage` root (drafts and the log live in `<storage>/fude/`)
+Kirby 5 · PHP 8.2 to 8.5 · `gd` (or ImageMagick) and `mbstring` · a writable `storage` root (drafts, the log and the write lock live in `<storage>/fude/`)
 
 ## Installation
 
@@ -114,7 +114,7 @@ All routes need Basic Auth. Replies are JSON with `ok`, `format` (currently 1) a
 | `POST /fude/publish` | `id`, `token`, `actor` | `id`, `url`, `hash` |
 | `POST /fude/discard` | `id`, `token`, `actor` | `id`, `kept` (`true` if a Panel editor's work stays) |
 
-Errors: 400 malformed request, 401 login, 403 HTTPS, role, token or publish permission, 404 unknown collection, entry or draft, 409 conflict (entry exists, page or its files changed, draft edited in the Panel, file used on another page), 410 draft expired or gone, 422 validation, 423 page locked or with unsaved Panel changes, 500 configuration error.
+Errors: 400 malformed request, 401 login, 403 HTTPS, role, token or publish permission, 404 unknown collection, entry or draft, 409 conflict (entry exists, page or its files changed, draft edited in the Panel, file used on another page), 410 draft expired or gone, 422 validation, 423 page locked or with unsaved Panel changes, 500 configuration or storage error, 503 another change is being saved right now (try again in a moment).
 
 ## Options
 
@@ -154,6 +154,8 @@ Routes answer 403 unless the connection itself is TLS. Behind a TLS-terminating 
 - **Structure and page drafts** go into the page's `changes` version; a new child page is a draft page until published. Publish validates against the blueprint again; a Panel editor can publish or discard the draft there.
 - **Images** become Kirby files on the page. Discard removes a file only if the draft owned it alone: unchanged since the draft and used nowhere else on the site.
 - **Deleting a page** takes its files only as the draft saw them: a file added or edited since, or one another page uses, answers 409.
+- **One write at a time.** Draft, publish and discard hold a lock file (`storage/fude/write.lock`), so two requests at once are handled one after the other; a request that waits more than 30 seconds answers 503. The lock holds Fude requests against each other, not against Panel saves.
+- **A draft that cannot be saved leaves nothing behind.** `storage/fude/drafts/` is checked before anything is stored (500, nothing changed). If saving fails later, the `changes` version goes back to what it was and the uploaded files and a created draft page are removed. If that undo fails too, the 500 says so: check the page in the Panel.
 
 ## Stored data
 
@@ -161,6 +163,7 @@ Fude processes no visitor data and stores no IP addresses, user agents or full-s
 
 - Proposed content as a `changes` version or draft page, until published or discarded.
 - Draft records in `storage/fude/drafts/` (field values, account, channel tag), deleted on publish or discard.
+- An empty lock file `storage/fude/write.lock`, which stays.
 - A log in `storage/fude/log.jsonl`: who, when, route, collection, action, key, outcome. No field values, no images; it restarts at 4 MB.
 
 ## Deviations from Kirby's plugin conventions
