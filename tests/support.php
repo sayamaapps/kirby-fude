@@ -314,8 +314,9 @@ function fude_fixture(array $extraOptions = [], bool $seam = false): array
 	$app = fude_app($tmp, $baseOptions);
 	$kirby = $app();
 	$kirby->impersonate('kirby');
-	$kirby->users()->create(['email' => FUDE_BOT, 'role' => Service::ROLE, 'password' => FUDE_PW]);
+	// Admin first: Kirby 6 requires the first account of a site to be an admin.
 	$kirby->users()->create(['email' => FUDE_ADMIN, 'role' => 'admin', 'password' => FUDE_ADMIN_PW]);
+	$kirby->users()->create(['email' => FUDE_BOT, 'role' => Service::ROLE, 'password' => FUDE_PW]);
 	I18n::setLanguage('en');
 	return [$tmp, $app];
 }
