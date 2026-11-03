@@ -170,7 +170,8 @@ class Service
 	/**
 	 * A draft needs a page nobody else is working on: no active Panel lock,
 	 * and no unsaved Panel changes (they would be published together with
-	 * ours — the editor would never have confirmed that).
+	 * ours — the editor would never have confirmed that). Publishing a new
+	 * page asks the same again.
 	 */
 	private static function checkEditable(Page $page): void
 	{
@@ -1167,6 +1168,8 @@ class Service
 				if (!$child->isDraft()) {
 					throw FudeError::t('draft.gone', [], 410);
 				}
+				// Somebody may have opened the new page in the Panel since the draft.
+				self::checkEditable($child);
 				self::checkKeyFree($collection, Content::rows($kirby, $collection), (string)$record['key'], null);
 				if (!hash_equals($record['changesHash'], self::changesHash($child->version('latest')))) {
 					throw FudeError::t('draft.changed', [], 409);

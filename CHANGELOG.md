@@ -10,6 +10,23 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## [1.11.3] — 2026-11-03
+
+### Fixed
+
+- **Confirming a new page no longer publishes it over an editor in the Panel.**
+  Publishing a draft that creates a page (a `pages` collection, action
+  `create`) compared the content and the key but never asked whether someone
+  was working on the new page. An editor who had the new draft page open in the
+  Panel (Kirby's lock) or had saved changes there without publishing them did
+  not stop the confirmation: the page went live and the draft record was
+  removed. Publishing a new page now answers 423 in both cases, as drafting
+  and updating a page already did, before anything is published. Nothing
+  changes on the page, and the draft stays confirmable once the editor has
+  saved or discarded in the Panel. The 409 for content changed since the draft
+  is unchanged.
+- Reach: unchanged. Route JSON `format` unchanged.
+
 ## [1.11.2] — 2026-11-03
 
 ### Fixed
