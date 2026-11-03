@@ -64,11 +64,48 @@ const FUDE_PW = 'fude-password-very-long-123';
 const FUDE_ADMIN = 'admin@example.invalid';
 const FUDE_ADMIN_PW = 'admin-password-very-long-123';
 
+/** The options every fixture app starts with. */
+function fude_options(): array
+{
+	return [
+		'url' => 'http://example.invalid',
+		'content.salt' => 'fixture-salt',
+		'fude.active' => true,
+		'fude.withoutHttps' => true,
+	];
+}
+
+/**
+ * A factory for fresh Kirby instances on the fixture site in $tmp:
+ * $app(array $request = [], array $options = []). The optional `server` key
+ * of $request is the connection ($_SERVER as seen by Kirby: HTTPS,
+ * SERVER_PORT, X-Forwarded-Proto); never the test runner's own.
+ */
+function fude_app(string $tmp, array $baseOptions): Closure
+{
+	return function (array $request = [], array $options = []) use ($tmp, $baseOptions): Kirby\Cms\App {
+		$server = $request['server'] ?? [];
+		unset($request['server']);
+		return new Kirby\Cms\App([
+			'roots' => [
+				'index' => $tmp . '/public', 'base' => $tmp, 'content' => $tmp . '/content',
+				'site' => $tmp . '/site', 'storage' => $tmp . '/storage', 'accounts' => $tmp . '/site/accounts',
+			],
+			'request' => $request,
+			'server' => $server,
+			'options' => array_merge($baseOptions, $options),
+		]);
+	};
+}
+
 /**
  * Builds the site and returns [$tmp, $app] where $app(array $request = [],
- * array $options = []) creates a fresh Kirby instance on it.
+ * array $options = []) creates a fresh Kirby instance on it. With $seam the
+ * site gets the plugin tests/fixtures/storage-seam.php: a test can then run
+ * code around every content write and delete (option `test.storage`). It has
+ * to be there when the first app of the process is built.
  */
-function fude_fixture(array $extraOptions = []): array
+function fude_fixture(array $extraOptions = [], bool $seam = false): array
 {
 	global $base;
 	$tmp = sys_get_temp_dir() . '/fude-' . bin2hex(random_bytes(6));
@@ -266,30 +303,15 @@ function fude_fixture(array $extraOptions = []): array
     ];
     PHP);
 
-	$baseOptions = [
-		'url' => 'http://example.invalid',
-		'content.salt' => 'fixture-salt',
-		'fude.active' => true,
-		'fude.withoutHttps' => true,
-	] + $extraOptions;
+	$baseOptions = fude_options() + $extraOptions;
 	// A plugin whose blueprint label is a translation key.
 	@mkdir($tmp . '/site/plugins/labels', 0775, true);
 	file_put_contents($tmp . '/site/plugins/labels/index.php', "<?php\nKirby::plugin('test/labels', ['translations' => ['en' => ['fixture.preis.label' => 'Price'], 'de' => ['fixture.preis.label' => 'Preis']]]);\n");
-	// The optional `server` key of $request is the connection ($_SERVER as seen
-	// by Kirby: HTTPS, SERVER_PORT, X-Forwarded-Proto); never the test runner's own.
-	$app = function (array $request = [], array $options = []) use ($tmp, $baseOptions): Kirby\Cms\App {
-		$server = $request['server'] ?? [];
-		unset($request['server']);
-		return new Kirby\Cms\App([
-			'roots' => [
-				'index' => $tmp . '/public', 'base' => $tmp, 'content' => $tmp . '/content',
-				'site' => $tmp . '/site', 'storage' => $tmp . '/storage', 'accounts' => $tmp . '/site/accounts',
-			],
-			'request' => $request,
-			'server' => $server,
-			'options' => array_merge($baseOptions, $options),
-		]);
-	};
+	if ($seam) {
+		mkdir($tmp . '/site/plugins/seam');
+		copy(__DIR__ . '/fixtures/storage-seam.php', $tmp . '/site/plugins/seam/index.php');
+	}
+	$app = fude_app($tmp, $baseOptions);
 	$kirby = $app();
 	$kirby->impersonate('kirby');
 	$kirby->users()->create(['email' => FUDE_BOT, 'role' => Service::ROLE, 'password' => FUDE_PW]);

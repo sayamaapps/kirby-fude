@@ -10,6 +10,36 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## [1.11.1] — 2026-11-03
+
+### Fixed
+
+- **A draft whose record cannot be saved is undone completely.** When the
+  record could not be written (`storage/fude/drafts` blocked by a file, not
+  writable, disk full), the draft used to leave its `changes` version and the
+  uploaded images behind, answered 500, and every retry got 423 ("unsaved
+  Panel changes") until someone cleaned up in the Panel. Now the folder is
+  checked before anything is stored. A failure after the content was written
+  undoes it: the uploaded files and a created draft page are removed, and the
+  page's `changes` version is put back to what it was (removed when there was
+  none). The same request works again once the storage is repaired. If the
+  undo itself fails, the 500 says so (check the page in the Panel) and both
+  errors go to the PHP error log.
+- **Simultaneous requests are handled one after another.** Two drafts for the
+  same page at the same moment could end with the first draft's token bound to
+  the second draft's content, so that publishing the first one published the
+  second. Draft, publish and discard now hold a lock file
+  (`storage/fude/write.lock`) while they work; a request that waits more than
+  30 seconds answers 503. The lock holds Fude requests against each other, not
+  against Panel saves, which keep using Kirby's own lock and Fude's existing
+  checks.
+- **The 500 text no longer claims "nothing changed" where that is not
+  certain.** A failing draft or schema request keeps "Internal error, nothing
+  changed." (a draft now undoes itself). Publish and discard can fail
+  half-way and answer "Internal error. Check the page in the Panel before
+  trying again."
+- Reach: unchanged. Route JSON `format` unchanged.
+
 ## [1.11.0] — 2026-11-02
 
 ### Added

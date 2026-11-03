@@ -13,6 +13,7 @@ use Sayamaapps\Fude\Log;
 use Sayamaapps\Fude\Options;
 use Sayamaapps\Fude\Service;
 use Sayamaapps\Fude\Validator;
+use Sayamaapps\Fude\WriteLock;
 
 /**
  * The class map in autoload.php matches src/: one entry per file, the file
@@ -29,6 +30,7 @@ use Sayamaapps\Fude\Validator;
 #[CoversClass(Options::class)]
 #[CoversClass(Service::class)]
 #[CoversClass(Validator::class)]
+#[CoversClass(WriteLock::class)]
 final class AutoloadTest extends TestCase
 {
 	public function testEveryEntryLoadsItsClass(): void
@@ -46,8 +48,8 @@ final class AutoloadTest extends TestCase
 
 		foreach (require dirname(__DIR__) . '/autoload.php' as $class => $path) {
 			$short = substr($class, strlen('sayamaapps\\fude\\'));
-			// DraftContext is new in 2.x and has no 1.x name.
-			if ($short === 'draftcontext') {
+			// DraftContext and WriteLock are new in 2.x and have no 1.x name.
+			if (in_array($short, ['draftcontext', 'writelock'], true)) {
 				continue;
 			}
 			$this->assertSame(

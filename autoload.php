@@ -19,4 +19,5 @@ return [
 	'sayamaapps\\fude\\options' => 'src/Options.php',
 	'sayamaapps\\fude\\service' => 'src/Service.php',
 	'sayamaapps\\fude\\validator' => 'src/Validator.php',
+	'sayamaapps\\fude\\writelock' => 'src/WriteLock.php',
 ];

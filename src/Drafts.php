@@ -44,10 +44,7 @@ class Drafts
 	/** Creates the record and returns it (with id and token). */
 	public static function create(App $kirby, array $record, \DateTimeImmutable $now): array
 	{
-		$dir = self::directory($kirby);
-		if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
-			throw new RuntimeException('Cannot create ' . $dir);
-		}
+		self::prepare($kirby);
 		$record['id'] = bin2hex(random_bytes(8));
 		$record['token'] = bin2hex(random_bytes(16));
 		$record['createdAt'] = $now->format(DATE_ATOM);
@@ -76,6 +73,24 @@ class Drafts
 	{
 		$seconds = Options::get($kirby, 'draftLifetime', self::DEFAULT_LIFETIME);
 		return is_int($seconds) && $seconds > 0 ? $seconds : self::DEFAULT_LIFETIME;
+	}
+
+	/**
+	 * Makes sure the record folder exists and takes files. Draft routes call
+	 * it before they store anything: the record is written last, and a
+	 * folder that cannot take it must not be found out by then.
+	 *
+	 * @throws RuntimeException when the folder cannot be created or written to
+	 */
+	public static function prepare(App $kirby): void
+	{
+		$dir = self::directory($kirby);
+		if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
+			throw new RuntimeException('Cannot create ' . $dir);
+		}
+		if (!is_writable($dir)) {
+			throw new RuntimeException('Cannot write to ' . $dir);
+		}
 	}
 
 	/** The record without the secret, for responses. */
