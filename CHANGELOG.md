@@ -23,7 +23,8 @@ All notable changes to this project are documented here. Versions follow
   removed. Publishing a new page now answers 423 in both cases, as drafting
   and updating a page already did, before anything is published. Nothing
   changes on the page, and the draft stays confirmable once the editor has
-  saved or discarded in the Panel. The 409 for content changed since the draft
+  discarded in the Panel (after a save there the content differs from the draft
+  and publishing answers 409). The 409 for content changed since the draft
   is unchanged.
 - Reach: unchanged. Route JSON `format` unchanged.
 

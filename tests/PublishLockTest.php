@@ -61,6 +61,14 @@ final class PublishLockTest extends TestCase
 		$kirby->page($page)->version('changes')->delete();
 	}
 
+	/** The editor presses Save in the Panel: the changes version becomes the page's latest content. */
+	private function panelPublishes(callable $app, string $page, string $as): void
+	{
+		$kirby = $app();
+		$kirby->impersonate($as);
+		$kirby->page($page)->version('changes')->publish();
+	}
+
 	/** Somebody saves the page's changes version in the Panel as $as; $edit changes fields on top of the page's content. */
 	private function panelSaves(callable $app, string $page, string $as, array $edit = []): void
 	{
@@ -148,6 +156,31 @@ final class PublishLockTest extends TestCase
 			same(200, $code, 'Published once the lock is gone', $json);
 			same('listed', $app()->page($page)->status(), 'Listed now');
 			same(false, is_file($tmp . '/storage/fude/drafts/' . $id . '.json'), 'Record gone');
+		} finally {
+			cleanup($tmp);
+		}
+	}
+
+	public function testPanelSaveOfANewPageAnswers409AndKeepsTheEditorsContent(): void
+	{
+		[$tmp, $app] = fude_fixture();
+		try {
+			[$id, $token, $page] = $this->newPage($app);
+			// The editor saves in the Panel: the changes go to the page's latest content, no lock or unsaved changes are left.
+			$this->panelSaves($app, $page, FUDE_ADMIN, ['text' => 'Saved in the Panel']);
+			$this->panelPublishes($app, $page, FUDE_ADMIN);
+			same(false, $app()->page($page)->version('changes')->exists(), 'The Panel save leaves no changes version');
+			same('Saved in the Panel', $app()->page($page)->version('latest')->read()['text'], 'The editor\'s content is the latest');
+
+			// Not what was confirmed any more: 409, not 200. Only a discard in the Panel keeps the draft confirmable.
+			for ($try = 1; $try <= 2; $try++) {
+				[$code, $json] = fude_call($app, 'publish', ['id' => $id, 'token' => $token]);
+				same([409, 'The draft was changed in the Panel meanwhile. Publish it there, or discard it and start again.'], [$code, $json['error'] ?? null], 'Publish after a Panel save, try ' . $try, $json);
+			}
+			same(true, $app()->page($page)->isDraft(), 'The page is still a draft');
+			same('Saved in the Panel', $app()->page($page)->version('latest')->read()['text'], 'The editor\'s content is untouched');
+			same(0, $app()->page('aktuelles')->children()->listed()->count(), 'Nothing listed');
+			same(true, is_file($tmp . '/storage/fude/drafts/' . $id . '.json'), 'The draft record is still there, to discard');
 		} finally {
 			cleanup($tmp);
 		}
