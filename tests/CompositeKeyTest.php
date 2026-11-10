@@ -53,6 +53,34 @@ final class CompositeKeyTest extends TestCase
 		return Data::decode($content['team'] ?? '', 'yaml') ?: [];
 	}
 
+	/** @return array<string, array{0: string, 1: int, 2: mixed}> */
+	public static function markers(): array
+	{
+		$invalid = 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: ';
+		return [
+			'a list is a composite key' => ['[name, abteilung]', 200, ['name', 'abteilung']],
+			'a list of one is the plain key' => ['[abteilung]', 200, 'abteilung'],
+			'a text is the plain key' => ['name', 200, 'name'],
+			'empty list' => ['[]', 500, $invalid . 'collection "standort-team": "key" must be a field name or a non-empty list of field names'],
+			'unknown field' => ['[name, nope]', 500, $invalid . 'collection "standort-team": "key" lists "nope", which is not a declared text, select or date field'],
+			'part that is no text' => ['[name, 3]', 500, $invalid . 'page "standort", field "team": fude option "key" must be a text or a list of texts'],
+		];
+	}
+
+	#[DataProvider('markers')]
+	public function testBlueprintMarker(string $marker, int $status, mixed $expected): void
+	{
+		[$tmp, $app] = fude_fixture();
+		try {
+			$none = fude_declare($tmp, 'none', "['collections' => []]");
+			file_put_contents($tmp . '/site/blueprints/pages/standort.yml', "title: Standort\nfields:\n  team:\n    label: Team\n    type: structure\n    fude:\n      key: $marker\n    fields:\n      name:\n        type: text\n      abteilung:\n        type: select\n        options: [aerzte, empfang]\n");
+			[$code, $json] = fude_call($app, 'schema', options: $none);
+			same([$status, $expected], [$code, $json['error'] ?? $json['collections']['standort-team']['key']], 'The marker key');
+		} finally {
+			cleanup($tmp);
+		}
+	}
+
 	public function testCompositeKey(): void
 	{
 		[$tmp, $app] = fude_fixture();
@@ -148,6 +176,32 @@ final class CompositeKeyTest extends TestCase
 		}
 	}
 
+	public function testConfigErrors(): void
+	{
+		[$tmp, $app] = fude_fixture();
+		try {
+			$configs = 0;
+			$with = function (string $key, string $fields = "'name' => 'text', 'abteilung' => 'select', 'foto' => 'image'") use ($tmp, $app, &$configs) {
+				$file = 'site/config/fude-key-' . (++$configs) . '.php';
+				file_put_contents($tmp . '/' . $file, "<?php\nreturn ['collections' => ['team' => ['kind' => 'structure', 'page' => 'standort', 'field' => 'team', 'key' => $key, 'fields' => [$fields]]]];\n");
+				[$code, $json] = fude_call($app, 'schema', options: ['fude.config' => $file]);
+				return [$code, $json['error'] ?? $json['collections']['team']['key']];
+			};
+			$invalid = 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: collection "team": ';
+			same([500, $invalid . '"key" must be a field name or a non-empty list of field names'], $with('[]'), 'Empty list');
+			same([500, $invalid . '"key" must be a field name or a non-empty list of field names'], $with("['a' => 'name']"), 'Not a list');
+			same([500, $invalid . '"key" lists "nope", which is not a declared text, select or date field'], $with("['name', 'nope']"), 'Unknown field');
+			same([500, $invalid . '"key" lists "foto", which is not a declared text, select or date field'], $with("['name', 'foto']"), 'An image is no key part');
+			same([500, $invalid . '"key" lists a value, which is not a declared text, select or date field'], $with("['name', 3]"), 'Not a field name');
+			same([500, $invalid . '"key" lists field "name" twice'], $with("['name', 'name']"), 'A part twice');
+			same([200, ['name', 'abteilung']], $with("['name', 'abteilung']"), 'A valid composite key');
+			same([200, 'name'], $with("['name']"), 'A list of one is the plain key');
+			same([200, 'name'], $with("'name'"), 'A text is the plain key');
+		} finally {
+			cleanup($tmp);
+		}
+	}
+
 	public function testPagesCollection(): void
 	{
 		[$tmp, $app] = fude_fixture();
@@ -175,60 +229,6 @@ final class CompositeKeyTest extends TestCase
 			// An update may not give a page the combination of another one.
 			[$code, $json] = fude_call($app, 'draft', ['collection' => 'notes', 'action' => 'update', 'key' => ['title' => 'Gasthaus Muster', 'kategorie' => 'urlaub'], 'fields' => ['kategorie' => 'praxis']], options: $options);
 			same([409, 'Another entry already has Title / Kategorie "Gasthaus Muster / praxis". Two entries could no longer be told apart.'], [$code, $json['error']], 'Taken at draft time');
-		} finally {
-			cleanup($tmp);
-		}
-	}
-
-	public function testConfigErrors(): void
-	{
-		[$tmp, $app] = fude_fixture();
-		try {
-			$configs = 0;
-			$with = function (string $key, string $fields = "'name' => 'text', 'abteilung' => 'select', 'foto' => 'image'") use ($tmp, $app, &$configs) {
-				$file = 'site/config/fude-key-' . (++$configs) . '.php';
-				file_put_contents($tmp . '/' . $file, "<?php\nreturn ['collections' => ['team' => ['kind' => 'structure', 'page' => 'standort', 'field' => 'team', 'key' => $key, 'fields' => [$fields]]]];\n");
-				[$code, $json] = fude_call($app, 'schema', options: ['fude.config' => $file]);
-				return [$code, $json['error'] ?? $json['collections']['team']['key']];
-			};
-			$invalid = 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: collection "team": ';
-			same([500, $invalid . '"key" must be a field name or a non-empty list of field names'], $with('[]'), 'Empty list');
-			same([500, $invalid . '"key" must be a field name or a non-empty list of field names'], $with("['a' => 'name']"), 'Not a list');
-			same([500, $invalid . '"key" lists "nope", which is not a declared text, select or date field'], $with("['name', 'nope']"), 'Unknown field');
-			same([500, $invalid . '"key" lists "foto", which is not a declared text, select or date field'], $with("['name', 'foto']"), 'An image is no key part');
-			same([500, $invalid . '"key" lists a value, which is not a declared text, select or date field'], $with("['name', 3]"), 'Not a field name');
-			same([500, $invalid . '"key" lists field "name" twice'], $with("['name', 'name']"), 'A part twice');
-			same([200, ['name', 'abteilung']], $with("['name', 'abteilung']"), 'A valid composite key');
-			same([200, 'name'], $with("['name']"), 'A list of one is the plain key');
-			same([200, 'name'], $with("'name'"), 'A text is the plain key');
-		} finally {
-			cleanup($tmp);
-		}
-	}
-
-	/** @return array<string, array{0: string, 1: int, 2: mixed}> */
-	public static function markers(): array
-	{
-		$invalid = 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: ';
-		return [
-			'a list is a composite key' => ['[name, abteilung]', 200, ['name', 'abteilung']],
-			'a list of one is the plain key' => ['[abteilung]', 200, 'abteilung'],
-			'a text is the plain key' => ['name', 200, 'name'],
-			'empty list' => ['[]', 500, $invalid . 'collection "standort-team": "key" must be a field name or a non-empty list of field names'],
-			'unknown field' => ['[name, nope]', 500, $invalid . 'collection "standort-team": "key" lists "nope", which is not a declared text, select or date field'],
-			'part that is no text' => ['[name, 3]', 500, $invalid . 'page "standort", field "team": fude option "key" must be a text or a list of texts'],
-		];
-	}
-
-	#[DataProvider('markers')]
-	public function testBlueprintMarker(string $marker, int $status, mixed $expected): void
-	{
-		[$tmp, $app] = fude_fixture();
-		try {
-			$none = fude_declare($tmp, 'none', "['collections' => []]");
-			file_put_contents($tmp . '/site/blueprints/pages/standort.yml', "title: Standort\nfields:\n  team:\n    label: Team\n    type: structure\n    fude:\n      key: $marker\n    fields:\n      name:\n        type: text\n      abteilung:\n        type: select\n        options: [aerzte, empfang]\n");
-			[$code, $json] = fude_call($app, 'schema', options: $none);
-			same([$status, $expected], [$code, $json['error'] ?? $json['collections']['standort-team']['key']], 'The marker key');
 		} finally {
 			cleanup($tmp);
 		}

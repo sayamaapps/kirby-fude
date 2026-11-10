@@ -215,6 +215,28 @@ class Blueprints
 	}
 
 	/**
+	 * The marker `key`: a field name, or a list of field names (a composite
+	 * key). Config checks the names.
+	 *
+	 * @return string|list<string>|null
+	 */
+	private static function keyMarker(mixed $value, string $where): string|array|null
+	{
+		if (is_array($value) && array_is_list($value)) {
+			foreach ($value as $part) {
+				if (!is_string($part)) {
+					throw self::invalid("$where: fude option \"key\" must be a text or a list of texts");
+				}
+			}
+			return $value;
+		}
+		if (is_array($value)) {
+			throw self::invalid("$where: fude option \"key\" must be a text or a list of texts");
+		}
+		return self::text($value, $where, 'key');
+	}
+
+	/**
 	 * The marker of a blueprint field: null when absent (or null), false for
 	 * an explicit `fude: false`, otherwise its options (`true` is `[]`).
 	 */
@@ -392,28 +414,6 @@ class Blueprints
 			return $value;
 		}
 		throw self::invalid("$where: fude option \"$option\" must be a text");
-	}
-
-	/**
-	 * The marker `key`: a field name, or a list of field names (a composite
-	 * key). Config checks the names.
-	 *
-	 * @return string|list<string>|null
-	 */
-	private static function keyMarker(mixed $value, string $where): string|array|null
-	{
-		if (is_array($value) && array_is_list($value)) {
-			foreach ($value as $part) {
-				if (!is_string($part)) {
-					throw self::invalid("$where: fude option \"key\" must be a text or a list of texts");
-				}
-			}
-			return $value;
-		}
-		if (is_array($value)) {
-			throw self::invalid("$where: fude option \"key\" must be a text or a list of texts");
-		}
-		return self::text($value, $where, 'key');
 	}
 
 	/**

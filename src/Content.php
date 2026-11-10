@@ -52,6 +52,27 @@ class Content
 	}
 
 	/**
+	 * Hash of the published state the draft is based on. If it changes
+	 * between draft and publish, somebody edited in parallel (409).
+	 */
+	public static function hash(App $kirby, array $collection, Page|null $target = null): string
+	{
+		$page = self::page($kirby, $collection);
+		if ($collection['kind'] === 'structure') {
+			return hash('sha256', self::latestField($page, $collection['field']));
+		}
+		if ($collection['kind'] === 'page') {
+			$target = $page;
+		}
+		if ($target !== null) {
+			$content = $target->version('latest')->read() ?? [];
+			unset($content['uuid'], $content['lock']);
+			return hash('sha256', (string)json_encode($content, JSON_UNESCAPED_UNICODE));
+		}
+		return hash('sha256', implode("\n", $page->children()->keys()));
+	}
+
+	/**
 	 * The field names of the collection's key: one, or several for a
 	 * composite key. None for a single page.
 	 *
@@ -70,22 +91,6 @@ class Content
 			$labels[] = $collection['fields'][$field]['label'] ?? $field;
 		}
 		return implode(' / ', $labels);
-	}
-
-	/**
-	 * The key of a row (or of the part values a request names) as text: the
-	 * trimmed value of a single-field key, the values of a composite key
-	 * joined with " / ".
-	 *
-	 * @param array<string, mixed> $row
-	 */
-	public static function keyText(array $collection, array $row): string
-	{
-		$values = [];
-		foreach (self::keyFields($collection) as $field) {
-			$values[] = trim((string)($row[$field] ?? ''));
-		}
-		return implode(' / ', $values);
 	}
 
 	/**
@@ -109,49 +114,20 @@ class Content
 		return $parts;
 	}
 
-	/** Whether two rows have the same key: every key part the same (case-insensitive, trimmed). */
-	public static function sameEntry(array $collection, array $a, array $b): bool
-	{
-		$parts = [];
-		foreach (self::keyFields($collection) as $field) {
-			$parts[$field] = $b[$field] ?? '';
-		}
-		return self::sameParts($parts, $a);
-	}
-
 	/**
-	 * @param array<string, mixed> $parts field name => key value
+	 * The key of a row (or of the part values a request names) as text: the
+	 * trimmed value of a single-field key, the values of a composite key
+	 * joined with " / ".
+	 *
 	 * @param array<string, mixed> $row
 	 */
-	private static function sameParts(array $parts, array $row): bool
+	public static function keyText(array $collection, array $row): string
 	{
-		foreach ($parts as $field => $value) {
-			if (!self::sameKey($row[$field] ?? '', $value)) {
-				return false;
-			}
+		$values = [];
+		foreach (self::keyFields($collection) as $field) {
+			$values[] = trim((string)($row[$field] ?? ''));
 		}
-		return true;
-	}
-
-	/**
-	 * Hash of the published state the draft is based on. If it changes
-	 * between draft and publish, somebody edited in parallel (409).
-	 */
-	public static function hash(App $kirby, array $collection, Page|null $target = null): string
-	{
-		$page = self::page($kirby, $collection);
-		if ($collection['kind'] === 'structure') {
-			return hash('sha256', self::latestField($page, $collection['field']));
-		}
-		if ($collection['kind'] === 'page') {
-			$target = $page;
-		}
-		if ($target !== null) {
-			$content = $target->version('latest')->read() ?? [];
-			unset($content['uuid'], $content['lock']);
-			return hash('sha256', (string)json_encode($content, JSON_UNESCAPED_UNICODE));
-		}
-		return hash('sha256', implode("\n", $page->children()->keys()));
+		return implode(' / ', $values);
 	}
 
 	/** The stored (string) value of a field in the latest version, '' if unset. */
@@ -213,10 +189,34 @@ class Content
 		return $rows;
 	}
 
+	/** Whether two rows have the same key: every key part the same (case-insensitive, trimmed). */
+	public static function sameEntry(array $collection, array $a, array $b): bool
+	{
+		$parts = [];
+		foreach (self::keyFields($collection) as $field) {
+			$parts[$field] = $b[$field] ?? '';
+		}
+		return self::sameParts($parts, $a);
+	}
+
 	/** Case-insensitive, trimmed comparison of key values. */
 	public static function sameKey(mixed $a, mixed $b): bool
 	{
 		return mb_strtolower(trim((string)$a)) === mb_strtolower(trim((string)$b));
+	}
+
+	/**
+	 * @param array<string, mixed> $parts field name => key value
+	 * @param array<string, mixed> $row
+	 */
+	private static function sameParts(array $parts, array $row): bool
+	{
+		foreach ($parts as $field => $value) {
+			if (!self::sameKey($row[$field] ?? '', $value)) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/** @return list<array<string, mixed>> */

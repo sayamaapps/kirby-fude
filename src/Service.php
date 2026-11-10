@@ -573,45 +573,6 @@ class Service
 		return [is_array($key) ? array_map('trim', $key) : trim($key), $index];
 	}
 
-	/**
-	 * The `key` of an update or delete: a text for a single-field key, an
-	 * object with every key field for a composite key (also as a JSON string,
-	 * like `fields`). No other fields, no blank part.
-	 *
-	 * @return string|array<string, string> the text, or field name => value
-	 * @throws FudeError 422
-	 */
-	private static function requestKey(array $collection, string $action, mixed $key): string|array
-	{
-		$fields = Content::keyFields($collection);
-		if (count($fields) === 1) {
-			if (!is_string($key) || trim($key) === '') {
-				throw FudeError::t($action === 'delete' ? 'collection.deleteKey' : 'collection.key', ['field' => Content::keyLabel($collection)]);
-			}
-			return $key;
-		}
-		if (is_string($key)) {
-			$key = json_decode($key, true);
-		}
-		$parts = [];
-		if (is_array($key) && !array_is_list($key) && array_diff(array_keys($key), $fields) === []) {
-			foreach ($fields as $field) {
-				$value = $key[$field] ?? null;
-				if (is_scalar($value) && trim((string)$value) !== '') {
-					$parts[$field] = (string)$value;
-				}
-			}
-		}
-		if (count($parts) !== count($fields)) {
-			$example = [];
-			foreach ($fields as $field) {
-				$example[] = '"' . $field . '": "…"';
-			}
-			throw FudeError::t('collection.keyParts', ['action' => $action, 'fields' => implode(', ', $fields), 'example' => '{' . implode(', ', $example) . '}']);
-		}
-		return $parts;
-	}
-
 	/** A create: a draft page under the parent, with its image, and the blueprint checked before it is saved. */
 	private static function draftNewPage(DraftContext $ctx): array
 	{
@@ -1400,6 +1361,45 @@ class Service
 			'rows'    => $rows,
 			'summary' => ['kept' => $kept, 'added' => $added, 'removed' => $removed, 'withoutImage' => $withoutImage],
 		];
+	}
+
+	/**
+	 * The `key` of an update or delete: a text for a single-field key, an
+	 * object with every key field for a composite key (also as a JSON string,
+	 * like `fields`). No other fields, no blank part.
+	 *
+	 * @return string|array<string, string> the text, or field name => value
+	 * @throws FudeError 422
+	 */
+	private static function requestKey(array $collection, string $action, mixed $key): string|array
+	{
+		$fields = Content::keyFields($collection);
+		if (count($fields) === 1) {
+			if (!is_string($key) || trim($key) === '') {
+				throw FudeError::t($action === 'delete' ? 'collection.deleteKey' : 'collection.key', ['field' => Content::keyLabel($collection)]);
+			}
+			return $key;
+		}
+		if (is_string($key)) {
+			$key = json_decode($key, true);
+		}
+		$parts = [];
+		if (is_array($key) && !array_is_list($key) && array_diff(array_keys($key), $fields) === []) {
+			foreach ($fields as $field) {
+				$value = $key[$field] ?? null;
+				if (is_scalar($value) && trim((string)$value) !== '') {
+					$parts[$field] = (string)$value;
+				}
+			}
+		}
+		if (count($parts) !== count($fields)) {
+			$example = [];
+			foreach ($fields as $field) {
+				$example[] = '"' . $field . '": "…"';
+			}
+			throw FudeError::t('collection.keyParts', ['action' => $action, 'fields' => implode(', ', $fields), 'example' => '{' . implode(', ', $example) . '}']);
+		}
+		return $parts;
 	}
 
 	/** Serves one `/fude/*` route: checks the request, logs it and answers with JSON. */
