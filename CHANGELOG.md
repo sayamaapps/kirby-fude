@@ -10,6 +10,30 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## Unreleased
+
+### Added
+
+- **A collection's key can be several fields.** `key` was one field, so
+  content whose entries are only unique by a combination could not be
+  declared: a closing for the restaurant and another for the kitchen on the
+  same date got a 409 (`collection.exists`), and a client that then followed
+  "same key, so update" overwrote the first, still valid entry. `key` now
+  also takes a list (`'key' => ['from', 'area']`, or `fude: {key: [from,
+  area]}` in a blueprint). Entries may share a part but not the whole key:
+  the duplicate checks (create, create with `entries`, replace, update at
+  draft time and again at publish) compare every part, case-insensitive and
+  trimmed. An update or delete addresses the entry with `key` as an object
+  of every part (`{"from": "2026-12-24", "area": "kitchen"}`, also as a JSON
+  string); the schema lists `key` as the list; replies name the key as its
+  parts joined with ` / `. An empty list, an unknown field or a part listed
+  twice is a 500 like any other configuration error. A key of one field,
+  or a list of one, works as before: same schema, same requests, same
+  replies.
+- Reach: unchanged, no new field type and no new route. Route JSON `format`
+  unchanged (the `key` of the schema and of a draft record is an array or an
+  object only for a collection that declares a composite key).
+
 ## [1.11.3] — 2026-11-03
 
 ### Fixed

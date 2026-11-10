@@ -62,7 +62,7 @@ Enable Fude with `'sayamaapps.fude.active' => true` in `site/config/config.php`,
 | Option | Meaning |
 |---|---|
 | `kind` | `structure` (default; needs `page`, `field`), `pages` (child pages; needs `parent`, `template`; `status` after publish: `listed` (default) or `unlisted`), or `page` (the page itself; `update` only) |
-| `key` | Identifies an entry: a `text`, `select` or `date` field, always required. Default: the first text field. |
+| `key` | Identifies an entry: a `text`, `select` or `date` field, always required. Default: the first text field. A list of such fields (`'key' => ['from', 'area']`) is a composite key for entries that are only unique by the combination: every part is required, two entries may share a part but not the whole key, and parts compare case-insensitively and trimmed. An `update` or `delete` then names the entry with `key` as an object of every part (`{"from": "2026-12-24", "area": "kitchen"}`), where a single-field key takes the text. |
 | `label`, `description`, `fields` | Shown to the bot; `fields` as below (a `pages` collection needs `title`) |
 | `actions` | `create`, `update` (default), `delete`, `replace` (structure only) |
 | `maxEntries` | `structure`: at most 1–100 rows, checked on `create` and `replace` |
@@ -110,7 +110,7 @@ All routes need Basic Auth. Replies are JSON with `ok`, `format` (currently 1) a
 | Route | Request | Reply |
 |---|---|---|
 | `GET /fude/schema` | — | `site`, `language`, `collections` (declarations and published entries) |
-| `POST /fude/draft` | `collection`, `action`, `fields`, `key` (update, delete), `entries` (replace; or create: several new entries of a structure collection), `touch`, `actor` (log tag), upload `image` (or `image0`, `image1`, … for the entries of a create) | `draft`, `token`, `preview` |
+| `POST /fude/draft` | `collection`, `action`, `fields`, `key` (update, delete: a text, or an object of every part for a composite key), `entries` (replace; or create: several new entries of a structure collection), `touch`, `actor` (log tag), upload `image` (or `image0`, `image1`, … for the entries of a create) | `draft`, `token`, `preview` |
 | `POST /fude/publish` | `id`, `token`, `actor` | `id`, `url`, `hash` |
 | `POST /fude/discard` | `id`, `token`, `actor` | `id`, `kept` (`true` if a Panel editor's work stays) |
 

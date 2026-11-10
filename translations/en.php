@@ -33,6 +33,7 @@ return [
 	'collection.exists' => 'There is already an entry with {field} "{key}". Use action "update".',
 	'collection.keyTaken' => 'Another entry already has {field} "{key}". Two entries could no longer be told apart.',
 	'collection.deleteKey' => 'A delete needs "key": the {field} of the entry to delete.',
+	'collection.keyParts' => 'Action "{action}" needs "key": an object with every key field ({fields}) of the entry, e.g. {example}.',
 	'collection.deleteFields' => 'Action "delete" takes only the key: no fields, no image.',
 	'collection.hasChildren' => 'The page "{name}" has child pages and cannot be deleted here.',
 	'collection.fileInUse' => 'The page "{name}" has a file another page uses ({file}). Delete it in the Panel.',
