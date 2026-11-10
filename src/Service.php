@@ -153,9 +153,8 @@ class Service
 	private static function checkDraftShown(App $kirby, array $collection, array $rows, int|null $index, string $action, array|null $entries, array $clean): void
 	{
 		if ($action === 'replace') {
-			$keyField = $collection['key'];
 			foreach ($entries ?? [] as $row) {
-				$published = array_values(array_filter($rows, fn ($old) => Content::sameKey($old[$keyField ?? ''] ?? '', $row[$keyField ?? ''])));
+				$published = array_values(array_filter($rows, fn ($old) => Content::sameEntry($collection, $old, $row)));
 				self::checkShown($collection, $published[0] ?? [], $row);
 			}
 		} elseif ($action === 'create' && $entries !== null) {
@@ -191,18 +190,19 @@ class Service
 	}
 
 	/**
-	 * No entry but $except has the key value yet. An update must not give an
+	 * No entry but $except has the key yet. An update must not give an
 	 * entry the key of another one, nor may publish make two of them: neither
-	 * could be named by its key afterwards.
+	 * could be named by its key afterwards. The key of a composite key is the
+	 * combination of its parts.
 	 *
+	 * @param array<string, mixed> $values the entry's values (at least its key fields)
 	 * @throws FudeError 409
 	 */
-	private static function checkKeyFree(array $collection, array $rows, string $value, int|null $except): void
+	private static function checkKeyFree(array $collection, array $rows, array $values, int|null $except): void
 	{
-		$keyField = $collection['key'];
 		foreach ($rows as $index => $row) {
-			if ($index !== $except && Content::sameKey($row[$keyField] ?? '', $value)) {
-				throw FudeError::t('collection.keyTaken', ['field' => $collection['fields'][$keyField]['label'], 'key' => trim($value)], 409);
+			if ($index !== $except && Content::sameEntry($collection, $row, $values)) {
+				throw FudeError::t('collection.keyTaken', ['field' => Content::keyLabel($collection), 'key' => Content::keyText($collection, $values)], 409);
 			}
 		}
 	}
@@ -538,40 +538,39 @@ class Service
 
 	/**
 	 * The entry a draft names and where it is: a new key (or several) must
-	 * be free, an update or delete names an existing entry by `key`.
+	 * be free, an update or delete names an existing entry by `key`: the
+	 * value of a single-field key, an object with every part (field name =>
+	 * value) for a composite key.
 	 *
 	 * @param list<array<string, mixed>> $rows the published rows
-	 * @return array{0: string|null, 1: int|null} the key for the record and the log, and the row index (update, delete)
+	 * @return array{0: string|array<string, string>|null, 1: int|null} the key for the record and the log, and the row index (update, delete)
 	 * @throws FudeError
 	 */
 	private static function draftKey(array $collection, array $rows, string $action, array $clean, array|null $entries, array $input): array
 	{
-		$keyField = $collection['key'];
-		$keyLabel = $keyField === null ? '' : $collection['fields'][$keyField]['label'];
 		if ($collection['kind'] === 'page' || $action === 'replace') {
 			return [null, null]; // the page itself, or the whole list: no single entry to name
 		}
+		$label = Content::keyLabel($collection);
 		if ($action === 'create') {
 			// One new entry, or several: every new key must be free.
 			foreach ($entries ?? [$clean] as $new) {
 				foreach ($rows as $row) {
-					if (Content::sameKey($row[$keyField ?? ''] ?? '', $new[$keyField ?? ''])) {
-						throw FudeError::t('collection.exists', ['field' => $keyLabel, 'key' => $new[$keyField ?? '']], 409);
+					if (Content::sameEntry($collection, $row, $new)) {
+						throw FudeError::t('collection.exists', ['field' => $label, 'key' => Content::keyText($collection, $new)], 409);
 					}
 				}
 			}
-			return [$entries === null ? $clean[$keyField ?? ''] : null, null]; // several entries: the record lists their keys
+			return [$entries === null ? Content::keyOf($collection, $clean) : null, null]; // several entries: the record lists their keys
 		}
 		// update and delete both name an existing entry.
-		$key = $input['key'] ?? null;
-		if (!is_string($key) || trim($key) === '') {
-			throw FudeError::t($action === 'delete' ? 'collection.deleteKey' : 'collection.key', ['field' => $keyLabel]);
-		}
+		$key = self::requestKey($collection, $action, $input['key'] ?? null);
 		$index = Content::find($collection, $rows, $key);
-		if ($action === 'update' && isset($clean[$keyField ?? ''])) {
-			self::checkKeyFree($collection, $rows, $clean[$keyField ?? ''], $index);
+		if ($action === 'update' && array_intersect_key($clean, array_flip(Content::keyFields($collection))) !== []) {
+			// The key the entry has afterwards: its own parts, the draft's on top.
+			self::checkKeyFree($collection, $rows, [...$rows[$index], ...$clean], $index);
 		}
-		return [trim($key), $index];
+		return [is_array($key) ? array_map('trim', $key) : trim($key), $index];
 	}
 
 	/** A create: a draft page under the parent, with its image, and the blueprint checked before it is saved. */
@@ -804,7 +803,7 @@ class Service
 				$rows = array_values($rows);
 			} elseif ($action === 'replace') {
 				$stored = array_values(array_map(fn (array $row) => self::stored($kirby, $collection, $row), $entries ?? []));
-				$merged = self::replaced($rows, $stored, $collection['key'], $imageField, $collection['fields']);
+				$merged = self::replaced($collection, $rows, $stored, $imageField);
 				$rows = $merged['rows'];
 				$replace = $merged['summary'];
 			} elseif ($many) {
@@ -850,7 +849,7 @@ class Service
 				'fileHash'    => $file === null ? null : self::filesHash([$file]),
 				// Several new entries: their keys, the checked rows and every uploaded file (discard removes them).
 				...($many ? [
-					'keys'    => array_values(array_map(fn (array $row): string => (string)$row[$collection['key']], $entries)),
+					'keys'    => array_values(array_map(fn (array $row): string => Content::keyText($collection, $row), $entries)),
 					'entries' => $entries,
 					'files'   => array_map(fn (File $image): array => ['name' => $image->filename(), 'hash' => self::filesHash([$image])], $files),
 				] : []),
@@ -905,7 +904,6 @@ class Service
 		if (count($entries) > self::MAX_REPLACE_ENTRIES) {
 			throw FudeError::t('collection.maxEntries', ['max' => self::MAX_REPLACE_ENTRIES]);
 		}
-		$keyField = $collection['key'];
 		$rows = [];
 		foreach ($entries as $entry) {
 			if (!is_array($entry) || ($entry !== [] && array_is_list($entry))) {
@@ -913,8 +911,8 @@ class Service
 			}
 			$row = Validator::check($collection, $entry, 'create', $today);
 			foreach ($rows as $other) {
-				if (Content::sameKey($other[$keyField], $row[$keyField])) {
-					throw FudeError::t('collection.duplicate', ['field' => $collection['fields'][$keyField]['label'], 'key' => $row[$keyField]]);
+				if (Content::sameEntry($collection, $other, $row)) {
+					throw FudeError::t('collection.duplicate', ['field' => Content::keyLabel($collection), 'key' => Content::keyText($collection, $row)]);
 				}
 			}
 			$rows[] = $row;
@@ -1170,7 +1168,7 @@ class Service
 				}
 				// Somebody may have opened the new page in the Panel since the draft.
 				self::checkEditable($child);
-				self::checkKeyFree($collection, Content::rows($kirby, $collection), (string)$record['key'], null);
+				self::checkKeyFree($collection, Content::rows($kirby, $collection), $record['fields'], null);
 				if (!hash_equals($record['changesHash'], self::changesHash($child->version('latest')))) {
 					throw FudeError::t('draft.changed', [], 409);
 				}
@@ -1181,10 +1179,12 @@ class Service
 				self::checkLock($child);
 				self::checkHash($kirby, $collection, $record, $child);
 				// The hash covers this page only: another may have taken the new key since.
-				if (isset($record['fields'][$collection['key']])) {
+				if (array_intersect_key($record['fields'], array_flip(Content::keyFields($collection))) !== []) {
 					$rows = Content::rows($kirby, $collection);
 					$self = array_search($child->id(), array_column($rows, '_id'), true);
-					self::checkKeyFree($collection, $rows, $record['fields'][$collection['key']], $self === false ? null : $self);
+					// The key the page has afterwards: its own parts, the draft's on top.
+					$own = $self === false ? [] : (array)$rows[$self];
+					self::checkKeyFree($collection, $rows, [...$own, ...(array)$record['fields']], $self === false ? null : $self);
 				}
 				$changes = $child->version('changes');
 				if (!$changes->exists()) {
@@ -1308,17 +1308,18 @@ class Service
 	 * @param list<array<string, mixed>> $entries the validated new rows
 	 * @return array{rows: list<array<string, mixed>>, summary: array{kept: list<string>, added: list<string>, removed: list<string>, withoutImage: list<string>}}
 	 */
-	private static function replaced(array $current, array $entries, string $keyField, string|null $imageField, array $declared): array
+	private static function replaced(array $collection, array $current, array $entries, string|null $imageField): array
 	{
+		$declared = $collection['fields'];
 		$rows = [];
 		$kept = [];
 		$added = [];
 		$withoutImage = [];
 		foreach ($entries as $entry) {
-			$key = (string)$entry[$keyField];
+			$key = Content::keyText($collection, $entry);
 			$base = [];
 			foreach ($current as $old) {
-				if (Content::sameKey($old[$keyField] ?? '', $key)) {
+				if (Content::sameEntry($collection, $old, $entry)) {
 					$base = $old;
 					break;
 				}
@@ -1344,10 +1345,10 @@ class Service
 		}
 		$removed = [];
 		foreach ($current as $old) {
-			$oldKey = (string)($old[$keyField] ?? '');
+			$oldKey = Content::keyText($collection, $old);
 			$listed = false;
 			foreach ($entries as $entry) {
-				if (Content::sameKey($entry[$keyField], $oldKey)) {
+				if (Content::sameEntry($collection, $entry, $old)) {
 					$listed = true;
 					break;
 				}
@@ -1360,6 +1361,45 @@ class Service
 			'rows'    => $rows,
 			'summary' => ['kept' => $kept, 'added' => $added, 'removed' => $removed, 'withoutImage' => $withoutImage],
 		];
+	}
+
+	/**
+	 * The `key` of an update or delete: a text for a single-field key, an
+	 * object with every key field for a composite key (also as a JSON string,
+	 * like `fields`). No other fields, no blank part.
+	 *
+	 * @return string|array<string, string> the text, or field name => value
+	 * @throws FudeError 422
+	 */
+	private static function requestKey(array $collection, string $action, mixed $key): string|array
+	{
+		$fields = Content::keyFields($collection);
+		if (count($fields) === 1) {
+			if (!is_string($key) || trim($key) === '') {
+				throw FudeError::t($action === 'delete' ? 'collection.deleteKey' : 'collection.key', ['field' => Content::keyLabel($collection)]);
+			}
+			return $key;
+		}
+		if (is_string($key)) {
+			$key = json_decode($key, true);
+		}
+		$parts = [];
+		if (is_array($key) && !array_is_list($key) && array_diff(array_keys($key), $fields) === []) {
+			foreach ($fields as $field) {
+				$value = $key[$field] ?? null;
+				if (is_scalar($value) && trim((string)$value) !== '') {
+					$parts[$field] = (string)$value;
+				}
+			}
+		}
+		if (count($parts) !== count($fields)) {
+			$example = [];
+			foreach ($fields as $field) {
+				$example[] = '"' . $field . '": "…"';
+			}
+			throw FudeError::t('collection.keyParts', ['action' => $action, 'fields' => implode(', ', $fields), 'example' => '{' . implode(', ', $example) . '}']);
+		}
+		return $parts;
 	}
 
 	/** Serves one `/fude/*` route: checks the request, logs it and answers with JSON. */
@@ -1564,9 +1604,11 @@ class Service
 	private static function storeImage(App $kirby, Page $page, array $collection, array $upload, string $format, string $imageField, array $row): File
 	{
 		$rule = $collection['fields'][$imageField];
-		$altField = $rule['alt'] ?? $collection['key'];
-		$alt = trim((string)($row[$altField] ?? $row[$collection['key']] ?? ''));
-		$base = trim((string)($row[$collection['key']] ?? $alt));
+		$keyFields = Content::keyFields($collection);
+		$altField = $rule['alt'] ?? $keyFields[0];
+		$alt = trim((string)($row[$altField] ?? $row[$keyFields[0]] ?? ''));
+		// A composite key names the file by every part.
+		$base = count($keyFields) === 1 ? trim((string)($row[$keyFields[0]] ?? $alt)) : Content::keyText($collection, $row);
 		return Images::store($kirby, $page, $upload, $rule, $format, $base !== '' ? $base : $imageField, $alt);
 	}
 

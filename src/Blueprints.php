@@ -215,6 +215,28 @@ class Blueprints
 	}
 
 	/**
+	 * The marker `key`: a field name, or a list of field names (a composite
+	 * key). Config checks the names.
+	 *
+	 * @return string|list<string>|null
+	 */
+	private static function keyMarker(mixed $value, string $where): string|array|null
+	{
+		if (is_array($value) && array_is_list($value)) {
+			foreach ($value as $part) {
+				if (!is_string($part)) {
+					throw self::invalid("$where: fude option \"key\" must be a text or a list of texts");
+				}
+			}
+			return $value;
+		}
+		if (is_array($value)) {
+			throw self::invalid("$where: fude option \"key\" must be a text or a list of texts");
+		}
+		return self::text($value, $where, 'key');
+	}
+
+	/**
 	 * The marker of a blueprint field: null when absent (or null), false for
 	 * an explicit `fude: false`, otherwise its options (`true` is `[]`).
 	 */
@@ -280,7 +302,7 @@ class Blueprints
 
 		$name = self::text($marker['name'] ?? null, $where, 'name')
 			?? strtolower(str_replace('/', '-', $page->id()) . '-' . $section);
-		$key = self::text($marker['key'] ?? null, $where, 'key');
+		$key = self::keyMarker($marker['key'] ?? null, $where);
 		$collection = [
 			'name'        => $name,
 			'kind'        => 'pages',
@@ -289,7 +311,7 @@ class Blueprints
 			'label'       => self::translated($marker['label'] ?? null, $where, 'label') ?? Config::label($definition) ?? $section,
 			'description' => self::translated($marker['description'] ?? null, $where, 'description') ?? Config::helpText($definition),
 			'actions'     => $marker['actions'] ?? self::SECTION_ACTIONS,
-			'key'         => $key === null ? 'title' : strtolower($key),
+			'key'         => $key === null ? 'title' : (is_array($key) ? array_map('strtolower', $key) : strtolower($key)),
 			'fields'      => $fields,
 		];
 		// Checked by Config like the same options in site/config/fude.php.
@@ -354,7 +376,7 @@ class Blueprints
 
 		$name = self::text($marker['name'] ?? null, $where, 'name')
 			?? strtolower(str_replace('/', '-', $page->id()) . '-' . $field);
-		$key = self::text($marker['key'] ?? null, $where, 'key');
+		$key = self::keyMarker($marker['key'] ?? null, $where);
 		if ($key === null) {
 			// The first text field identifies a row, as in Config.
 			foreach ($fields as $fieldName => $rule) {

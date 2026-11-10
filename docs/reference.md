@@ -14,9 +14,9 @@ Marked fields and sections in a page blueprint derive collections. `fude.php` ca
 | `fude: false` on a field or sub-field | not reachable |
 
 - **Page collection:** name = page id with `/` replaced by `-`; label = page title; actions `update`.
-- **Structure collection:** name = `<page-id>-<field>` in lower case, unless `name` is set. Options: `name`, `label`, `description` (default: help text without tags), `key` (default: first text sub-field), `actions` (default `create`, `update`, `delete`), `insert`, `maxEntries`, `touch`, `readImages`. Any other option is a 500.
+- **Structure collection:** name = `<page-id>-<field>` in lower case, unless `name` is set. Options: `name`, `label`, `description` (default: help text without tags), `key` (default: first text sub-field; a field name or a list of them), `actions` (default `create`, `update`, `delete`), `insert`, `maxEntries`, `touch`, `readImages`. Any other option is a 500.
 - **Sub-fields:** `description`; for `files` also `maxWidth`, `alt`, `formats`, `template`. A sub-field of a known type is included without a marker, except `pages`, which needs one.
-- **Pages collection** (marked `pages` section): name = `<page-id>-<section>`, unless `name` is set; parent = the page; template = the section's one template, or `template` when it names several. Fields: `title` plus the fields marked in the template's blueprint, with the sub-field options (`files` becomes `image`). Options: `name`, `label` (default: section label), `description` (default: section help), `key` (default `title`), `actions` (default `create`, `update`), `status` (`listed` default, `unlisted`), `template`, `readImages`.
+- **Pages collection** (marked `pages` section): name = `<page-id>-<section>`, unless `name` is set; parent = the page; template = the section's one template, or `template` when it names several. Fields: `title` plus the fields marked in the template's blueprint, with the sub-field options (`files` becomes `image`). Options: `name`, `label` (default: section label), `description` (default: section help), `key` (default `title`; a field name or a list of them), `actions` (default `create`, `update`), `status` (`listed` default, `unlisted`), `template`, `readImages`.
   - Pages of that template get no collection of their own, wherever they are, so many children stay one collection. A site that replaces the parent blueprint keeps the marker, or each child page with marked fields becomes a collection (and `maxCollections` fails).
   - Refused with a 500: a marker on another section type, a section with `parent` or `query`, two marked sections of one page for the same template, a field type Fude cannot map (also `structure`) marked in the template.
   - Example: `events: {type: pages, templates: [event], fude: {key: startdate}}` with `fude: true` at the event fields `startDate` and `venue`.
@@ -47,6 +47,7 @@ Other types are skipped in a structure and refused when marked. Refused with a 5
 
 - Every declared field must exist in the blueprint with a compatible type: `text` → `text`, `slug`, `tel`, `email`, `url`; `textarea` → `textarea`, `writer`, `text`; `select` → `select`, `radio`, `toggles`; `image` → `files`; `date`, `number`, `time`, `toggle` → the same; `page` → `pages`.
 - `key` is a declared `text`, `select` or `date` field, never a `page` field, and always required. Default: the first declared text field.
+- `key` may be a list of such fields, a composite key, for entries that are only unique by the combination (the same date for the restaurant and the kitchen): `'key' => ['from', 'area']`, or `fude: {key: [from, area]}` in a blueprint. Every part is required, none is listed twice, and a list of one is the plain key. An empty list, a name that is not a declared text, select or date field, or a part listed twice is a 500 naming the collection. The schema lists `key` as that list.
 - A `pages` collection declares a `title` field. A `page` collection has no key and no image field.
 
 | Field option | Meaning |
@@ -64,7 +65,9 @@ Taken from the blueprint: label (translation arrays and keys); `format` (`url`, 
 
 A value for a field that the blueprint's `when` hides on this entry is a 422, read from the entry's stored values with the draft's on top (a new entry starts from the blueprint defaults). An emptied field passes. When the condition is on a declared field, the draft may send it along; otherwise it changes in the Panel only.
 
-The key stays unique: an update to a key another entry has is a 409, at draft time and again at publish.
+The key stays unique: an update to a key another entry has is a 409, at draft time and again at publish. For a composite key the whole combination is the key: two entries may share a part, a create or update that would repeat the combination is a 409 (`collection.exists`, `collection.keyTaken`), and so is a repeat inside one `entries` list (422). Replies name the key as its parts joined with ` / `, the labels first (`Date / Area "2026-12-24 / kitchen"`).
+
+An `update` or `delete` addresses the entry with `key`: the text for a single-field key, an object with every part for a composite key (`"key": {"from": "2026-12-24", "area": "kitchen"}`; a form post may send that object as a JSON string, like `fields`). A text, a missing, blank or extra part is a 422 that shows the form; a combination nobody has is a 404. The draft record and the log carry the key in the same form (a `replace` summary and the `keys` of a create with `entries` use the joined text).
 
 ## Field types
 

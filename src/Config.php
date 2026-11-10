@@ -19,7 +19,7 @@ use Kirby\Form\Form;
  *                 'kind'    => 'structure',       // rows of a structure field on one page
  *                 'page'    => 'standort',              // page id
  *                 'field'   => 'team',            // structure field name in that page's blueprint
- *                 'key'     => 'name',            // field that identifies a row (for updates)
+ *                 'key'     => 'name',            // field that identifies a row (for updates); a list of fields, e.g. ['from', 'area'], when only the combination is unique
  *                 'label'   => 'Team',
  *                 'description' => 'Who works at the practice.',
  *                 'actions' => ['create', 'update'],
@@ -352,13 +352,18 @@ class Config
 
 	/**
 	 * The key of an entry: the declared "key", otherwise the first text field.
-	 * It names a declared text, select or date field.
+	 * It names a declared text, select or date field, or a list of them when
+	 * only the combination tells entries apart (a composite key).
 	 *
 	 * @param array<string, array<string, mixed>> $fields the declared fields
+	 * @return string|list<string> one field name, or the field names of a composite key (at least two)
 	 */
-	private static function keyField(string $name, array $entry, array $fields): string
+	private static function keyField(string $name, array $entry, array $fields): string|array
 	{
 		$key = $entry['key'] ?? null;
+		if (is_array($key)) {
+			return self::keyList($name, $key, $fields);
+		}
 		if ($key === null) {
 			// The first declared text field identifies an entry.
 			foreach ($fields as $fieldName => $field) {
@@ -373,6 +378,32 @@ class Config
 			throw self::invalid("collection \"$name\": \"key\" must name a declared text, select or date field");
 		}
 		return $key;
+	}
+
+	/**
+	 * A key declared as a list: every part a declared text, select or date
+	 * field, none twice. One part is the same as the plain field name.
+	 *
+	 * @param array<mixed> $key
+	 * @param array<string, array<string, mixed>> $fields the declared fields
+	 * @return string|list<string>
+	 */
+	private static function keyList(string $name, array $key, array $fields): string|array
+	{
+		if ($key === [] || !array_is_list($key)) {
+			throw self::invalid("collection \"$name\": \"key\" must be a field name or a non-empty list of field names");
+		}
+		$parts = [];
+		foreach ($key as $part) {
+			if (!is_string($part) || !isset($fields[$part]) || !in_array($fields[$part]['type'], self::KEY_TYPES, true)) {
+				throw self::invalid("collection \"$name\": \"key\" lists " . (is_string($part) ? "\"$part\"" : 'a value') . ', which is not a declared text, select or date field');
+			}
+			if (in_array($part, $parts, true)) {
+				throw self::invalid("collection \"$name\": \"key\" lists field \"$part\" twice");
+			}
+			$parts[] = $part;
+		}
+		return count($parts) === 1 ? $parts[0] : $parts;
 	}
 
 	/** The kind of a collection: structure (default), page or pages. */
@@ -643,7 +674,9 @@ class Config
 			$collection['key'] = self::keyField($name, $entry, $collection['fields']);
 			// The key identifies an entry: without it there is no row to create
 			// or find. Forced here, so the blueprint merge can only add to it.
-			$collection['fields'][$collection['key']]['required'] = true;
+			foreach ((array)$collection['key'] as $keyField) {
+				$collection['fields'][$keyField]['required'] = true;
+			}
 		}
 		self::checkAlt($name, $collection['fields']);
 
@@ -861,7 +894,7 @@ class Config
 			if ($blueprintOptions === []) {
 				// A query that yields nothing (a site without separate areas): the field is
 				// left out, so the schema does not list it. A field that cannot be left out fails.
-				if ($field['required'] || $name === $collection['key']) {
+				if ($field['required'] || in_array($name, (array)$collection['key'], true)) {
 					throw self::invalid("collection \"{$collection['name']}\": field \"$name\" has no options");
 				}
 				if ($field['options'] !== []) {
