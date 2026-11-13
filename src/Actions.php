@@ -61,11 +61,87 @@ class Actions
 	/** The context keys. */
 	public const CONTEXT = ['user', 'actor', 'owner', 'ref', 'wait', 'canPublish', 'log', 'now'];
 
+	/** Longest owner and ref tag, in characters. */
+	public const MAX_TAG_LENGTH = 200;
+
 	/** Log fields the context may not set: Fude's own. */
 	public const RESERVED_LOG_FIELDS = ['at', 'route', 'user', 'actor', 'collection', 'action', 'key', 'draft', 'kept', 'status', 'error'];
 
-	/** Longest owner and ref tag, in characters. */
-	public const MAX_TAG_LENGTH = 200;
+	/**
+	 * Discards drafts that expired more than one lifetime ago (older than
+	 * twice `draftLifetime`) by the rules of discard(): only what is still
+	 * the draft's own goes, Panel work on top stays. Until then an expired
+	 * draft can be discarded by its caller and is listed by drafts(). Runs
+	 * inside the write lock; a draft that cannot be discarded keeps its
+	 * record and is noted in the PHP error log, the call goes on.
+	 *
+	 * @return int how many drafts were discarded
+	 */
+	private static function cleanup(App $kirby, array $collections, DateTimeImmutable $now): int
+	{
+		$limit = 2 * Drafts::lifetime($kirby);
+		$done = 0;
+		foreach (Drafts::all($kirby) as $record) {
+			if ($now->getTimestamp() - (int)($record['createdTs'] ?? 0) <= $limit) {
+				continue;
+			}
+			try {
+				$entry = ['route' => 'cleanup', 'user' => null, 'actor' => null];
+				if (!isset($collections[$record['collection'] ?? ''])) {
+					// The collection is no longer declared: nothing to discard by its rules, the record goes.
+					Drafts::delete($kirby, (string)$record['id']);
+					$done++;
+					continue;
+				}
+				Service::discardRecord($kirby, $collections, $record, $entry);
+				Log::write($kirby, $entry + ['status' => 200], $now);
+				$done++;
+			} catch (Throwable $e) {
+				Service::logFailure($e);
+			}
+		}
+		return $done;
+	}
+
+	/**
+	 * The checked context with every key set.
+	 *
+	 * @return array{user: User, actor: string|null, owner: string|null, ref: string|null, wait: float, canPublish: callable|null, log: array<string, scalar|null>, now: DateTimeImmutable}
+	 * @throws InvalidArgumentException
+	 */
+	private static function context(array $context): array
+	{
+		$unknown = array_diff(array_keys($context), self::CONTEXT);
+		if ($unknown !== []) {
+			throw new InvalidArgumentException('Fude: unknown context key(s): ' . implode(', ', $unknown));
+		}
+		$user = $context['user'] ?? null;
+		if (!$user instanceof User) {
+			throw new InvalidArgumentException('Fude: the context needs "user", a Kirby user');
+		}
+		$wait = $context['wait'] ?? WriteLock::WAIT;
+		if (!is_int($wait) && !is_float($wait) || $wait < 0) {
+			throw new InvalidArgumentException('Fude: "wait" is a number of seconds, 0 or more');
+		}
+		$canPublish = $context['canPublish'] ?? null;
+		if ($canPublish !== null && !is_callable($canPublish)) {
+			throw new InvalidArgumentException('Fude: "canPublish" is a callable');
+		}
+		$now = $context['now'] ?? new DateTimeImmutable('now', new DateTimeZone('Europe/Berlin'));
+		if (!$now instanceof DateTimeImmutable) {
+			throw new InvalidArgumentException('Fude: "now" is a DateTimeImmutable');
+		}
+		return [
+			'user'       => $user,
+			'actor'      => self::tag($context, 'actor', 120),
+			'owner'      => self::tag($context, 'owner', self::MAX_TAG_LENGTH),
+			'ref'        => self::tag($context, 'ref', self::MAX_TAG_LENGTH),
+			'wait'       => (float)$wait,
+			'canPublish' => $canPublish,
+			'log'        => self::logFields($context['log'] ?? []),
+			'now'        => $now,
+		];
+	}
 
 	/**
 	 * Discards a draft: with `token`, or as its owner. An expired draft can
@@ -193,119 +269,6 @@ class Actions
 	}
 
 	/**
-	 * Publishes a draft: with `token`, or as its owner. Who may publish
-	 * decides `canPublish` in the context, or the collection's
-	 * `publishRoles`. Every other check stays (age, Panel lock, unsaved
-	 * Panel changes, published content unchanged). Returns `id`, `url` and
-	 * `hash`.
-	 *
-	 * @param array{id?: mixed, token?: mixed} $input
-	 * @throws FudeError
-	 */
-	public static function publish(App $kirby, array $input, array $context): array
-	{
-		$ctx = self::context($context);
-		return self::run($kirby, 'publish', $ctx, function (array $collections, array &$entry) use ($kirby, $input, $ctx): array {
-			return WriteLock::run($kirby, function () use ($kirby, $collections, $input, $ctx, &$entry): array {
-				return Service::publish($kirby, $collections, $input, $ctx['user'], $ctx['canPublish'], $ctx['owner'], $ctx['now'], $entry);
-			}, $ctx['wait']);
-		});
-	}
-
-	/**
-	 * What this site allows: `site`, `language` and `collections` as
-	 * `GET /fude/schema` answers, without the entries of each collection
-	 * when `entries` is false.
-	 *
-	 * @param array{entries?: bool} $input
-	 * @throws FudeError
-	 */
-	public static function schema(App $kirby, array $input, array $context): array
-	{
-		$ctx = self::context($context);
-		$entries = ($input['entries'] ?? true) !== false;
-		return self::run($kirby, 'schema', $ctx, function (array $collections) use ($kirby, $entries): array {
-			return Service::schema($kirby, $collections, $entries);
-		});
-	}
-
-	/**
-	 * Discards drafts that expired more than one lifetime ago (older than
-	 * twice `draftLifetime`) by the rules of discard(): only what is still
-	 * the draft's own goes, Panel work on top stays. Until then an expired
-	 * draft can be discarded by its caller and is listed by drafts(). Runs
-	 * inside the write lock; a draft that cannot be discarded keeps its
-	 * record and is noted in the PHP error log, the call goes on.
-	 *
-	 * @return int how many drafts were discarded
-	 */
-	private static function cleanup(App $kirby, array $collections, DateTimeImmutable $now): int
-	{
-		$limit = 2 * Drafts::lifetime($kirby);
-		$done = 0;
-		foreach (Drafts::all($kirby) as $record) {
-			if ($now->getTimestamp() - (int)($record['createdTs'] ?? 0) <= $limit) {
-				continue;
-			}
-			try {
-				$entry = ['route' => 'cleanup', 'user' => null, 'actor' => null];
-				if (!isset($collections[$record['collection'] ?? ''])) {
-					// The collection is no longer declared: nothing to discard by its rules, the record goes.
-					Drafts::delete($kirby, (string)$record['id']);
-					$done++;
-					continue;
-				}
-				Service::discardRecord($kirby, $collections, $record, $entry);
-				Log::write($kirby, $entry + ['status' => 200], $now);
-				$done++;
-			} catch (Throwable $e) {
-				Service::logFailure($e);
-			}
-		}
-		return $done;
-	}
-
-	/**
-	 * The checked context with every key set.
-	 *
-	 * @return array{user: User, actor: string|null, owner: string|null, ref: string|null, wait: float, canPublish: callable|null, log: array<string, scalar|null>, now: DateTimeImmutable}
-	 * @throws InvalidArgumentException
-	 */
-	private static function context(array $context): array
-	{
-		$unknown = array_diff(array_keys($context), self::CONTEXT);
-		if ($unknown !== []) {
-			throw new InvalidArgumentException('Fude: unknown context key(s): ' . implode(', ', $unknown));
-		}
-		$user = $context['user'] ?? null;
-		if (!$user instanceof User) {
-			throw new InvalidArgumentException('Fude: the context needs "user", a Kirby user');
-		}
-		$wait = $context['wait'] ?? WriteLock::WAIT;
-		if (!is_int($wait) && !is_float($wait) || $wait < 0) {
-			throw new InvalidArgumentException('Fude: "wait" is a number of seconds, 0 or more');
-		}
-		$canPublish = $context['canPublish'] ?? null;
-		if ($canPublish !== null && !is_callable($canPublish)) {
-			throw new InvalidArgumentException('Fude: "canPublish" is a callable');
-		}
-		$now = $context['now'] ?? new DateTimeImmutable('now', new DateTimeZone('Europe/Berlin'));
-		if (!$now instanceof DateTimeImmutable) {
-			throw new InvalidArgumentException('Fude: "now" is a DateTimeImmutable');
-		}
-		return [
-			'user'       => $user,
-			'actor'      => self::tag($context, 'actor', 120),
-			'owner'      => self::tag($context, 'owner', self::MAX_TAG_LENGTH),
-			'ref'        => self::tag($context, 'ref', self::MAX_TAG_LENGTH),
-			'wait'       => (float)$wait,
-			'canPublish' => $canPublish,
-			'log'        => self::logFields($context['log'] ?? []),
-			'now'        => $now,
-		];
-	}
-
-	/**
 	 * @return array<string, scalar|null>
 	 * @throws InvalidArgumentException
 	 */
@@ -323,6 +286,26 @@ class Actions
 			}
 		}
 		return $fields;
+	}
+
+	/**
+	 * Publishes a draft: with `token`, or as its owner. Who may publish
+	 * decides `canPublish` in the context, or the collection's
+	 * `publishRoles`. Every other check stays (age, Panel lock, unsaved
+	 * Panel changes, published content unchanged). Returns `id`, `url` and
+	 * `hash`.
+	 *
+	 * @param array{id?: mixed, token?: mixed} $input
+	 * @throws FudeError
+	 */
+	public static function publish(App $kirby, array $input, array $context): array
+	{
+		$ctx = self::context($context);
+		return self::run($kirby, 'publish', $ctx, function (array $collections, array &$entry) use ($kirby, $input, $ctx): array {
+			return WriteLock::run($kirby, function () use ($kirby, $collections, $input, $ctx, &$entry): array {
+				return Service::publish($kirby, $collections, $input, $ctx['user'], $ctx['canPublish'], $ctx['owner'], $ctx['now'], $entry);
+			}, $ctx['wait']);
+		});
 	}
 
 	/**
@@ -355,6 +338,23 @@ class Actions
 			Log::write($kirby, $entry + ['status' => 500, 'error' => $e::class . ': ' . $e->getMessage()], $now);
 			throw $e;
 		}
+	}
+
+	/**
+	 * What this site allows: `site`, `language` and `collections` as
+	 * `GET /fude/schema` answers, without the entries of each collection
+	 * when `entries` is false.
+	 *
+	 * @param array{entries?: bool} $input
+	 * @throws FudeError
+	 */
+	public static function schema(App $kirby, array $input, array $context): array
+	{
+		$ctx = self::context($context);
+		$entries = ($input['entries'] ?? true) !== false;
+		return self::run($kirby, 'schema', $ctx, function (array $collections) use ($kirby, $entries): array {
+			return Service::schema($kirby, $collections, $entries);
+		});
 	}
 
 	/**

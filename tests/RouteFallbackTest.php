@@ -17,6 +17,28 @@ use Sayamaapps\Fude\Service;
 #[RunTestsInSeparateProcesses]
 final class RouteFallbackTest extends TestCase
 {
+	public function testAnUnknownPathIsStillTheReal404(): void
+	{
+		[$tmp, $app] = fude_fixture();
+		try {
+			App::plugin('test/later', extends: ['routes' => [
+				['pattern' => 'fude/extra', 'method' => 'GET', 'action' => fn () => 'LATER GET'],
+			]]);
+			$expected = Service::notFound();
+			same([404, 'Fixture 404'], [$expected->code(), $expected->body()], 'The real 404 is the error page');
+			foreach ([['GET', 'fude/unknown'], ['GET', 'fude'], ['POST', 'fude/extra'], ['GET', 'fude/draft'], ['GET', 'fude/extra/more'], ['DELETE', 'fude/schema']] as [$method, $path]) {
+				$response = $app(['method' => $method, 'url' => 'http://example.invalid/' . $path])->render();
+				same(
+					[$expected->code(), $expected->body(), $expected->type()],
+					[$response->code(), $response->body(), $response->type()],
+					$method . ' ' . $path . ' answers as before'
+				);
+			}
+		} finally {
+			cleanup($tmp);
+		}
+	}
+
 	public function testARouteOfAPluginLoadedAfterFudeIsReachable(): void
 	{
 		[$tmp, $app] = fude_fixture();
@@ -42,28 +64,6 @@ final class RouteFallbackTest extends TestCase
 			// Fude's own routes stay Fude's.
 			[$code, $json] = fude_call($app, 'schema');
 			same([200, true], [$code, $json['ok']], 'The schema route is Fude\'s');
-		} finally {
-			cleanup($tmp);
-		}
-	}
-
-	public function testAnUnknownPathIsStillTheReal404(): void
-	{
-		[$tmp, $app] = fude_fixture();
-		try {
-			App::plugin('test/later', extends: ['routes' => [
-				['pattern' => 'fude/extra', 'method' => 'GET', 'action' => fn () => 'LATER GET'],
-			]]);
-			$expected = Service::notFound();
-			same([404, 'Fixture 404'], [$expected->code(), $expected->body()], 'The real 404 is the error page');
-			foreach ([['GET', 'fude/unknown'], ['GET', 'fude'], ['POST', 'fude/extra'], ['GET', 'fude/draft'], ['GET', 'fude/extra/more'], ['DELETE', 'fude/schema']] as [$method, $path]) {
-				$response = $app(['method' => $method, 'url' => 'http://example.invalid/' . $path])->render();
-				same(
-					[$expected->code(), $expected->body(), $expected->type()],
-					[$response->code(), $response->body(), $response->type()],
-					$method . ' ' . $path . ' answers as before'
-				);
-			}
 		} finally {
 			cleanup($tmp);
 		}

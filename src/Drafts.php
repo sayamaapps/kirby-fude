@@ -24,13 +24,23 @@ class Drafts
 {
 	public const DEFAULT_LIFETIME = 48 * 3600;
 
-	/** Refuses a draft older than its lifetime (`draftLifetime`, 48 hours by default). */
-	public static function checkAge(App $kirby, array $record, \DateTimeImmutable $now): void
+	/**
+	 * Every readable draft record, newest first. A file that is no record
+	 * (not JSON, no id) is skipped.
+	 *
+	 * @return list<array<string, mixed>>
+	 */
+	public static function all(App $kirby): array
 	{
-		$lifetime = self::lifetime($kirby);
-		if ($now->getTimestamp() - (int)($record['createdTs'] ?? 0) > $lifetime) {
-			throw FudeError::t('draft.expired', ['hours' => (int)round($lifetime / 3600)], 410);
+		$records = [];
+		foreach (glob(self::directory($kirby) . '/*.json') ?: [] as $file) {
+			$json = json_decode((string)@file_get_contents($file), true);
+			if (is_array($json) && is_string($json['id'] ?? null) && basename($file) === $json['id'] . '.json') {
+				$records[] = $json;
+			}
 		}
+		usort($records, fn (array $a, array $b): int => [(int)($b['createdTs'] ?? 0), (string)$b['id']] <=> [(int)($a['createdTs'] ?? 0), (string)$a['id']]);
+		return $records;
 	}
 
 	/**
@@ -54,35 +64,13 @@ class Drafts
 		self::checkToken($record, $token);
 	}
 
-	/**
-	 * Every readable draft record, newest first. A file that is no record
-	 * (not JSON, no id) is skipped.
-	 *
-	 * @return list<array<string, mixed>>
-	 */
-	public static function all(App $kirby): array
+	/** Refuses a draft older than its lifetime (`draftLifetime`, 48 hours by default). */
+	public static function checkAge(App $kirby, array $record, \DateTimeImmutable $now): void
 	{
-		$records = [];
-		foreach (glob(self::directory($kirby) . '/*.json') ?: [] as $file) {
-			$json = json_decode((string)@file_get_contents($file), true);
-			if (is_array($json) && is_string($json['id'] ?? null) && basename($file) === $json['id'] . '.json') {
-				$records[] = $json;
-			}
+		$lifetime = self::lifetime($kirby);
+		if ($now->getTimestamp() - (int)($record['createdTs'] ?? 0) > $lifetime) {
+			throw FudeError::t('draft.expired', ['hours' => (int)round($lifetime / 3600)], 410);
 		}
-		usort($records, fn (array $a, array $b): int => [(int)($b['createdTs'] ?? 0), (string)$b['id']] <=> [(int)($a['createdTs'] ?? 0), (string)$a['id']]);
-		return $records;
-	}
-
-	/** When the draft can no longer be published, as ISO 8601. */
-	public static function expiresAt(App $kirby, array $record): string
-	{
-		return date(DATE_ATOM, (int)($record['createdTs'] ?? 0) + self::lifetime($kirby));
-	}
-
-	/** Whether the draft is older than its lifetime (checkAge() would refuse it). */
-	public static function isExpired(App $kirby, array $record, \DateTimeImmutable $now): bool
-	{
-		return $now->getTimestamp() - (int)($record['createdTs'] ?? 0) > self::lifetime($kirby);
 	}
 
 	/** Constant-time comparison of the confirmation token. */
@@ -118,6 +106,18 @@ class Drafts
 	public static function directory(App $kirby): string
 	{
 		return Options::directory($kirby) . '/drafts';
+	}
+
+	/** When the draft can no longer be published, as ISO 8601. */
+	public static function expiresAt(App $kirby, array $record): string
+	{
+		return date(DATE_ATOM, (int)($record['createdTs'] ?? 0) + self::lifetime($kirby));
+	}
+
+	/** Whether the draft is older than its lifetime (checkAge() would refuse it). */
+	public static function isExpired(App $kirby, array $record, \DateTimeImmutable $now): bool
+	{
+		return $now->getTimestamp() - (int)($record['createdTs'] ?? 0) > self::lifetime($kirby);
 	}
 
 	/** How long a draft stays publishable, in seconds. */

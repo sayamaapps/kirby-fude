@@ -97,108 +97,6 @@ final class ActionsTest extends TestCase
 		same('Ada Beispiel', $results['actions']['rows'][2]['name'], 'The new row is there');
 	}
 
-	/** F2: the schema, with and without entries, and the entries of one collection. */
-	public function testSchemaAndEntries(): void
-	{
-		[$tmp, $app] = fude_fixture();
-		try {
-			$kirby = $app();
-			[, $json] = fude_call($app, 'schema');
-			$schema = Actions::schema($kirby, [], self::as($kirby));
-			same(null, $kirby->user(), 'The call ran as Kirby, and only the call');
-			same(json_decode(json_encode($json['collections']), true), json_decode(json_encode($schema['collections']), true), 'Same collections as the route');
-			same([$json['site'], $json['language']], [$schema['site'], $schema['language']], 'Same site and language');
-
-			$bare = json_decode(json_encode(Actions::schema($kirby, ['entries' => false], self::as($kirby))['collections']), true);
-			same(false, array_key_exists('entries', $bare['team']), 'Without entries');
-			$withEntries = json_decode(json_encode($json['collections']), true);
-			unset($withEntries['team']['entries'], $withEntries['aktuelles']['entries'], $withEntries['ohnebild']['entries'], $withEntries['news']['entries']);
-			same($withEntries, $bare, 'Otherwise the same declaration');
-
-			$team = Actions::entries($kirby, ['collection' => 'team'], self::as($kirby));
-			same(['collection' => 'team', 'entries' => $json['collections']['team']['entries'], 'openDraft' => null], $team, 'Entries as in the schema, nothing open');
-			$one = Actions::entries($kirby, ['collection' => 'team', 'key' => ' veronika beispiel '], self::as($kirby));
-			same(['Veronika Beispiel'], array_column($one['entries'], 'name'), 'Filtered by key');
-			same(404, self::refused(fn () => Actions::entries($kirby, ['collection' => 'team', 'key' => 'Nobody'], self::as($kirby)), 'Unknown key')->status, 'Unknown key: 404');
-			same(422, self::refused(fn () => Actions::entries($kirby, ['collection' => 'team', 'key' => ['x']], self::as($kirby)), 'Bad key')->status, 'A key that is no text: 422');
-			same(404, self::refused(fn () => Actions::entries($kirby, ['collection' => 'nope'], self::as($kirby)), 'Unknown collection')->status, 'Unknown collection: 404');
-			same(['collection' => 'news', 'entries' => [], 'openDraft' => null, 'openDrafts' => []], Actions::entries($kirby, ['collection' => 'news'], self::as($kirby)), 'A pages collection lists open drafts per entry');
-
-			$log = fude_log($tmp);
-			same(['schema', 'schema', 'schema', 'entries', 'entries', 'entries', 'entries', 'entries', 'entries'], array_column($log, 'route'), 'Every call logged');
-			same([200, 404], [$log[4]['status'], $log[5]['status']], 'with its outcome');
-			same('veronika beispiel', $log[4]['key'], 'and the key filter, trimmed');
-		} finally {
-			cleanup($tmp);
-		}
-	}
-
-	/** F3: owner and ref are stored with the draft and filter the drafts list; the route stores neither. */
-	public function testOwnerAndRefAreStoredAndFiltered(): void
-	{
-		[$tmp, $app] = fude_fixture();
-		try {
-			$kirby = $app();
-			$a = Actions::draft($kirby, ['collection' => 'team', 'action' => 'update', 'key' => 'Jörg Muster', 'fields' => ['rolle' => 'Chefarzt']], self::as($kirby, ['owner' => 'user-1', 'ref' => 'link-a']));
-			$b = Actions::draft($app(), ['collection' => 'aktuelles', 'fields' => ['titel' => 'Sprechstunde', 'text' => 'Neu.']], self::as($kirby, ['owner' => 'user-1', 'ref' => 'link-b'], 1));
-			[, $rest] = fude_call($app, 'draft', ['collection' => 'news', 'fields' => ['title' => 'Urlaub', 'text' => 'Zu.']]);
-
-			same(['user-1', 'link-a'], [$a['draft']['owner'], $a['draft']['ref']], 'The reply carries the tags');
-			$record = Drafts::read($app(), $a['draft']['id']);
-			same(['user-1', 'link-a'], [$record['owner'], $record['ref']], 'The record stores them');
-			$restRecord = Drafts::read($app(), $rest['draft']['id']);
-			same([false, false], [array_key_exists('owner', $restRecord), array_key_exists('ref', $restRecord)], 'A route draft has no tags');
-			same(false, array_key_exists('owner', $rest['draft']), 'and the route reply is as before');
-
-			$list = Actions::drafts($app(), [], self::as($kirby, ['owner' => 'user-1'], 2));
-			same([$b['draft']['id'], $a['draft']['id']], array_column($list['drafts'], 'id'), 'The owner\'s drafts, newest first');
-			same([false, false], [isset($list['drafts'][0]['token']), $list['drafts'][0]['expired']], 'without token, not expired');
-			same(date(DATE_ATOM, $list['drafts'][0]['createdTs'] + Drafts::DEFAULT_LIFETIME), $list['drafts'][0]['expiresAt'], 'with the end of its lifetime');
-			same([$a['draft']['id']], array_column(Actions::drafts($app(), ['ref' => 'link-a'], self::as($kirby, ['owner' => 'user-1']))['drafts'], 'id'), 'Filtered by ref');
-			same([$b['draft']['id']], array_column(Actions::drafts($app(), ['collection' => 'aktuelles'], self::as($kirby, ['owner' => 'user-1']))['drafts'], 'id'), 'Filtered by collection');
-			same([], Actions::drafts($app(), [], self::as($kirby, ['owner' => 'user-2']))['drafts'], 'Another owner sees none');
-			throws(fn () => Actions::drafts($app(), [], self::as($kirby)), 'needs an owner', 'Listing needs an owner', InvalidArgumentException::class);
-		} finally {
-			cleanup($tmp);
-		}
-	}
-
-	/** F3: publish and discard by owner match without token; another or an empty owner is refused; the token works as before. */
-	public function testPublishAndDiscardByOwner(): void
-	{
-		[$tmp, $app] = fude_fixture();
-		try {
-			$kirby = $app();
-			$own = self::as($kirby, ['owner' => 'user-1']);
-			$a = Actions::draft($kirby, ['collection' => 'team', 'action' => 'update', 'key' => 'Jörg Muster', 'fields' => ['rolle' => 'Chefarzt']], $own);
-			$id = $a['draft']['id'];
-
-			$other = self::refused(fn () => Actions::publish($app(), ['id' => $id], self::as($kirby, ['owner' => 'user-2'])), 'Other owner');
-			same([404, 'Unknown draft "' . $id . '".'], [$other->status, $other->getMessage()], 'Another owner: as an unknown draft');
-			$none = self::refused(fn () => Actions::publish($app(), ['id' => $id], self::as($kirby, ['owner' => ''])), 'Empty owner');
-			same([403, 'The confirmation token does not match this draft.'], [$none->status, $none->getMessage()], 'An empty owner needs the token');
-			same(403, self::refused(fn () => Actions::discard($app(), ['id' => $id], self::as($kirby)), 'No owner')->status, 'No owner, no token: 403');
-			same(403, self::refused(fn () => Actions::publish($app(), ['id' => $id, 'token' => 'wrong'], $own), 'Wrong token')->status, 'A given token is checked, owner or not');
-			[$code, $json] = fude_call($app, 'publish', ['id' => $id]);
-			same([403, false], [$code, $json['ok']], 'The route without token: 403 as before');
-
-			$published = Actions::publish($app(), ['id' => $id], $own);
-			same($id, $published['id'], 'The owner publishes without token');
-			same('Chefarzt', self::rows($app(), 'standort', 'team')[0]['rolle'], 'and the change is live');
-
-			$b = Actions::draft($app(), ['collection' => 'team', 'action' => 'update', 'key' => 'Jörg Muster', 'fields' => ['rolle' => 'Oberarzt']], $own);
-			same(['id' => $b['draft']['id'], 'kept' => false], Actions::discard($app(), ['id' => $b['draft']['id']], $own), 'The owner discards without token');
-			same(false, $app()->page('standort')->version('changes')->exists(), 'and the draft is gone');
-
-			// A tagged draft still takes its token on the route.
-			$c = Actions::draft($app(), ['collection' => 'team', 'action' => 'update', 'key' => 'Jörg Muster', 'fields' => ['rolle' => 'Hausarzt']], $own);
-			[$code, $json] = fude_call($app, 'publish', ['id' => $c['draft']['id'], 'token' => $c['token']]);
-			same([200, true], [$code, $json['ok']], 'Token on the route');
-		} finally {
-			cleanup($tmp);
-		}
-	}
-
 	/** F3: an expired draft cannot be published but can be discarded, by token and by owner. */
 	public function testAnExpiredDraftCanBeDiscarded(): void
 	{
@@ -279,6 +177,62 @@ final class ActionsTest extends TestCase
 		}
 	}
 
+	/** F4: the lock wait of the context is honoured: 1 s answers 503 after about 1 s. */
+	public function testLockWait(): void
+	{
+		[$tmp, $app] = fude_fixture();
+		try {
+			$kirby = $app();
+			mkdir($tmp . '/storage/fude', 0775, true);
+			$other = fopen($tmp . '/storage/fude/write.lock', 'c');
+			same(true, flock($other, LOCK_EX), 'The test holds the lock');
+			try {
+				$start = microtime(true);
+				$e = self::refused(fn () => Actions::draft($kirby, ['collection' => 'team', 'action' => 'update', 'key' => 'Jörg Muster', 'fields' => ['rolle' => 'Chefarzt']], self::as($kirby, ['wait' => 1])), 'Busy');
+				$took = microtime(true) - $start;
+				same([503, 'Another change is being saved right now. Try again in a moment.'], [$e->status, $e->getMessage()], 'Busy');
+				ok($took >= 0.95 && $took < 3, 'after about one second', $took);
+				same(503, fude_log($tmp)[0]['status'], 'Logged');
+			} finally {
+				flock($other, LOCK_UN);
+				fclose($other);
+			}
+			same(false, $app()->page('standort')->version('changes')->exists(), 'Nothing stored');
+		} finally {
+			cleanup($tmp);
+		}
+	}
+
+	/** F3: owner and ref are stored with the draft and filter the drafts list; the route stores neither. */
+	public function testOwnerAndRefAreStoredAndFiltered(): void
+	{
+		[$tmp, $app] = fude_fixture();
+		try {
+			$kirby = $app();
+			$a = Actions::draft($kirby, ['collection' => 'team', 'action' => 'update', 'key' => 'Jörg Muster', 'fields' => ['rolle' => 'Chefarzt']], self::as($kirby, ['owner' => 'user-1', 'ref' => 'link-a']));
+			$b = Actions::draft($app(), ['collection' => 'aktuelles', 'fields' => ['titel' => 'Sprechstunde', 'text' => 'Neu.']], self::as($kirby, ['owner' => 'user-1', 'ref' => 'link-b'], 1));
+			[, $rest] = fude_call($app, 'draft', ['collection' => 'news', 'fields' => ['title' => 'Urlaub', 'text' => 'Zu.']]);
+
+			same(['user-1', 'link-a'], [$a['draft']['owner'], $a['draft']['ref']], 'The reply carries the tags');
+			$record = Drafts::read($app(), $a['draft']['id']);
+			same(['user-1', 'link-a'], [$record['owner'], $record['ref']], 'The record stores them');
+			$restRecord = Drafts::read($app(), $rest['draft']['id']);
+			same([false, false], [array_key_exists('owner', $restRecord), array_key_exists('ref', $restRecord)], 'A route draft has no tags');
+			same(false, array_key_exists('owner', $rest['draft']), 'and the route reply is as before');
+
+			$list = Actions::drafts($app(), [], self::as($kirby, ['owner' => 'user-1'], 2));
+			same([$b['draft']['id'], $a['draft']['id']], array_column($list['drafts'], 'id'), 'The owner\'s drafts, newest first');
+			same([false, false], [isset($list['drafts'][0]['token']), $list['drafts'][0]['expired']], 'without token, not expired');
+			same(date(DATE_ATOM, $list['drafts'][0]['createdTs'] + Drafts::DEFAULT_LIFETIME), $list['drafts'][0]['expiresAt'], 'with the end of its lifetime');
+			same([$a['draft']['id']], array_column(Actions::drafts($app(), ['ref' => 'link-a'], self::as($kirby, ['owner' => 'user-1']))['drafts'], 'id'), 'Filtered by ref');
+			same([$b['draft']['id']], array_column(Actions::drafts($app(), ['collection' => 'aktuelles'], self::as($kirby, ['owner' => 'user-1']))['drafts'], 'id'), 'Filtered by collection');
+			same([], Actions::drafts($app(), [], self::as($kirby, ['owner' => 'user-2']))['drafts'], 'Another owner sees none');
+			throws(fn () => Actions::drafts($app(), [], self::as($kirby)), 'needs an owner', 'Listing needs an owner', InvalidArgumentException::class);
+		} finally {
+			cleanup($tmp);
+		}
+	}
+
 	/** F4: the 423 for unsaved changes names the Fude draft behind them; entries() shows what holds a page. */
 	public function testPendingNamesTheBlockingDraft(): void
 	{
@@ -320,27 +274,37 @@ final class ActionsTest extends TestCase
 		}
 	}
 
-	/** F4: the lock wait of the context is honoured: 1 s answers 503 after about 1 s. */
-	public function testLockWait(): void
+	/** F3: publish and discard by owner match without token; another or an empty owner is refused; the token works as before. */
+	public function testPublishAndDiscardByOwner(): void
 	{
 		[$tmp, $app] = fude_fixture();
 		try {
 			$kirby = $app();
-			mkdir($tmp . '/storage/fude', 0775, true);
-			$other = fopen($tmp . '/storage/fude/write.lock', 'c');
-			same(true, flock($other, LOCK_EX), 'The test holds the lock');
-			try {
-				$start = microtime(true);
-				$e = self::refused(fn () => Actions::draft($kirby, ['collection' => 'team', 'action' => 'update', 'key' => 'Jörg Muster', 'fields' => ['rolle' => 'Chefarzt']], self::as($kirby, ['wait' => 1])), 'Busy');
-				$took = microtime(true) - $start;
-				same([503, 'Another change is being saved right now. Try again in a moment.'], [$e->status, $e->getMessage()], 'Busy');
-				ok($took >= 0.95 && $took < 3, 'after about one second', $took);
-				same(503, fude_log($tmp)[0]['status'], 'Logged');
-			} finally {
-				flock($other, LOCK_UN);
-				fclose($other);
-			}
-			same(false, $app()->page('standort')->version('changes')->exists(), 'Nothing stored');
+			$own = self::as($kirby, ['owner' => 'user-1']);
+			$a = Actions::draft($kirby, ['collection' => 'team', 'action' => 'update', 'key' => 'Jörg Muster', 'fields' => ['rolle' => 'Chefarzt']], $own);
+			$id = $a['draft']['id'];
+
+			$other = self::refused(fn () => Actions::publish($app(), ['id' => $id], self::as($kirby, ['owner' => 'user-2'])), 'Other owner');
+			same([404, 'Unknown draft "' . $id . '".'], [$other->status, $other->getMessage()], 'Another owner: as an unknown draft');
+			$none = self::refused(fn () => Actions::publish($app(), ['id' => $id], self::as($kirby, ['owner' => ''])), 'Empty owner');
+			same([403, 'The confirmation token does not match this draft.'], [$none->status, $none->getMessage()], 'An empty owner needs the token');
+			same(403, self::refused(fn () => Actions::discard($app(), ['id' => $id], self::as($kirby)), 'No owner')->status, 'No owner, no token: 403');
+			same(403, self::refused(fn () => Actions::publish($app(), ['id' => $id, 'token' => 'wrong'], $own), 'Wrong token')->status, 'A given token is checked, owner or not');
+			[$code, $json] = fude_call($app, 'publish', ['id' => $id]);
+			same([403, false], [$code, $json['ok']], 'The route without token: 403 as before');
+
+			$published = Actions::publish($app(), ['id' => $id], $own);
+			same($id, $published['id'], 'The owner publishes without token');
+			same('Chefarzt', self::rows($app(), 'standort', 'team')[0]['rolle'], 'and the change is live');
+
+			$b = Actions::draft($app(), ['collection' => 'team', 'action' => 'update', 'key' => 'Jörg Muster', 'fields' => ['rolle' => 'Oberarzt']], $own);
+			same(['id' => $b['draft']['id'], 'kept' => false], Actions::discard($app(), ['id' => $b['draft']['id']], $own), 'The owner discards without token');
+			same(false, $app()->page('standort')->version('changes')->exists(), 'and the draft is gone');
+
+			// A tagged draft still takes its token on the route.
+			$c = Actions::draft($app(), ['collection' => 'team', 'action' => 'update', 'key' => 'Jörg Muster', 'fields' => ['rolle' => 'Hausarzt']], $own);
+			[$code, $json] = fude_call($app, 'publish', ['id' => $c['draft']['id'], 'token' => $c['token']]);
+			same([200, true], [$code, $json['ok']], 'Token on the route');
 		} finally {
 			cleanup($tmp);
 		}
@@ -371,6 +335,42 @@ final class ActionsTest extends TestCase
 			$e = self::refused(fn () => Actions::publish($app(), ['id' => $b['draft']['id']], self::as($kirby, ['owner' => 'user-1', 'canPublish' => fn () => false])), 'Callback no');
 			same([403, 'This account may not publish this collection.'], [$e->status, $e->getMessage()], 'A no refuses');
 			same(true, $app()->page('standort')->version('changes')->exists(), 'The draft stays');
+		} finally {
+			cleanup($tmp);
+		}
+	}
+
+	/** F2: the schema, with and without entries, and the entries of one collection. */
+	public function testSchemaAndEntries(): void
+	{
+		[$tmp, $app] = fude_fixture();
+		try {
+			$kirby = $app();
+			[, $json] = fude_call($app, 'schema');
+			$schema = Actions::schema($kirby, [], self::as($kirby));
+			same(null, $kirby->user(), 'The call ran as Kirby, and only the call');
+			same(json_decode(json_encode($json['collections']), true), json_decode(json_encode($schema['collections']), true), 'Same collections as the route');
+			same([$json['site'], $json['language']], [$schema['site'], $schema['language']], 'Same site and language');
+
+			$bare = json_decode(json_encode(Actions::schema($kirby, ['entries' => false], self::as($kirby))['collections']), true);
+			same(false, array_key_exists('entries', $bare['team']), 'Without entries');
+			$withEntries = json_decode(json_encode($json['collections']), true);
+			unset($withEntries['team']['entries'], $withEntries['aktuelles']['entries'], $withEntries['ohnebild']['entries'], $withEntries['news']['entries']);
+			same($withEntries, $bare, 'Otherwise the same declaration');
+
+			$team = Actions::entries($kirby, ['collection' => 'team'], self::as($kirby));
+			same(['collection' => 'team', 'entries' => $json['collections']['team']['entries'], 'openDraft' => null], $team, 'Entries as in the schema, nothing open');
+			$one = Actions::entries($kirby, ['collection' => 'team', 'key' => ' veronika beispiel '], self::as($kirby));
+			same(['Veronika Beispiel'], array_column($one['entries'], 'name'), 'Filtered by key');
+			same(404, self::refused(fn () => Actions::entries($kirby, ['collection' => 'team', 'key' => 'Nobody'], self::as($kirby)), 'Unknown key')->status, 'Unknown key: 404');
+			same(422, self::refused(fn () => Actions::entries($kirby, ['collection' => 'team', 'key' => ['x']], self::as($kirby)), 'Bad key')->status, 'A key that is no text: 422');
+			same(404, self::refused(fn () => Actions::entries($kirby, ['collection' => 'nope'], self::as($kirby)), 'Unknown collection')->status, 'Unknown collection: 404');
+			same(['collection' => 'news', 'entries' => [], 'openDraft' => null, 'openDrafts' => []], Actions::entries($kirby, ['collection' => 'news'], self::as($kirby)), 'A pages collection lists open drafts per entry');
+
+			$log = fude_log($tmp);
+			same(['schema', 'schema', 'schema', 'entries', 'entries', 'entries', 'entries', 'entries', 'entries'], array_column($log, 'route'), 'Every call logged');
+			same([200, 404], [$log[4]['status'], $log[5]['status']], 'with its outcome');
+			same('veronika beispiel', $log[4]['key'], 'and the key filter, trimmed');
 		} finally {
 			cleanup($tmp);
 		}

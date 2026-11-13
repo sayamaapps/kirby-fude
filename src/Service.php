@@ -58,10 +58,10 @@ class Service
 	/** Most rows one replace may carry, with or without maxEntries. */
 	public const MAX_REPLACE_ENTRIES = 100;
 	public const ROLE = 'fude';
-	public const ROUTES = ['schema', 'draft', 'publish', 'discard'];
 
 	/** The prefix of the names of Fude's own routes (config/routes.php). */
 	public const ROUTE_NAME = 'sayamaapps.fude.';
+	public const ROUTES = ['schema', 'draft', 'publish', 'discard'];
 
 	/** Who spoke on the channel: a short tag like "telegram:123" — for the log only. */
 	private static function actor(array $input): string|null
@@ -185,40 +185,6 @@ class Service
 			// Names the Fude draft that holds the page, so the caller can finish or discard it.
 			throw FudeError::t('draft.pending', [], 423, isset($open['id']) ? ['draft' => $open] : []);
 		}
-	}
-
-	/**
-	 * What holds the page's changes version, if anything does: the Fude
-	 * draft on it (`id`, `owner`, `preview`; never the token), or
-	 * `['panel' => true]` for unsaved Panel changes without a Fude draft;
-	 * null when the page has no unsaved changes. Of several drafts on the
-	 * page, the one whose content is there unchanged, else the newest.
-	 *
-	 * @internal
-	 * @return array{id?: string, owner?: string|null, preview?: string|null, panel?: true}|null
-	 */
-	public static function openDraft(Page $page): array|null
-	{
-		$changes = $page->version('changes');
-		if (!$changes->exists() || $changes->isIdentical('latest')) {
-			return null;
-		}
-		$hash = self::changesHash($changes);
-		$found = null;
-		foreach (Drafts::all($page->kirby()) as $record) {
-			if (($record['page'] ?? null) !== $page->id() || ($record['changesHash'] ?? null) === null || $record['action'] === 'delete') {
-				continue;
-			}
-			if (hash_equals((string)$record['changesHash'], $hash)) {
-				$found = $record;
-				break;
-			}
-			$found ??= $record;
-		}
-		if ($found === null) {
-			return ['panel' => true];
-		}
-		return ['id' => (string)$found['id'], 'owner' => $found['owner'] ?? null, 'preview' => $found['preview'] ?? null];
 	}
 
 	private static function checkHash(App $kirby, array $collection, array $record, Page|null $target): void
@@ -1037,6 +1003,23 @@ class Service
 		return is_string($uuid) && $uuid !== '' ? 'file://' . $uuid : null;
 	}
 
+	/**
+	 * The `key` that filters entries(): a text for a single-field key, an
+	 * object with every key field for a composite key.
+	 *
+	 * @internal
+	 * @return string|array<string, string>
+	 * @throws FudeError 422
+	 */
+	public static function filterKey(array $collection, mixed $key): string|array
+	{
+		if (count(Content::keyFields($collection)) === 1 && (!is_string($key) || trim($key) === '')) {
+			throw FudeError::t('collection.filterKey', ['field' => Content::keyLabel($collection)]);
+		}
+		$key = self::requestKey($collection, 'entries', $key);
+		return is_array($key) ? array_map('trim', $key) : trim($key);
+	}
+
 	/** Whether the connection comes from a listed proxy (`sayamaapps.fude.trustedProxies`, by REMOTE_ADDR). */
 	public static function fromTrustedProxy(App $kirby): bool
 	{
@@ -1071,6 +1054,16 @@ class Service
 			throw FudeError::t('request.json', [], 400);
 		}
 		return $data;
+	}
+
+	/**
+	 * The reply text of an unexpected failure: "nothing changed" only where
+	 * it is certain. A draft undoes itself, a publish or discard can fail
+	 * half-way.
+	 */
+	private static function internalError(string $route): string
+	{
+		return in_array($route, ['schema', 'draft'], true) ? 'draft.internal' : 'request.internal';
 	}
 
 	private static function isBlank(mixed $value): bool
@@ -1140,6 +1133,16 @@ class Service
 		return Response::json($data, $status, true, $headers);
 	}
 
+	/**
+	 * A failure for the PHP error log, with the place it came from.
+	 *
+	 * @internal
+	 */
+	public static function logFailure(Throwable $e): void
+	{
+		error_log('Fude: ' . $e::class . ': ' . $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine());
+	}
+
 	/** Kirby's real 404: no format of its own that would reveal the module. */
 	public static function notFound(): Response
 	{
@@ -1190,6 +1193,40 @@ class Service
 			return null;
 		}
 		return $upload;
+	}
+
+	/**
+	 * What holds the page's changes version, if anything does: the Fude
+	 * draft on it (`id`, `owner`, `preview`; never the token), or
+	 * `['panel' => true]` for unsaved Panel changes without a Fude draft;
+	 * null when the page has no unsaved changes. Of several drafts on the
+	 * page, the one whose content is there unchanged, else the newest.
+	 *
+	 * @internal
+	 * @return array{id?: string, owner?: string|null, preview?: string|null, panel?: true}|null
+	 */
+	public static function openDraft(Page $page): array|null
+	{
+		$changes = $page->version('changes');
+		if (!$changes->exists() || $changes->isIdentical('latest')) {
+			return null;
+		}
+		$hash = self::changesHash($changes);
+		$found = null;
+		foreach (Drafts::all($page->kirby()) as $record) {
+			if (($record['page'] ?? null) !== $page->id() || ($record['changesHash'] ?? null) === null || $record['action'] === 'delete') {
+				continue;
+			}
+			if (hash_equals((string)$record['changesHash'], $hash)) {
+				$found = $record;
+				break;
+			}
+			$found ??= $record;
+		}
+		if ($found === null) {
+			return ['panel' => true];
+		}
+		return ['id' => (string)$found['id'], 'owner' => $found['owner'] ?? null, 'preview' => $found['preview'] ?? null];
 	}
 
 	/**
@@ -1478,23 +1515,6 @@ class Service
 	}
 
 	/**
-	 * The `key` that filters entries(): a text for a single-field key, an
-	 * object with every key field for a composite key.
-	 *
-	 * @internal
-	 * @return string|array<string, string>
-	 * @throws FudeError 422
-	 */
-	public static function filterKey(array $collection, mixed $key): string|array
-	{
-		if (count(Content::keyFields($collection)) === 1 && (!is_string($key) || trim($key) === '')) {
-			throw FudeError::t('collection.filterKey', ['field' => Content::keyLabel($collection)]);
-		}
-		$key = self::requestKey($collection, 'entries', $key);
-		return is_array($key) ? array_map('trim', $key) : trim($key);
-	}
-
-	/**
 	 * The `key` of an update or delete: a text for a single-field key, an
 	 * object with every key field for a composite key (also as a JSON string,
 	 * like `fields`). No other fields, no blank part.
@@ -1577,26 +1597,6 @@ class Service
 			// rest of the request as Kirby, as it always did.
 			$kirby->impersonate('kirby');
 		}
-	}
-
-	/**
-	 * The reply text of an unexpected failure: "nothing changed" only where
-	 * it is certain. A draft undoes itself, a publish or discard can fail
-	 * half-way.
-	 */
-	private static function internalError(string $route): string
-	{
-		return in_array($route, ['schema', 'draft'], true) ? 'draft.internal' : 'request.internal';
-	}
-
-	/**
-	 * A failure for the PHP error log, with the place it came from.
-	 *
-	 * @internal
-	 */
-	public static function logFailure(Throwable $e): void
-	{
-		error_log('Fude: ' . $e::class . ': ' . $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine());
 	}
 
 	/** The route entry point: one request, with the current time in Europe/Berlin. */
