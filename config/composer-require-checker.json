@@ -26,6 +26,8 @@
 		"Kirby\\Form\\Form",
 		"Kirby\\Http\\Request\\Auth\\BasicAuth",
 		"Kirby\\Http\\Response",
+		"Kirby\\Http\\Route",
+		"Kirby\\Http\\Router",
 		"Kirby\\Text\\KirbyTag",
 		"Kirby\\Toolkit\\I18n",
 		"Kirby\\Toolkit\\Str",

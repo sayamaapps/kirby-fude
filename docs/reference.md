@@ -113,3 +113,74 @@ An `update` or `delete` addresses the entry with `key`: the text for a single-fi
 ## Schema fields
 
 `GET /fude/schema` lists per field: `type`, `label`, `required`, `description`, `maxlength`, `options` (select, page), `format`, `maxWidth` and `formats` (image), `min`, `max`. `ask`, `requiredWhen` and `askWhen` appear only when set.
+
+## PHP API
+
+`Sayamaapps\Fude\Actions` is the PHP API for other entry points: what the routes do, callable without HTTP. The routes call it too, so every entry point checks, locks and logs the same way. Fude must be active (`sayamaapps.fude.active`); the API does not check it, the caller does. How a caller authenticates its users is the caller's business; the API trusts the context it is given.
+
+Every method is static and takes `(App $kirby, array $input, array $context)`; `draft()` takes the uploads as a fourth argument.
+
+| Method | Input | Returns |
+|---|---|---|
+| `schema()` | `entries` (default `true`; `false` leaves out the entries of every collection) | `site`, `language`, `collections`, as `GET /fude/schema` |
+| `entries()` | `collection`, `key` (optional: only that entry; a text, or an object of every part for a composite key) | `collection`, `entries` (as in the schema), `openDraft`; for a pages collection also `openDrafts` |
+| `draft()` | as `POST /fude/draft`; uploads in `$files` | `draft` (the record without token), `token`, `preview` |
+| `publish()` | `id`, `token` (or none, as the owner) | `id`, `url`, `hash` |
+| `discard()` | `id`, `token` (or none, as the owner) | `id`, `kept` |
+| `drafts()` | `collection`, `ref` (both optional filters) | `drafts`: the owner's drafts, newest first |
+
+**Context:**
+
+| Key | Type | Meaning |
+|---|---|---|
+| `user` | Kirby `User`, required | The acting account: stored with a new draft, logged, and checked against `publishRoles` |
+| `actor` | `?string`, at most 120 characters | Who spoke on the channel; log and record only |
+| `owner` | `?string`, at most 200 characters | Opaque tag stored with a new draft, for example a user id. `publish()` and `discard()` accept a draft without its token when the context has the same non-empty `owner`; `drafts()` lists by it |
+| `ref` | `?string`, at most 200 characters | Second opaque tag stored with a new draft, for example a connection id; a filter of `drafts()` |
+| `wait` | number of seconds, default `30` | How long a write waits for the write lock before it answers 503 |
+| `canPublish` | `?callable(User $user, array $draft): bool` | Who may publish, instead of the collection's `publishRoles`. `$draft` is the record without token. Every other publish check stays |
+| `log` | `array<string, scalar\|null>` | Extra fields for the log line, after `actor`; Fude's own field names are refused |
+| `now` | `?DateTimeImmutable` | The time of the call; default now |
+
+Tags and text values may not contain control characters. A context that breaks these rules, or has an unknown key, throws `InvalidArgumentException` before anything is done or logged; so does `drafts()` without an `owner`.
+
+**Uploads:** `$files` maps the form part name to one `$_FILES` entry (`name`, `type`, `tmp_name`, `error`, `size`): `image`, or `image0`, `image1`, … for a create with `entries`. Nothing is read from the request.
+
+**Draft access:** with a `token` in the input, the token is checked (403 when wrong), with or without an owner. Without a token, a context `owner` equal to the record's `owner` is enough; a different owner gets the answer of an unknown draft (404). Without token and owner: 403. The routes never set `owner`, so their drafts are confirmed by token only, as before. An expired draft can no longer be published (410) but can still be discarded.
+
+**Open drafts:** `openDraft` is what holds a page's unsaved changes: the Fude draft (`id`, `owner`, `preview`), `{"panel": true}` for unsaved Panel changes without a Fude draft, or `null`. While it is not `null`, a draft for that page answers 423 `draft.pending`, and the reply names the Fude draft in `draft` when there is one. In a pages collection every entry is a page of its own: `openDraft` is `null`, and `openDrafts` lists `key` and `openDraft` of each entry that has unsaved changes.
+
+**Drafts list:** each item is the record without token plus `expiresAt` (ISO 8601) and `expired` (`true`: discard only).
+
+**Cleanup:** each `draft()` first discards drafts that are older than twice `draftLifetime` (96 hours by default), by the rules of `discard()`: only what is still the draft's own goes, Panel work on top stays (`kept`). Until then an expired draft can be discarded and is listed. Each cleanup writes a log line with `route: cleanup`.
+
+**Errors:** `FudeError` (a `RuntimeException`) for what the caller can act on: the message is translated (`sayamaapps.fude.language`), `status` is the HTTP status the route would answer, `data` holds extra reply fields (the current `hash` of a 409, the `draft` of a 423). Anything else is an internal error; it is logged like a route's 500 and thrown on.
+
+**Log:** each call writes one line to `storage/fude/log.jsonl`: `route` (the method name), `user`, `actor`, the extra `log` fields, then collection, action, key and draft id as known, and `status` (and `error`).
+
+**Example**, a form on the site that proposes a change and publishes it after a second click:
+
+```php
+use Sayamaapps\Fude\Actions;
+use Sayamaapps\Fude\FudeError;
+
+$context = [
+    'user'  => $kirby->user(),              // the logged-in editor
+    'owner' => $kirby->user()->id(),
+    'ref'   => 'form',
+    'wait'  => 5,
+    'log'   => ['channel' => 'form'],
+];
+try {
+    $reply = Actions::draft($kirby, [
+        'collection' => 'menu',
+        'action'     => 'update',
+        'key'        => 'Gasthaus Salad',
+        'fields'     => ['price' => '9.50'],
+    ], $context);
+    // show $reply['preview']; later, on confirmation:
+    Actions::publish($kirby, ['id' => $reply['draft']['id']], $context);
+} catch (FudeError $e) {
+    // $e->getMessage(), $e->status, $e->data
+}
+```

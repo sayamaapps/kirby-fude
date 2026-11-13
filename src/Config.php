@@ -797,8 +797,9 @@ class Config
 	/**
 	 * What a reader may know: the declaration as JSON plus the current
 	 * entries (key and text fields only — never files, never other fields).
+	 * Without $withEntries the declaration alone, without the entries.
 	 */
-	public static function schema(App $kirby, array $collections): array
+	public static function schema(App $kirby, array $collections, bool $withEntries = true): array
 	{
 		$out = [];
 		foreach ($collections as $name => $collection) {
@@ -847,7 +848,7 @@ class Config
 				'actions'     => $collection['actions'],
 				'key'         => $collection['key'],
 				'fields'      => (object)$fields,
-				'entries'     => self::entries($kirby, $collection),
+				...($withEntries ? ['entries' => self::entries($kirby, $collection)] : []),
 			];
 			if (isset($collection['maxEntries'])) {
 				$entry['maxEntries'] = $collection['maxEntries'];
@@ -861,7 +862,7 @@ class Config
 				$entry['touch'] = $collection['touch']['field'];
 			}
 			// A date the bot may choose (draft parameter `touch`), with its published value.
-			$touch = $collection['touch'] ?? [];
+			$touch = (array)($collection['touch'] ?? []);
 			if (($touch['editable'] ?? false) === true) {
 				$entry['touchDate'] = [
 					'label'       => $touch['label'] ?? null,

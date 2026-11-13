@@ -14,6 +14,8 @@ use Kirby\Content\Version;
 use Kirby\Form\Form;
 use Kirby\Http\Request\Auth\BasicAuth;
 use Kirby\Http\Response;
+use Kirby\Http\Route;
+use Kirby\Http\Router;
 use Kirby\Toolkit\Str;
 use Kirby\Uuid\Uuids;
 use Throwable;
@@ -57,6 +59,9 @@ class Service
 	public const MAX_REPLACE_ENTRIES = 100;
 	public const ROLE = 'fude';
 	public const ROUTES = ['schema', 'draft', 'publish', 'discard'];
+
+	/** The prefix of the names of Fude's own routes (config/routes.php). */
+	public const ROUTE_NAME = 'sayamaapps.fude.';
 
 	/** Who spoke on the channel: a short tag like "telegram:123" — for the log only. */
 	private static function actor(array $input): string|null
@@ -175,10 +180,45 @@ class Service
 	private static function checkEditable(Page $page): void
 	{
 		self::checkLock($page);
-		$changes = $page->version('changes');
-		if ($changes->exists() && !$changes->isIdentical('latest')) {
-			throw FudeError::t('draft.pending', [], 423);
+		$open = self::openDraft($page);
+		if ($open !== null) {
+			// Names the Fude draft that holds the page, so the caller can finish or discard it.
+			throw FudeError::t('draft.pending', [], 423, isset($open['id']) ? ['draft' => $open] : []);
 		}
+	}
+
+	/**
+	 * What holds the page's changes version, if anything does: the Fude
+	 * draft on it (`id`, `owner`, `preview`; never the token), or
+	 * `['panel' => true]` for unsaved Panel changes without a Fude draft;
+	 * null when the page has no unsaved changes. Of several drafts on the
+	 * page, the one whose content is there unchanged, else the newest.
+	 *
+	 * @internal
+	 * @return array{id?: string, owner?: string|null, preview?: string|null, panel?: true}|null
+	 */
+	public static function openDraft(Page $page): array|null
+	{
+		$changes = $page->version('changes');
+		if (!$changes->exists() || $changes->isIdentical('latest')) {
+			return null;
+		}
+		$hash = self::changesHash($changes);
+		$found = null;
+		foreach (Drafts::all($page->kirby()) as $record) {
+			if (($record['page'] ?? null) !== $page->id() || ($record['changesHash'] ?? null) === null || $record['action'] === 'delete') {
+				continue;
+			}
+			if (hash_equals((string)$record['changesHash'], $hash)) {
+				$found = $record;
+				break;
+			}
+			$found ??= $record;
+		}
+		if ($found === null) {
+			return ['panel' => true];
+		}
+		return ['id' => (string)$found['id'], 'owner' => $found['owner'] ?? null, 'preview' => $found['preview'] ?? null];
 	}
 
 	private static function checkHash(App $kirby, array $collection, array $record, Page|null $target): void
@@ -287,6 +327,17 @@ class Service
 	/** @throws FudeError */
 	private static function collection(array $collections, mixed $name): array
 	{
+		return self::collectionNamed($collections, $name);
+	}
+
+	/**
+	 * The declared collection of that name.
+	 *
+	 * @internal
+	 * @throws FudeError 404
+	 */
+	public static function collectionNamed(array $collections, mixed $name): array
+	{
 		if (!is_string($name) || !isset($collections[$name])) {
 			throw FudeError::t('collection.unknown', ['name' => is_scalar($name) ? (string)$name : '?'], 404);
 		}
@@ -390,12 +441,31 @@ class Service
 		return [[...$ctx->rows, ...$new], null];
 	}
 
-	/** @SuppressWarnings(PHPMD.UnusedFormalParameter) the time stays in the signature shared with draft() and publish(). */
-	private static function discard(App $kirby, array $collections, array $input, DateTimeImmutable $now, array &$entry): array
+	/**
+	 * Discards a draft, expired or not: with its token, or as its owner
+	 * (Drafts::checkAccess()). Called by Actions::discard() inside the write
+	 * lock, as Kirby.
+	 *
+	 * @internal
+	 */
+	public static function discard(App $kirby, array $collections, array $input, string|null $owner, array &$entry): array
 	{
 		$record = Drafts::read($kirby, (string)($input['id'] ?? ''));
 		$entry += ['draft' => $record['id'], 'collection' => $record['collection'], 'action' => $record['action'], 'key' => $record['key']];
-		Drafts::checkToken($record, $input['token'] ?? null);
+		Drafts::checkAccess($record, $input['token'] ?? null, $owner);
+		return self::discardRecord($kirby, $collections, $record, $entry);
+	}
+
+	/**
+	 * Removes what the draft left on its page, as far as it is still the
+	 * draft's own (a Panel editor's work on top stays: `kept`), and then the
+	 * record. Also what the cleanup of long-expired drafts does.
+	 *
+	 * @internal
+	 */
+	public static function discardRecord(App $kirby, array $collections, array $record, array &$entry): array
+	{
+		$entry += ['draft' => $record['id'], 'collection' => $record['collection'], 'action' => $record['action'], 'key' => $record['key']];
 		$collection = self::collection($collections, $record['collection']);
 		$kept = false;   // a Panel editor's work on top of the draft stays, so does a draft the Panel used
 		$removed = false; // our draft's changes version went: its files may go with it
@@ -459,7 +529,15 @@ class Service
 		return ['id' => $record['id'], 'kept' => $kept];
 	}
 
-	private static function draft(App $kirby, array $collections, array $input, DateTimeImmutable $now, array &$entry): array
+	/**
+	 * A draft from the checked input. Called by Actions::draft() inside the
+	 * write lock, as Kirby.
+	 *
+	 * @internal
+	 * @param array<string, mixed> $files the form parts with uploads (`image`, `image<n>`), as Kirby's request has them
+	 * @param array<string, string> $tags `owner` and `ref` for the record, only those that are set
+	 */
+	public static function draft(App $kirby, array $collections, array $input, array $files, array $tags, DateTimeImmutable $now, array &$entry): array
 	{
 		$collection = self::collection($collections, $input['collection'] ?? null);
 		$entry['collection'] = $collection['name'];
@@ -481,7 +559,7 @@ class Service
 		}
 		// The date a touch sets: today, or the day the draft names (editable touch only).
 		$touch = self::touch($kirby, $collection, $input['touch'] ?? null, $now);
-		$upload = self::upload($kirby);
+		$upload = self::upload($files);
 		$entries = null;
 		if ($action === 'delete') {
 			// The key says which entry; anything else would be a second, unasked change.
@@ -506,7 +584,7 @@ class Service
 			$clean = Validator::check($collection, $fields, $action, self::today($kirby, $now));
 		}
 		// The images of several new entries, `image<n>` for entry n; refused for every other draft.
-		$uploads = self::uploads($kirby, $action === 'create' ? count($entries ?? []) : 0);
+		$uploads = self::uploads($files, $action === 'create' ? count($entries ?? []) : 0);
 		[$imageField, $format, $formats] = self::checkUploads($kirby, $collection, $upload, $uploads);
 		if (in_array($action, ['create', 'update'], true) && $clean === [] && $upload === null && $entries === null) {
 			throw FudeError::t('fields.empty');
@@ -523,7 +601,7 @@ class Service
 		Drafts::prepare($kirby);
 
 		if ($collection['kind'] === 'page') {
-			return self::draftSinglePage($kirby, $collection, $clean, $touch, $now, $entry);
+			return self::draftSinglePage($kirby, $collection, $clean, $touch, $tags, $now, $entry);
 		}
 		$context = new DraftContext($kirby, $collection, $page, $rows, $index, $clean, $action, $now, $entry);
 		$context->upload = $upload;
@@ -533,6 +611,7 @@ class Service
 		$context->imageField = $imageField;
 		$context->entries = $entries;
 		$context->touched = $touch;
+		$context->tags = $tags;
 		return $collection['kind'] === 'structure' ? self::draftStructure($context) : self::draftPage($context);
 	}
 
@@ -724,7 +803,7 @@ class Service
 	 * into the page's changes version, which carries the WHOLE page — like a
 	 * structure draft, with no key and no rows.
 	 */
-	private static function draftSinglePage(App $kirby, array $collection, array $clean, array $touched, DateTimeImmutable $now, array &$entry): array
+	private static function draftSinglePage(App $kirby, array $collection, array $clean, array $touched, array $tags, DateTimeImmutable $now, array &$entry): array
 	{
 		$page = Content::page($kirby, $collection);
 		self::checkEditable($page);
@@ -755,6 +834,7 @@ class Service
 				'preview'     => $changes->url(),
 				'user'        => $entry['user'],
 				'actor'       => $entry['actor'],
+				...$tags,
 			], $now);
 			$entry['draft'] = $record['id'];
 			return ['draft' => Drafts::public($record), 'token' => $record['token'], 'preview' => $record['preview']];
@@ -1060,12 +1140,6 @@ class Service
 		return Response::json($data, $status, true, $headers);
 	}
 
-	/** A failure for the PHP error log, with the place it came from. */
-	private static function logFailure(Throwable $e): void
-	{
-		error_log('Fude: ' . $e::class . ': ' . $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine());
-	}
-
 	/** Kirby's real 404: no format of its own that would reveal the module. */
 	public static function notFound(): Response
 	{
@@ -1073,6 +1147,34 @@ class Service
 		$page = App::instance()->site()->errorPage();
 
 		return new Response($page?->render() ?? '', 'text/html', 404);
+	}
+
+	/**
+	 * The answer for a path under /fude/ that no Fude route serves: Kirby's
+	 * real 404, as notFound() — unless a route of another plugin or of the
+	 * site config matches the path and the request method. Then the router
+	 * goes on to that route (Route::next()). Without this, Fude's catch-all
+	 * would hide such a route whenever Kirby loads Fude first.
+	 *
+	 * @internal
+	 */
+	public static function notFoundOrNext(string $path): Response
+	{
+		$kirby = App::instance();
+		$others = array_values(array_filter(
+			$kirby->extensions('routes'),
+			fn (mixed $route): bool => is_array($route) && !str_starts_with((string)($route['name'] ?? ''), self::ROUTE_NAME)
+		));
+		try {
+			(new Router($others))->find($path, $kirby->request()->method());
+			$found = true;
+		} catch (Throwable) {
+			$found = false;
+		}
+		if ($found) {
+			Route::next();
+		}
+		return self::notFound();
 	}
 
 	/** One entry of $_FILES as Kirby hands it over (a list means the first), or null for no upload. */
@@ -1112,14 +1214,26 @@ class Service
 		return $changes->exists() ? ($changes->read() ?? []) : null;
 	}
 
-	private static function publish(App $kirby, array $collections, array $input, User $user, DateTimeImmutable $now, array &$entry): array
+	/**
+	 * Publishes a draft: with its token, or as its owner
+	 * (Drafts::checkAccess()). Who may publish decides $canPublish, or
+	 * without it the collection's `publishRoles`. Called by
+	 * Actions::publish() inside the write lock, as Kirby.
+	 *
+	 * @internal
+	 * @param (callable(User, array): bool)|null $canPublish
+	 */
+	public static function publish(App $kirby, array $collections, array $input, User $user, callable|null $canPublish, string|null $owner, DateTimeImmutable $now, array &$entry): array
 	{
 		$record = Drafts::read($kirby, (string)($input['id'] ?? ''));
 		$entry += ['draft' => $record['id'], 'collection' => $record['collection'], 'action' => $record['action'], 'key' => $record['key']];
-		Drafts::checkToken($record, $input['token'] ?? null);
+		Drafts::checkAccess($record, $input['token'] ?? null, $owner);
 		Drafts::checkAge($kirby, $record, $now);
 		$collection = self::collection($collections, $record['collection']);
-		if (!in_array($user->role()->name(), $collection['publishRoles'], true)) {
+		$allowed = $canPublish === null
+			? in_array($user->role()->name(), $collection['publishRoles'], true)
+			: $canPublish($user, Drafts::public($record)) === true;
+		if (!$allowed) {
 			throw FudeError::t('auth.publish', [], 403);
 		}
 
@@ -1233,14 +1347,14 @@ class Service
 	}
 
 	/**
-	 * Creates the draft record with the caller's user and actor, sets the entry's
+	 * Creates the draft record with the caller's user, actor and tags, sets the entry's
 	 * draft id and returns the reply.
 	 *
-	 * @param array<string, mixed> $record the record without user and actor
+	 * @param array<string, mixed> $record the record without user, actor and tags
 	 */
 	private static function recordDraft(DraftContext $ctx, array $record, DateTimeImmutable $now): array
 	{
-		$saved = Drafts::create($ctx->kirby, [...$record, 'user' => $ctx->entry['user'], 'actor' => $ctx->entry['actor']], $now);
+		$saved = Drafts::create($ctx->kirby, [...$record, 'user' => $ctx->entry['user'], 'actor' => $ctx->entry['actor'], ...$ctx->tags], $now);
 		$ctx->entry['draft'] = $saved['id'];
 		return ['draft' => Drafts::public($saved), 'token' => $saved['token'], 'preview' => $saved['preview']];
 	}
@@ -1364,6 +1478,23 @@ class Service
 	}
 
 	/**
+	 * The `key` that filters entries(): a text for a single-field key, an
+	 * object with every key field for a composite key.
+	 *
+	 * @internal
+	 * @return string|array<string, string>
+	 * @throws FudeError 422
+	 */
+	public static function filterKey(array $collection, mixed $key): string|array
+	{
+		if (count(Content::keyFields($collection)) === 1 && (!is_string($key) || trim($key) === '')) {
+			throw FudeError::t('collection.filterKey', ['field' => Content::keyLabel($collection)]);
+		}
+		$key = self::requestKey($collection, 'entries', $key);
+		return is_array($key) ? array_map('trim', $key) : trim($key);
+	}
+
+	/**
 	 * The `key` of an update or delete: a text for a single-field key, an
 	 * object with every key field for a composite key (also as a JSON string,
 	 * like `fields`). No other fields, no blank part.
@@ -1402,7 +1533,11 @@ class Service
 		return $parts;
 	}
 
-	/** Serves one `/fude/*` route: checks the request, logs it and answers with JSON. */
+	/**
+	 * Serves one `/fude/*` route: authenticates the bot, reads the request
+	 * and answers with JSON. The work, the write lock and the log line are
+	 * Actions'; a request refused before it gets there is logged here.
+	 */
 	public static function respond(App $kirby, DateTimeImmutable $now, string $route): Response
 	{
 		if (Options::get($kirby, 'active', false) !== true || !in_array($route, self::ROUTES, true)) {
@@ -1415,38 +1550,53 @@ class Service
 			$entry['user'] = $user->email();
 			$input = self::input($kirby);
 			$entry['actor'] = self::actor($input);
-			$collections = Config::load($kirby);
-			Options::timezone($kirby); // a wrong zone is loud on every route, not only on a date
-			Options::trustedProxies($kirby); // so is a wrong proxy list
-			// Writes need permissions the bot role does not have — and must
-			// not have anywhere else. From here on everything runs as Kirby.
-			$kirby->impersonate('kirby');
-			// One write at a time: the routes that change content wait for each other.
-			$data = match ($route) {
-				'schema'  => self::schema($kirby, $collections),
-				'draft'   => WriteLock::run($kirby, function () use ($kirby, $collections, $input, $now, &$entry): array {
-					return self::draft($kirby, $collections, $input, $now, $entry);
-				}),
-				'publish' => WriteLock::run($kirby, function () use ($kirby, $collections, $input, $user, $now, &$entry): array {
-					return self::publish($kirby, $collections, $input, $user, $now, $entry);
-				}),
-				'discard' => WriteLock::run($kirby, function () use ($kirby, $collections, $input, $now, &$entry): array {
-					return self::discard($kirby, $collections, $input, $now, $entry);
-				}),
-			};
-			Log::write($kirby, $entry + ['status' => 200], $now);
-			return self::json(['ok' => true, 'format' => self::FORMAT] + $data, 200);
 		} catch (FudeError $e) {
 			Log::write($kirby, $entry + ['status' => $e->status, 'error' => $e->getMessage()], $now);
 			return self::json(['ok' => false, 'error' => $e->getMessage()] + $e->data, $e->status);
 		} catch (Throwable $e) {
 			self::logFailure($e);
 			Log::write($kirby, $entry + ['status' => 500, 'error' => $e::class . ': ' . $e->getMessage()], $now);
-			// "Nothing changed" only where it is certain: a draft undoes itself, a
-			// publish or discard can fail half-way.
-			$text = in_array($route, ['schema', 'draft'], true) ? 'draft.internal' : 'request.internal';
-			return self::json(['ok' => false, 'error' => I18n::t($text)], 500);
+			return self::json(['ok' => false, 'error' => I18n::t(self::internalError($route))], 500);
 		}
+		// The bot never sets owner or ref: its drafts are confirmed by token only.
+		$context = ['user' => $user, 'actor' => $entry['actor'], 'now' => $now];
+		try {
+			$data = match ($route) {
+				'schema'  => Actions::schema($kirby, [], $context),
+				'draft'   => Actions::draft($kirby, $input, $context, $kirby->request()->files()->data()),
+				'publish' => Actions::publish($kirby, $input, $context),
+				'discard' => Actions::discard($kirby, $input, $context),
+			};
+			return self::json(['ok' => true, 'format' => self::FORMAT] + $data, 200);
+		} catch (FudeError $e) {
+			return self::json(['ok' => false, 'error' => $e->getMessage()] + $e->data, $e->status);
+		} catch (Throwable) {
+			return self::json(['ok' => false, 'error' => I18n::t(self::internalError($route))], 500);
+		} finally {
+			// Actions runs as Kirby for the call only. The route leaves the
+			// rest of the request as Kirby, as it always did.
+			$kirby->impersonate('kirby');
+		}
+	}
+
+	/**
+	 * The reply text of an unexpected failure: "nothing changed" only where
+	 * it is certain. A draft undoes itself, a publish or discard can fail
+	 * half-way.
+	 */
+	private static function internalError(string $route): string
+	{
+		return in_array($route, ['schema', 'draft'], true) ? 'draft.internal' : 'request.internal';
+	}
+
+	/**
+	 * A failure for the PHP error log, with the place it came from.
+	 *
+	 * @internal
+	 */
+	public static function logFailure(Throwable $e): void
+	{
+		error_log('Fude: ' . $e::class . ': ' . $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine());
 	}
 
 	/** The route entry point: one request, with the current time in Europe/Berlin. */
@@ -1534,12 +1684,18 @@ class Service
 
 	// --- Routes --------------------------------------------------------------
 
-	private static function schema(App $kirby, array $collections): array
+	/**
+	 * What the site allows: the declaration, with the current entries unless
+	 * $entries is false. Called by Actions::schema().
+	 *
+	 * @internal
+	 */
+	public static function schema(App $kirby, array $collections, bool $entries = true): array
 	{
 		return [
 			'site'        => Options::siteId($kirby),
 			'language'    => I18n::language(),
-			'collections' => (object)Config::schema($kirby, $collections),
+			'collections' => (object)Config::schema($kirby, $collections, $entries),
 		];
 	}
 
@@ -1679,10 +1835,14 @@ class Service
 		return $field === null ? null : ['field' => $field, 'value' => $touched[$field]];
 	}
 
-	/** The upload named "image", or null when none was sent. */
-	private static function upload(App $kirby): array|null
+	/**
+	 * The upload named "image", or null when none was sent.
+	 *
+	 * @param array<string, mixed> $files the form parts with uploads
+	 */
+	private static function upload(array $files): array|null
 	{
-		return self::oneUpload($kirby->request()->files()->get('image'));
+		return self::oneUpload($files['image'] ?? null);
 	}
 
 	/**
@@ -1691,13 +1851,14 @@ class Service
 	 * this draft (a number too high, or any such part in another draft) is
 	 * refused.
 	 *
+	 * @param array<string, mixed> $files the form parts with uploads
 	 * @param $count how many entries the draft adds
 	 * @return array<int, array> the uploads by entry index, in order
 	 */
-	private static function uploads(App $kirby, int $count): array
+	private static function uploads(array $files, int $count): array
 	{
 		$out = [];
-		foreach ($kirby->request()->files()->data() as $name => $upload) {
+		foreach ($files as $name => $upload) {
 			if (!preg_match('/^image(0|[1-9][0-9]*)$/D', (string)$name, $match)) {
 				continue;
 			}
