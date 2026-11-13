@@ -114,7 +114,23 @@ All routes need Basic Auth. Replies are JSON with `ok`, `format` (currently 1) a
 | `POST /fude/publish` | `id`, `token`, `actor` | `id`, `url`, `hash` |
 | `POST /fude/discard` | `id`, `token`, `actor` | `id`, `kept` (`true` if a Panel editor's work stays) |
 
-Errors: 400 malformed request, 401 login, 403 HTTPS, role, token or publish permission, 404 unknown collection, entry or draft, 409 conflict (entry exists, page or its files changed, draft edited in the Panel, file used on another page), 410 draft expired or gone, 422 validation, 423 page locked or with unsaved Panel changes, 500 configuration or storage error, 503 another change is being saved right now (try again in a moment).
+Errors: 400 malformed request, 401 login, 403 HTTPS, role, token or publish permission, 404 unknown collection, entry or draft, 409 conflict (entry exists, page or its files changed, draft edited in the Panel, file used on another page), 410 draft expired or gone, 422 validation, 423 page locked or with unsaved Panel changes, 500 configuration or storage error, 503 another change is being saved right now (try again in a moment). When the unsaved changes of a 423 are a Fude draft, the reply names it in `draft` (`id`, `owner`, `preview`; never the token).
+
+Other paths under `/fude/` answer with Kirby's real 404, unless the site config or another plugin registers a route there: that route answers, although Kirby puts it after Fude's routes (plugins in load order, the site config after every plugin).
+
+## PHP API
+
+`Sayamaapps\Fude\Actions` is the PHP API for other entry points: the routes' work without HTTP, with the same checks, write lock and log line. The routes call it too.
+
+```php
+use Sayamaapps\Fude\Actions;
+
+$context = ['user' => $kirby->user('editor@example.com'), 'owner' => 'editor-1', 'log' => ['channel' => 'form']];
+$draft = Actions::draft($kirby, ['collection' => 'team', 'action' => 'update', 'key' => 'Erika Beispiel', 'fields' => ['role' => 'Kitchen']], $context);
+Actions::publish($kirby, ['id' => $draft['draft']['id']], $context); // the owner needs no token
+```
+
+`schema()`, `entries()`, `draft()`, `publish()`, `discard()` and `drafts()` take the input as an array and a context: the acting Kirby user, an `actor` tag, two opaque tags stored with a new draft (`owner`, `ref`), the write-lock wait, a publish permission callback and extra log fields. Uploads are passed in, never read from the request. Errors are `FudeError` exceptions with the translated message and the HTTP status. Details: [PHP API](docs/reference.md#php-api).
 
 ## Options
 
@@ -162,7 +178,7 @@ Routes answer 403 unless the connection itself is TLS. Behind a TLS-terminating 
 Fude processes no visitor data and stores no IP addresses, user agents or full-size photo originals. The chat side logs in with Kirby's own password check and its lockout, using an account without Panel access. On the server, Fude keeps:
 
 - Proposed content as a `changes` version or draft page, until published or discarded.
-- Draft records in `storage/fude/drafts/` (field values, account, channel tag), deleted on publish or discard.
+- Draft records in `storage/fude/drafts/` (field values, account, channel tag, and the `owner` and `ref` tags of a PHP API caller), deleted on publish or discard. A draft left alone for twice `draftLifetime` (96 h by default) is discarded by the next draft: its own changes and files go, Panel work on top stays.
 - An empty lock file `storage/fude/write.lock`, which stays.
 - A log in `storage/fude/log.jsonl`: who, when, route, collection, action, key, outcome. No field values, no images; it restarts at 4 MB.
 

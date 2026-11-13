@@ -32,6 +32,7 @@ return [
 	'collection.ambiguous' => 'Several entries with {field} "{key}" — change this one in the Panel.',
 	'collection.exists' => 'There is already an entry with {field} "{key}". Use action "update".',
 	'collection.keyTaken' => 'Another entry already has {field} "{key}". Two entries could no longer be told apart.',
+	'collection.filterKey' => 'A "key" filter names one entry: its {field}.',
 	'collection.deleteKey' => 'A delete needs "key": the {field} of the entry to delete.',
 	'collection.keyParts' => 'Action "{action}" needs "key": an object with every key field ({fields}) of the entry, e.g. {example}.',
 	'collection.deleteFields' => 'Action "delete" takes only the key: no fields, no image.',

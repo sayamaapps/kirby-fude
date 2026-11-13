@@ -10,6 +10,50 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## [1.13.0] — unreleased
+
+### Added
+
+- **A PHP API for other entry points.** `Sayamaapps\Fude\Actions` offers
+  `schema()`, `entries()`, `draft()`, `publish()`, `discard()` and
+  `drafts()` without HTTP: input as an array, uploads passed in (never read
+  from the request), and a context with the acting Kirby user, an `actor`
+  tag, two opaque tags stored with a new draft (`owner`, `ref`), the
+  write-lock wait (default 30 s), a publish permission callback (default:
+  the collection's `publishRoles`) and extra log fields. Impersonation, the
+  write lock and the log line moved from the routes into `Actions`; the
+  routes call it, so every entry point checks, locks and logs the same way.
+  See [PHP API](docs/reference.md#php-api).
+- `publish()` and `discard()` accept a draft without its token when the
+  caller's `owner` equals the draft's; another owner gets the answer of an
+  unknown draft (404). The routes never set `owner` and keep the token.
+- `drafts()` lists the drafts of an owner, optionally of one collection or
+  one `ref`, with `expiresAt` and `expired`.
+- `entries()` returns the entries of one collection, optionally only one by
+  `key`, and `openDraft`: the Fude draft (`id`, `owner`, `preview`) or the
+  unsaved Panel changes that would refuse a draft for that page.
+- `schema()` without entries (`['entries' => false]`).
+- A 423 `draft.pending` names the Fude draft behind the unsaved changes in
+  `draft` (`id`, `owner`, `preview`; never the token), as long as the
+  changes are exactly what that draft left. Any other unsaved changes
+  (Panel work, also on top of a Fude draft) answer as before.
+- Drafts left alone for twice `draftLifetime` (96 h by default) are
+  discarded by the next draft, by the rules of discard: only what is still
+  the draft's own goes, Panel work on top stays. Draft records no longer
+  pile up, and an abandoned draft no longer blocks its page for good.
+
+- Reach: unchanged, no new field type and no new route. Route JSON `format`
+  unchanged (a 423 may carry the new field `draft`; draft records of the
+  PHP API carry `owner` and `ref`).
+
+### Fixed
+
+- A route under `/fude/` that the site config registers, or a plugin that
+  Kirby loads after Fude (plugins load in folder order, the site config's
+  routes come after every plugin's), was hidden by Fude's catch-all
+  `fude/(:all?)`. It now answers; any other path under `/fude/` is still
+  Kirby's real 404, with the same status and body.
+
 ## [1.12.0] — 2026-11-10
 
 ### Added

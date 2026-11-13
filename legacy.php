@@ -16,8 +16,8 @@ use Sayamaapps\Fude\Service;
  *
  * Every 1.x class name is aliased here, eagerly. `catch` and `instanceof`
  * do not autoload, so a lazy alias would not exist before the first use of
- * the old name. The list is the 1.x class set; DraftContext, StoredFileError
- * and WriteLock are new in 2.x and have no 1.x name.
+ * the old name. The list is the 1.x class set; Actions, DraftContext,
+ * StoredFileError and WriteLock are new and have no 1.x name.
  */
 class_alias(\Sayamaapps\Fude\Blueprints::class, 'Fude\\Blueprints');
 class_alias(\Sayamaapps\Fude\Config::class, 'Fude\\Config');

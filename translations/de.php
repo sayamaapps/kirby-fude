@@ -31,6 +31,7 @@ return [
 	'collection.ambiguous' => 'Mehrere Einträge mit {field} „{key}“ — diesen bitte im Panel ändern.',
 	'collection.exists' => 'Es gibt schon einen Eintrag mit {field} „{key}“. Bitte Aktion „update“ verwenden.',
 	'collection.keyTaken' => 'Ein anderer Eintrag hat schon {field} „{key}“. Zwei Einträge ließen sich dann nicht mehr unterscheiden.',
+	'collection.filterKey' => 'Ein Filter „key“ nennt einen Eintrag: {field} des Eintrags.',
 	'collection.deleteKey' => 'Zum Löschen fehlt „key“: {field} des Eintrags, der gelöscht werden soll.',
 	'collection.keyParts' => 'Die Aktion „{action}“ braucht „key“: ein Objekt mit jedem Schlüsselfeld ({fields}) des Eintrags, z. B. {example}.',
 	'collection.deleteFields' => 'Die Aktion „delete“ braucht nur den Schlüssel: keine Felder, kein Bild.',

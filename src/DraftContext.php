@@ -30,6 +30,13 @@ class DraftContext
 	public array $formats = [];
 	public string|null $imageField = null;
 
+	/**
+	 * The caller's `owner` and `ref` for the record, only those that are set.
+	 *
+	 * @var array<string, string>
+	 */
+	public array $tags = [];
+
 	/** The values a touch collection sets with the draft. */
 	public array $touched = [];
 
