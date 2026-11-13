@@ -419,25 +419,32 @@ class Service
 		$record = Drafts::read($kirby, (string)($input['id'] ?? ''));
 		$entry += ['draft' => $record['id'], 'collection' => $record['collection'], 'action' => $record['action'], 'key' => $record['key']];
 		Drafts::checkAccess($record, $input['token'] ?? null, $owner);
+		self::collection($collections, $record['collection']);
 		return self::discardRecord($kirby, $collections, $record, $entry);
 	}
 
 	/**
 	 * Removes what the draft left on its page, as far as it is still the
 	 * draft's own (a Panel editor's work on top stays: `kept`), and then the
-	 * record. Also what the cleanup of long-expired drafts does.
+	 * record. Also what the cleanup of long-expired drafts does. A record of
+	 * a collection that is no longer declared is discarded by its own page
+	 * (`page`); when that page is gone too, only the record goes.
 	 *
 	 * @internal
 	 */
 	public static function discardRecord(App $kirby, array $collections, array $record, array &$entry): array
 	{
 		$entry += ['draft' => $record['id'], 'collection' => $record['collection'], 'action' => $record['action'], 'key' => $record['key']];
-		$collection = self::collection($collections, $record['collection']);
+		$collection = $collections[$record['collection']] ?? null;
+		$holder = null; // the page of a structure or page draft
+		if (in_array($record['kind'], ['structure', 'page'], true)) {
+			$holder = $collection !== null ? Content::page($kirby, $collection) : $kirby->site()->find((string)$record['page']);
+		}
 		$kept = false;   // a Panel editor's work on top of the draft stays, so does a draft the Panel used
 		$removed = false; // our draft's changes version went: its files may go with it
 
-		if ($record['kind'] === 'structure') {
-			$page = Content::page($kirby, $collection);
+		if ($record['kind'] === 'structure' && $holder instanceof Page) {
+			$page = $holder;
 			$changes = $page->version('changes');
 			$gone = !$changes->exists();
 			if (!$gone) {
@@ -453,9 +460,8 @@ class Service
 			// there. Its files go with it unless something uses them (an image the
 			// published page references is live now and stays: removeFile()).
 			$kept = self::removeFiles($page, $record, $removed || $gone) || $kept;
-		} elseif ($record['kind'] === 'page') {
-			$page = Content::page($kirby, $collection);
-			$changes = $page->version('changes');
+		} elseif ($record['kind'] === 'page' && $holder instanceof Page) {
+			$changes = $holder->version('changes');
 			if ($changes->exists()) {
 				// Only our own draft goes; a Panel editor's work on top stays.
 				if (hash_equals($record['changesHash'], self::changesHash($changes))) {
@@ -464,7 +470,7 @@ class Service
 					$kept = true;
 				}
 			}
-		} else {
+		} elseif ($record['kind'] === 'pages') {
 			$child = $kirby->page($record['page']);
 			if ($child instanceof Page) {
 				if ($record['action'] === 'create') {
@@ -1198,9 +1204,10 @@ class Service
 	/**
 	 * What holds the page's changes version, if anything does: the Fude
 	 * draft on it (`id`, `owner`, `preview`; never the token), or
-	 * `['panel' => true]` for unsaved Panel changes without a Fude draft;
-	 * null when the page has no unsaved changes. Of several drafts on the
-	 * page, the one whose content is there unchanged, else the newest.
+	 * `['panel' => true]` for any other unsaved changes; null when the page
+	 * has none. A draft is named only while the changes are exactly what it
+	 * left: with Panel work on top, or after the draft was published or
+	 * discarded in the Panel, a Fude discard would not free the page.
 	 *
 	 * @internal
 	 * @return array{id?: string, owner?: string|null, preview?: string|null, panel?: true}|null
@@ -1212,21 +1219,16 @@ class Service
 			return null;
 		}
 		$hash = self::changesHash($changes);
-		$found = null;
 		foreach (Drafts::all($page->kirby()) as $record) {
-			if (($record['page'] ?? null) !== $page->id() || ($record['changesHash'] ?? null) === null || $record['action'] === 'delete') {
+			// A new page keeps its draft in the published version, not in changes: never the one holding them.
+			if (($record['page'] ?? null) !== $page->id() || ($record['kind'] === 'pages' && $record['action'] === 'create')) {
 				continue;
 			}
-			if (hash_equals((string)$record['changesHash'], $hash)) {
-				$found = $record;
-				break;
+			if (is_string($record['changesHash'] ?? null) && hash_equals($record['changesHash'], $hash)) {
+				return ['id' => (string)$record['id'], 'owner' => $record['owner'] ?? null, 'preview' => $record['preview'] ?? null];
 			}
-			$found ??= $record;
 		}
-		if ($found === null) {
-			return ['panel' => true];
-		}
-		return ['id' => (string)$found['id'], 'owner' => $found['owner'] ?? null, 'preview' => $found['preview'] ?? null];
+		return ['panel' => true];
 	}
 
 	/**

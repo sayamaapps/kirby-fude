@@ -116,7 +116,7 @@ All routes need Basic Auth. Replies are JSON with `ok`, `format` (currently 1) a
 
 Errors: 400 malformed request, 401 login, 403 HTTPS, role, token or publish permission, 404 unknown collection, entry or draft, 409 conflict (entry exists, page or its files changed, draft edited in the Panel, file used on another page), 410 draft expired or gone, 422 validation, 423 page locked or with unsaved Panel changes, 500 configuration or storage error, 503 another change is being saved right now (try again in a moment). When the unsaved changes of a 423 are a Fude draft, the reply names it in `draft` (`id`, `owner`, `preview`; never the token).
 
-Other paths under `/fude/` answer with Kirby's real 404, unless the site config or another plugin registers a route there: that route answers, whichever plugin Kirby loads first.
+Other paths under `/fude/` answer with Kirby's real 404, unless the site config or another plugin registers a route there: that route answers, although Kirby puts it after Fude's routes (plugins in load order, the site config after every plugin).
 
 ## PHP API
 

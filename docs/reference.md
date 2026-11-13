@@ -148,7 +148,7 @@ Tags and text values may not contain control characters. A context that breaks t
 
 **Draft access:** with a `token` in the input, the token is checked (403 when wrong), with or without an owner. Without a token, a context `owner` equal to the record's `owner` is enough; a different owner gets the answer of an unknown draft (404). Without token and owner: 403. The routes never set `owner`, so their drafts are confirmed by token only, as before. An expired draft can no longer be published (410) but can still be discarded.
 
-**Open drafts:** `openDraft` is what holds a page's unsaved changes: the Fude draft (`id`, `owner`, `preview`), `{"panel": true}` for unsaved Panel changes without a Fude draft, or `null`. While it is not `null`, a draft for that page answers 423 `draft.pending`, and the reply names the Fude draft in `draft` when there is one. In a pages collection every entry is a page of its own: `openDraft` is `null`, and `openDrafts` lists `key` and `openDraft` of each entry that has unsaved changes.
+**Open drafts:** `openDraft` is what holds a page's unsaved changes: the Fude draft (`id`, `owner`, `preview`) while the changes are exactly what it left, `{"panel": true}` for any other unsaved changes (Panel work, also on top of a Fude draft), or `null`. While it is not `null`, a draft for that page answers 423 `draft.pending`, and the reply names the Fude draft in `draft` when there is one: discarding that draft frees the page. In a pages collection every entry is a page of its own: `openDraft` is `null`, and `openDrafts` lists `key` and `openDraft` of each entry that has unsaved changes.
 
 **Drafts list:** each item is the record without token plus `expiresAt` (ISO 8601) and `expired` (`true`: discard only).
 

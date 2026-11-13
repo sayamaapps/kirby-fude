@@ -72,8 +72,10 @@ class Actions
 	 * twice `draftLifetime`) by the rules of discard(): only what is still
 	 * the draft's own goes, Panel work on top stays. Until then an expired
 	 * draft can be discarded by its caller and is listed by drafts(). Runs
-	 * inside the write lock; a draft that cannot be discarded keeps its
-	 * record and is noted in the PHP error log, the call goes on.
+	 * inside the write lock. A draft of a collection that is no longer
+	 * declared is discarded by its own page. A draft that cannot be
+	 * discarded keeps its record and gets a log line with status 500 (and a
+	 * note in the PHP error log); the call goes on.
 	 *
 	 * @return int how many drafts were discarded
 	 */
@@ -85,19 +87,15 @@ class Actions
 			if ($now->getTimestamp() - (int)($record['createdTs'] ?? 0) <= $limit) {
 				continue;
 			}
+			// A collection that is no longer declared is discarded by the record's own page.
+			$entry = ['route' => 'cleanup', 'user' => null, 'actor' => null];
 			try {
-				$entry = ['route' => 'cleanup', 'user' => null, 'actor' => null];
-				if (!isset($collections[$record['collection'] ?? ''])) {
-					// The collection is no longer declared: nothing to discard by its rules, the record goes.
-					Drafts::delete($kirby, (string)$record['id']);
-					$done++;
-					continue;
-				}
 				Service::discardRecord($kirby, $collections, $record, $entry);
 				Log::write($kirby, $entry + ['status' => 200], $now);
 				$done++;
 			} catch (Throwable $e) {
 				Service::logFailure($e);
+				Log::write($kirby, $entry + ['status' => 500, 'error' => $e::class . ': ' . $e->getMessage()], $now);
 			}
 		}
 		return $done;
@@ -133,7 +131,8 @@ class Actions
 		}
 		return [
 			'user'       => $user,
-			'actor'      => self::tag($context, 'actor', 120),
+			// The actor follows the rule of the routes' `actor`, so a route call is never refused here.
+			'actor'      => self::tag($context, 'actor', 120, '/[\x00-\x1f]/'),
 			'owner'      => self::tag($context, 'owner', self::MAX_TAG_LENGTH),
 			'ref'        => self::tag($context, 'ref', self::MAX_TAG_LENGTH),
 			'wait'       => (float)$wait,
@@ -360,15 +359,16 @@ class Actions
 	/**
 	 * A short text tag from the context: null when missing or empty.
 	 *
+	 * @param non-empty-string $forbidden the characters it may not contain, as a pattern
 	 * @throws InvalidArgumentException
 	 */
-	private static function tag(array $context, string $name, int $max): string|null
+	private static function tag(array $context, string $name, int $max, string $forbidden = '/[\x00-\x1f\x7f]/'): string|null
 	{
 		$value = $context[$name] ?? null;
 		if ($value === null || $value === '') {
 			return null;
 		}
-		if (!is_string($value) || mb_strlen($value) > $max || preg_match('/[\x00-\x1f\x7f]/', $value)) {
+		if (!is_string($value) || mb_strlen($value) > $max || preg_match($forbidden, $value)) {
 			throw new InvalidArgumentException('Fude: "' . $name . '" is a text of at most ' . $max . ' characters without control characters');
 		}
 		return $value;

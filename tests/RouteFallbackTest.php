@@ -7,11 +7,12 @@ use PHPUnit\Framework\TestCase;
 use Sayamaapps\Fude\Service;
 
 /**
- * Fude's catch-all `fude/(:all?)` answers unknown paths under /fude/ with
- * Kirby's real 404, but it does not hide a route that another plugin or the
- * site config registers under /fude/: Kirby takes the first matching route,
- * and plugins load in folder order. Only when no other route matches does
- * the 404 come, exactly as before.
+ * F6: Fude's catch-all `fude/(:all?)` answers unknown paths under /fude/
+ * with Kirby's real 404, but it does not hide a route that another plugin
+ * or the site config registers under /fude/. Kirby takes the first matching
+ * route; plugin routes come in plugin load order (folder order), and the
+ * routes of the site config after all plugin routes. Only when no other
+ * route matches does the 404 come, exactly as before.
  */
 #[CoversClass(Service::class)]
 #[RunTestsInSeparateProcesses]
@@ -57,7 +58,7 @@ final class RouteFallbackTest extends TestCase
 			same([200, 'LATER POST 42'], $render('POST', 'fude/extra/42'), 'with its pattern and its method');
 			same([200, 'LATER GET'], $render('GET', 'fude/extra', ['fude.active' => false]), 'also with Fude switched off');
 
-			// A route of the site config comes before every plugin anyway.
+			// The routes of the site config come after every plugin's, so after Fude's catch-all too.
 			$config = ['routes' => [['pattern' => 'fude/early', 'method' => 'GET', 'action' => fn () => 'CONFIG']]];
 			same([200, 'CONFIG'], $render('GET', 'fude/early', $config), 'A config route under fude/ answers');
 

@@ -117,6 +117,23 @@ final class ActionsTest extends TestCase
 		}
 	}
 
+	/** F4: a delete draft of a structure collection is named as the draft that holds its page. */
+	public function testAStructureDeleteDraftIsNamed(): void
+	{
+		[$tmp, $app] = fude_fixture();
+		try {
+			$opt = fude_declare($tmp, 'loeschen', "['collections' => ['team' => ['kind' => 'structure', 'page' => 'standort', 'field' => 'team', 'key' => 'name', 'actions' => ['create', 'update', 'delete'], 'fields' => ['name' => ['type' => 'text', 'required' => true], 'rolle' => 'text']]]]");
+			$kirby = $app([], $opt);
+			$d = Actions::draft($kirby, ['collection' => 'team', 'action' => 'delete', 'key' => 'Veronika Beispiel'], self::as($kirby, ['owner' => 'user-1']));
+			$open = ['id' => $d['draft']['id'], 'owner' => 'user-1', 'preview' => $d['preview']];
+			same($open, Actions::entries($app([], $opt), ['collection' => 'team'], self::as($kirby))['openDraft'], 'entries() names the delete draft');
+			[$code, $json] = fude_call($app, 'draft', ['collection' => 'team', 'action' => 'update', 'key' => 'Jörg Muster', 'fields' => ['rolle' => 'Chefarzt']], options: $opt);
+			same([423, $open], [$code, $json['draft'] ?? null], 'The next draft is refused and names it');
+		} finally {
+			cleanup($tmp);
+		}
+	}
+
 	/**
 	 * F3: a draft that expired more than one lifetime ago is discarded by the
 	 * next draft: its own changes go, Panel work on top stays, the record goes.
@@ -144,6 +161,28 @@ final class ActionsTest extends TestCase
 			same('Aus dem Panel', $app()->page('home')->version('changes')->read()['leitsatz'], 'A\'s page keeps the Panel work');
 			$cleanups = array_values(array_filter(fude_log($tmp), fn (array $line) => $line['route'] === 'cleanup'));
 			same([[$b['draft']['id'], false, 200], [$a['draft']['id'], true, 200]], array_map(fn (array $l) => [$l['draft'], $l['kept'], $l['status']], $cleanups), 'Each cleanup is logged, newest first, A kept');
+		} finally {
+			cleanup($tmp);
+		}
+	}
+
+	/** F3: the cleanup discards a draft of a collection that is no longer declared, by the record's page. */
+	public function testCleanupOfAnUndeclaredCollection(): void
+	{
+		[$tmp, $app] = fude_fixture();
+		try {
+			$kirby = $app();
+			$a = Actions::draft($kirby, ['collection' => 'aktuelles', 'fields' => ['titel' => 'Sprechstunde', 'text' => 'Neu.']], self::as($kirby, ['owner' => 'user-1']));
+			same(true, $app()->page('home')->version('changes')->exists(), 'The draft is on the page');
+
+			// The declaration loses the collection; a draft 97 hours on cleans up.
+			$opt = fude_declare($tmp, 'ohne', "['collections' => ['team' => ['kind' => 'structure', 'page' => 'standort', 'field' => 'team', 'key' => 'name', 'fields' => ['name' => ['type' => 'text', 'required' => true], 'rolle' => 'text']]]]");
+			$later = $app([], $opt);
+			Actions::draft($later, ['collection' => 'team', 'action' => 'update', 'key' => 'Jörg Muster', 'fields' => ['rolle' => 'Chefarzt']], self::as($later, ['owner' => 'user-1'], 97));
+			same(false, $app()->page('home')->version('changes')->exists(), 'Its changes were discarded by the record\'s page');
+			throws(fn () => Drafts::read($app(), $a['draft']['id']), 'Unknown draft', 'and its record is gone', FudeError::class);
+			$cleanup = array_values(array_filter(fude_log($tmp), fn (array $line) => $line['route'] === 'cleanup'));
+			same([[$a['draft']['id'], 'aktuelles', false, 200]], array_map(fn (array $l) => [$l['draft'], $l['collection'], $l['kept'], $l['status']], $cleanup), 'Logged');
 		} finally {
 			cleanup($tmp);
 		}
@@ -198,6 +237,47 @@ final class ActionsTest extends TestCase
 				fclose($other);
 			}
 			same(false, $app()->page('standort')->version('changes')->exists(), 'Nothing stored');
+		} finally {
+			cleanup($tmp);
+		}
+	}
+
+	/**
+	 * F4: only a draft whose content is still there is named. Panel changes on
+	 * a new page's draft page, or after a draft was published or discarded in
+	 * the Panel, answer the 423 as before, without a draft.
+	 */
+	public function testOnlyTheDraftStillThereIsNamed(): void
+	{
+		[$tmp, $app] = fude_fixture();
+		try {
+			$kirby = $app();
+			// A new page with Panel changes on its draft page: publishing it names no draft, itself included.
+			[, $note] = fude_call($app, 'draft', ['collection' => 'news', 'fields' => ['title' => 'Urlaub', 'text' => 'Zu.']]);
+			$child = $app()->page($note['draft']['page']);
+			$child->version('changes')->save([...$child->version('latest')->read(), 'text' => 'Aus dem Panel']);
+			[$code, $json] = fude_call($app, 'publish', ['id' => $note['draft']['id'], 'token' => $note['token']]);
+			same([423, false], [$code, array_key_exists('draft', $json)], 'A new page with Panel changes: 423 without a draft');
+
+			// A structure draft published in the Panel, then new Panel changes: the old record is not named.
+			[, $a] = fude_call($app, 'draft', ['collection' => 'aktuelles', 'fields' => ['titel' => 'Sprechstunde', 'text' => 'Neu.']]);
+			$panel = $app();
+			$panel->impersonate('kirby'); // a Panel editor
+			$panel->page('home')->version('changes')->publish();
+			$home = $app()->page('home');
+			$home->version('changes')->save([...$home->version('latest')->read(), 'leitsatz' => 'Aus dem Panel']);
+			same(['panel' => true], Actions::entries($app(), ['collection' => 'aktuelles'], self::as($kirby))['openDraft'], 'Published in the Panel: Panel changes');
+			[$code, $json] = fude_call($app, 'draft', ['collection' => 'aktuelles', 'fields' => ['titel' => 'Ferien', 'text' => 'Zu.']]);
+			same([423, false], [$code, array_key_exists('draft', $json)], 'and the 423 names no draft');
+			same(true, is_array(Drafts::read($app(), $a['draft']['id'])), 'though its record is still there');
+
+			// A structure draft discarded in the Panel, then new Panel changes: the same.
+			[, $b] = fude_call($app, 'draft', ['collection' => 'team', 'action' => 'update', 'key' => 'Jörg Muster', 'fields' => ['rolle' => 'Chefarzt']]);
+			$app()->page('standort')->version('changes')->delete();
+			$standort = $app()->page('standort');
+			$standort->version('changes')->save([...$standort->version('latest')->read(), 'kurzname' => 'Panel']);
+			same(['panel' => true], Actions::entries($app(), ['collection' => 'team'], self::as($kirby))['openDraft'], 'Discarded in the Panel: Panel changes');
+			same(true, is_array(Drafts::read($app(), $b['draft']['id'])), 'though its record is still there');
 		} finally {
 			cleanup($tmp);
 		}
@@ -371,6 +451,21 @@ final class ActionsTest extends TestCase
 			same(['schema', 'schema', 'schema', 'entries', 'entries', 'entries', 'entries', 'entries', 'entries'], array_column($log, 'route'), 'Every call logged');
 			same([200, 404], [$log[4]['status'], $log[5]['status']], 'with its outcome');
 			same('veronika beispiel', $log[4]['key'], 'and the key filter, trimmed');
+		} finally {
+			cleanup($tmp);
+		}
+	}
+
+	/** F2: the route keeps its actor rule; Actions does not refuse what the route lets through. */
+	public function testTheRouteActorRuleIsUnchanged(): void
+	{
+		[$tmp, $app] = fude_fixture();
+		try {
+			[$code, $json] = fude_call($app, 'draft', ['collection' => 'aktuelles', 'fields' => ['titel' => 'Sprechstunde', 'text' => 'Neu.'], 'actor' => "chat\x7f1"]);
+			same([200, "chat\x7f1"], [$code, $json['draft']['actor'] ?? null], 'DEL passes, as before');
+			same([200, "chat\x7f1"], [fude_log($tmp)[0]['status'], fude_log($tmp)[0]['actor']], 'and is logged');
+			[$code, $json] = fude_call($app, 'draft', ['collection' => 'team', 'action' => 'update', 'key' => 'Jörg Muster', 'fields' => ['rolle' => 'Chefarzt'], 'actor' => "chat\n1"]);
+			same([400, Sayamaapps\Fude\I18n::t('request.actor')], [$code, $json['error']], 'A line break is refused, as before');
 		} finally {
 			cleanup($tmp);
 		}

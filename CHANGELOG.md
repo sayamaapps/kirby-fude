@@ -34,8 +34,9 @@ All notable changes to this project are documented here. Versions follow
   unsaved Panel changes that would refuse a draft for that page.
 - `schema()` without entries (`['entries' => false]`).
 - A 423 `draft.pending` names the Fude draft behind the unsaved changes in
-  `draft` (`id`, `owner`, `preview`; never the token). Unsaved Panel
-  changes without a Fude draft answer as before.
+  `draft` (`id`, `owner`, `preview`; never the token), as long as the
+  changes are exactly what that draft left. Any other unsaved changes
+  (Panel work, also on top of a Fude draft) answer as before.
 - Drafts left alone for twice `draftLifetime` (96 h by default) are
   discarded by the next draft, by the rules of discard: only what is still
   the draft's own goes, Panel work on top stays. Draft records no longer
@@ -47,9 +48,11 @@ All notable changes to this project are documented here. Versions follow
 
 ### Fixed
 
-- A route that the site config or another plugin registers under `/fude/`
-  was hidden by Fude's catch-all when Kirby loaded Fude first. It now
-  answers; any other path under `/fude/` is still Kirby's real 404.
+- A route under `/fude/` that the site config registers, or a plugin that
+  Kirby loads after Fude (plugins load in folder order, the site config's
+  routes come after every plugin's), was hidden by Fude's catch-all
+  `fude/(:all?)`. It now answers; any other path under `/fude/` is still
+  Kirby's real 404, with the same status and body.
 
 ## [1.12.0] — 2026-11-10
 

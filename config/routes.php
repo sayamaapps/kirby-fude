@@ -4,9 +4,9 @@ use Sayamaapps\Fude\Service;
 
 // The routes under /fude/*. Anything else under /fude/, and GET on the POST
 // routes, answer with the real 404 — unless a route of another plugin or of
-// the site config matches the path: then that route answers, whichever
-// plugin Kirby loaded first (Service::notFoundOrNext()). The names mark the
-// routes as Fude's own.
+// the site config matches the path: then that route answers, though Kirby
+// puts it after this catch-all (Service::notFoundOrNext()). The names mark
+// the routes as Fude's own.
 return function () {
 	return [
 		['pattern' => 'fude/schema',  'method' => 'GET',  'name' => Service::ROUTE_NAME . 'schema',  'action' => fn () => Service::respondNow('schema')],
