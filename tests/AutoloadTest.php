@@ -50,8 +50,8 @@ final class AutoloadTest extends TestCase
 
 		foreach (require dirname(__DIR__) . '/autoload.php' as $class => $path) {
 			$short = substr($class, strlen('sayamaapps\\fude\\'));
-			// Actions, DraftContext, StoredFileError and WriteLock are new and have no 1.x name.
-			if (in_array($short, ['actions', 'draftcontext', 'storedfileerror', 'writelock'], true)) {
+			// Actions, Compat, DraftContext, StoredFileError and WriteLock are new and have no 1.x name.
+			if (in_array($short, ['actions', 'compat', 'draftcontext', 'storedfileerror', 'writelock'], true)) {
 				continue;
 			}
 			$this->assertSame(

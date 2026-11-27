@@ -9,6 +9,7 @@
 return [
 	'sayamaapps\\fude\\actions' => 'src/Actions.php',
 	'sayamaapps\\fude\\blueprints' => 'src/Blueprints.php',
+	'sayamaapps\\fude\\compat' => 'src/Compat.php',
 	'sayamaapps\\fude\\config' => 'src/Config.php',
 	'sayamaapps\\fude\\content' => 'src/Content.php',
 	'sayamaapps\\fude\\draftcontext' => 'src/DraftContext.php',

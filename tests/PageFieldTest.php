@@ -161,7 +161,8 @@ final class PageFieldTest extends TestCase
 			$draft = $json['draft'];
 			same(['Atelier Musterstadt', 'Saal (orte/saal)'], [$draft['fields']['ort'], $draft['fields']['ortid']], 'The draft record keeps the titles');
 			$stored = $app()->page($draft['page'])->version('latest')->read();
-			same('- page://atelieruuid00001', $stored['ort'] ?? null, 'Stored as a list with the page UUID, as the Panel stores it');
+			// Kirby's own YAML: Kirby 6 quotes the UUID, Kirby 5 does not.
+			same(trim(Kirby\Data\Data::encode(['page://atelieruuid00001'], 'yaml')), $stored['ort'] ?? null, 'Stored as a list with the page UUID, as the Panel stores it');
 			same('- orte/saal', $stored['ortid'] ?? null, 'store: id stores the page id');
 			[$code, $j] = fude_call($app, 'publish', ['id' => $draft['id'], 'token' => $json['token']], options: $opt);
 			same(200, $code, 'Published', $j);

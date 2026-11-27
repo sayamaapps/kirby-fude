@@ -191,8 +191,11 @@ final class DiscardTest extends TestCase
 			same('Admin tippt noch', $app()->page($page)?->version('changes')->read()['text'] ?? null, 'Unsaved Panel changes stay');
 
 			[$page, $draft] = $create('Panel Sperre');
-			$lock = $panel()->page($page);
-			\Kirby\Data\Data::write($lock->root() . '/.lock', ['/' . $lock->id() => ['lock' => ['user' => $lock->kirby()->user(FUDE_ADMIN)->id(), 'time' => time()]]], 'yml');
+			// The lock as the Panel sets it in Kirby 5 and 6: unsaved changes of another user.
+			$kirby = $app();
+			$kirby->impersonate(FUDE_ADMIN);
+			$kirby->page($page)->version('changes')->save([...$kirby->page($page)->version('latest')->read(), 'text' => 'Admin hat die Seite offen']);
+			ok($app()->page($page)->lock()->isLocked(), 'The admin\'s changes lock the page for the bot');
 			[$code, $j] = fude_call($app, 'discard', $draft);
 			same([200, true, true], [$code, $j['kept'], $app()->page($page) !== null], 'An active Panel lock keeps the created page');
 

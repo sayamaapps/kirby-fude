@@ -201,7 +201,7 @@ final class PagesSectionTest extends TestCase
 			same(200, $code, 'Create with the last course\'s values and a new date', $json);
 			$child = $app()->page($json['draft']['page']);
 			same(
-				[true, 'kurs', '2026-11-15', '- page://atelieruuid00001', '45.5'],
+				[true, 'kurs', '2026-11-15', trim(Kirby\Data\Data::encode(['page://atelieruuid00001'], 'yaml')), '45.5'],
 				[$child->isDraft(), $child->intendedTemplate()->name(), $child->datum()->value(), $child->version('latest')->read()['ort'] ?? null, $child->preis()->value()],
 				'Draft child with the copied values'
 			);
@@ -240,9 +240,12 @@ final class PagesSectionTest extends TestCase
 			$kirby = $app();
 			$kirby->impersonate('kirby');
 			$kurse = $kirby->page('kurse');
-			same('datum', $kurse->blueprint()->toArray()['tabs']['main']['columns']['main']['sections']['kurse']['fude']['key'] ?? null, 'Marker survives in the section');
-			$section = $kurse->blueprint()->section('kurse');
-			same([7, 1], [$section?->total(), $kurse->blueprint()->section('entwuerfe')?->total()], 'Panel sections list the courses and the draft');
+			same('datum', Sayamaapps\Fude\Compat::sections($kurse)['kurse']['fude']['key'] ?? null, 'Marker survives in the section (in Kirby 6 the pagelist field)');
+			// Kirby 5 has sections, Kirby 6 list fields in their place.
+			$listed = static fn (string $name): int|null => method_exists($kurse->blueprint(), 'section')
+				? $kurse->blueprint()->section($name)?->total()
+				: Form::for($kurse)->fields()->get($name)?->models()->count();
+			same([7, 1], [$listed('kurse'), $listed('entwuerfe')], 'Panel sections list the courses and the draft');
 			ok(Form::for($kurse)->fields()->has('einleitung'), 'Panel form loads the parent');
 			ok(Form::for($kurse->children()->first())->fields()->has('datum'), 'Panel form loads a child');
 		} finally {

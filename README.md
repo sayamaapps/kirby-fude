@@ -13,7 +13,7 @@ A chat bot proposes a change, for example a new team member with a photo. Fude s
 - One log line per call: account, channel tag, route, outcome.
 - Own bot role without Panel access; HTTPS only; English and German replies.
 
-Kirby 5 · PHP 8.2 to 8.5 · `gd` (or ImageMagick) and `mbstring` · a writable `storage` root (drafts, the log and the write lock live in `<storage>/fude/`)
+Kirby 5 or 6 · PHP 8.2 to 8.5 (Kirby 6: 8.3 to 8.5) · `gd` (or ImageMagick) and `mbstring` · a writable `storage` root (drafts, the log and the write lock live in `<storage>/fude/`)
 
 ## Installation
 
@@ -31,7 +31,9 @@ As a Git submodule: `git submodule add https://github.com/sayamaapps/kirby-fude.
 
 ## Requirements
 
-Kirby 5 is supported; PHP 8.2 to 8.5 is tested in CI.
+Kirby 5 and Kirby 6 are supported. CI tests Kirby 5 on PHP 8.2 to 8.5 and Kirby 6 on PHP 8.3 to 8.5.
+
+Under Kirby 6 the blueprint markers stay the same: a `fude` marker on a `filepicker` or `pagepicker` field works like one on a `files` or `pages` field, and one on a `pagelist` field (Kirby 6's `pages` section) like one on a `pages` section.
 
 ## Usage
 

@@ -10,6 +10,17 @@ All notable changes to this project are documented here. Versions follow
 - The route JSON carries `format`; it increases only when a field is
   removed, renamed or changes meaning. New fields alone don't increase it.
 
+## [Unreleased]
+
+### Added
+
+- **Kirby 6.** Fude runs on Kirby 5 and Kirby 6 (`^5.0 || ^6.0`). Kirby 6
+  renames the `files`, `pages` and `users` fields to `filepicker`,
+  `pagepicker` and `userpicker` and turns the `pages` and `files` sections
+  into the fields `pagelist` and `filelist`; Fude reads them as the Kirby 5
+  types, so blueprints and `fude.php` need no change. The difference is kept
+  in one class, `Compat`. CI tests Kirby 6 on PHP 8.3 to 8.5.
+
 ## [1.13.0] — 2026-11-13
 
 ### Added
