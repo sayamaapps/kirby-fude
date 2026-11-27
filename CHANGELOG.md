@@ -18,8 +18,10 @@ All notable changes to this project are documented here. Versions follow
   renames the `files`, `pages` and `users` fields to `filepicker`,
   `pagepicker` and `userpicker` and turns the `pages` and `files` sections
   into the fields `pagelist` and `filelist`; Fude reads them as the Kirby 5
-  types, so blueprints and `fude.php` need no change. The difference is kept
-  in one class, `Compat`. CI tests Kirby 6 on PHP 8.3 to 8.5.
+  types, so blueprints and `fude.php` need no change. Only under Kirby 6:
+  under Kirby 5 a plugin field type of one of these names keeps its own
+  meaning. Error messages name the blueprint's own type. The difference is
+  kept in one class, `Compat`. CI tests Kirby 6 on PHP 8.3 to 8.5.
 
 ## [1.13.0] — 2026-11-13
 

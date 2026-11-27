@@ -240,7 +240,10 @@ final class PagesSectionTest extends TestCase
 			$kirby = $app();
 			$kirby->impersonate('kirby');
 			$kurse = $kirby->page('kurse');
-			same('datum', Sayamaapps\Fude\Compat::sections($kurse)['kurse']['fude']['key'] ?? null, 'Marker survives in the section (in Kirby 6 the pagelist field)');
+			// Kirby's own blueprint array: a section in Kirby 5, a pagelist field in Kirby 6.
+			$tab = $kurse->blueprint()->toArray()['tabs']['main'] ?? [];
+			$raw = fude_kirby6() ? ($tab['columns']['main']['fields']['kurse'] ?? []) : ($tab['columns']['main']['sections']['kurse'] ?? []);
+			same(['datum', fude_kirby6() ? 'pagelist' : 'pages'], [$raw['fude']['key'] ?? null, $raw['type'] ?? null], 'Marker survives in the section');
 			// Kirby 5 has sections, Kirby 6 list fields in their place.
 			$listed = static fn (string $name): int|null => method_exists($kurse->blueprint(), 'section')
 				? $kurse->blueprint()->section($name)?->total()

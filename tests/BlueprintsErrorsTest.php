@@ -27,7 +27,7 @@ const CASES = [
 	'files-on-page' => [
 		'files' => ['pages/standort.yml' => "title: Standort\nfields:\n  bild:\n    type: files\n    fude: true\n"],
 		'options' => [],
-		'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: page "standort", field "bild": files fields are only supported inside a structure or a marked pages section\'s template',
+		'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: page "standort", field "bild": {files} fields are only supported inside a structure or a marked pages section\'s template',
 	],
 	'unsupported-sub-field' => [
 		'files' => ['pages/standort.yml' => "title: Standort\nfields:\n  team:\n    type: structure\n    fude: true\n    fields:\n      stichworte:\n        type: tags\n        fude: true\n"],
@@ -58,6 +58,17 @@ const CASES = [
 		'files' => ['pages/standort.yml' => "title: Standort\nsections:\n  bilder:\n    type: files\n    fude: true\n"],
 		'options' => [],
 		'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: page "standort", section "bilder": the fude marker is only for pages sections and fields',
+	],
+	// Kirby 6 unwraps a fields section and drops its marker; Fude reads it from the file.
+	'fields-section' => [
+		'files' => ['pages/standort.yml' => "title: Standort\nsections:\n  felder:\n    type: fields\n    fude: true\n    fields:\n      n:\n        type: text\n"],
+		'options' => [],
+		'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: page "standort", section "felder": the fude marker is only for pages sections and fields',
+	],
+	'fields-section-in-tab' => [
+		'files' => ['pages/standort.yml' => "title: Standort\ntabs:\n  inhalt:\n    columns:\n      links:\n        sections:\n          felder:\n            type: fields\n            fude: {key: n}\n            fields:\n              n:\n                type: text\n"],
+		'options' => [],
+		'error' => 'The Fude configuration (blueprint markers, site/config/fude.php) is invalid: page "standort", section "felder": the fude marker is only for pages sections and fields',
 	],
 	'section-no-template' => [
 		'files' => ['pages/standort.yml' => "title: Standort\nsections:\n  seiten:\n    type: pages\n    fude: true\n"],
@@ -138,6 +149,6 @@ final class BlueprintsErrorsTest extends TestCase
 		$options = fude_declare($tmp, 'none', "['collections' => []]");
 		[$code, $json] = fude_call($app, 'schema', options: $case['options'] + $options);
 		cleanup($tmp);
-		same([500, $case['error']], [$code, $json['error'] ?? null], 'Error case ' . $name);
+		same([500, str_replace('{files}', fude_files_type(), $case['error'])], [$code, $json['error'] ?? null], 'Error case ' . $name);
 	}
 }

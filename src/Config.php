@@ -547,7 +547,7 @@ class Config
 				throw self::invalid("collection \"{$collection['name']}\": field \"$name\" is not in the blueprint");
 			}
 			$blueprintType = (string)($definition['type'] ?? '');
-			if (!in_array($blueprintType, self::COMPATIBLE[$field['type']], true)) {
+			if (!in_array(Compat::type($blueprintType), self::COMPATIBLE[$field['type']], true)) {
 				throw self::invalid("collection \"{$collection['name']}\": field \"$name\" is declared as {$field['type']} but the blueprint says $blueprintType");
 			}
 			$field['label'] = self::label($definition) ?? ucfirst($name);

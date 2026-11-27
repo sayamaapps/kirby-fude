@@ -33,7 +33,7 @@ As a Git submodule: `git submodule add https://github.com/sayamaapps/kirby-fude.
 
 Kirby 5 and Kirby 6 are supported. CI tests Kirby 5 on PHP 8.2 to 8.5 and Kirby 6 on PHP 8.3 to 8.5.
 
-Under Kirby 6 the blueprint markers stay the same: a `fude` marker on a `filepicker` or `pagepicker` field works like one on a `files` or `pages` field, and one on a `pagelist` field (Kirby 6's `pages` section) like one on a `pages` section.
+Under Kirby 6 the blueprint markers stay the same: a `fude` marker on a `filepicker` or `pagepicker` field works like one on a `files` or `pages` field, and one on a `pagelist` field (Kirby 6's `pages` section) like one on a `pages` section. Error messages name the type as the blueprint has it (`filepicker` under Kirby 6). A marker on a `fields` section is rejected under both versions; under Kirby 6 Fude reads it from the blueprint file itself, so a marked `fields` section that comes in through `extends` from another file is not noticed there.
 
 ## Usage
 

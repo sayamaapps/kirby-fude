@@ -199,6 +199,18 @@ final class DiscardTest extends TestCase
 			[$code, $j] = fude_call($app, 'discard', $draft);
 			same([200, true, true], [$code, $j['kept'], $app()->page($page) !== null], 'An active Panel lock keeps the created page');
 
+			// A lock alone, without unsaved changes: only Kirby 5 has one (an old
+			// .lock file). Kirby 6 no longer reads them; there a lock always comes
+			// with the changes covered above.
+			if (!fude_kirby6()) {
+				[$page, $draft] = $create('Nur Sperre');
+				$lock = $panel()->page($page);
+				\Kirby\Data\Data::write($lock->root() . '/.lock', ['/' . $lock->id() => ['lock' => ['user' => $lock->kirby()->user(FUDE_ADMIN)->id(), 'time' => time()]]], 'yml');
+				ok(!$app()->page($page)->version('changes')->exists(), 'No unsaved changes, only the lock');
+				[$code, $j] = fude_call($app, 'discard', $draft);
+				same([200, true, true], [$code, $j['kept'], $app()->page($page) !== null], 'A lock alone keeps the created page');
+			}
+
 			[$page, $draft] = $create('Mit Unterseite');
 			$kirby = $panel();
 			Kirby\Cms\Page::create(['parent' => $kirby->page($page), 'slug' => 'unterseite', 'template' => 'note', 'content' => ['title' => 'Unterseite'], 'isDraft' => true]);
