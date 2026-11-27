@@ -201,7 +201,7 @@ final class PagesSectionTest extends TestCase
 			same(200, $code, 'Create with the last course\'s values and a new date', $json);
 			$child = $app()->page($json['draft']['page']);
 			same(
-				[true, 'kurs', '2026-11-15', '- page://atelieruuid00001', '45.5'],
+				[true, 'kurs', '2026-11-15', trim(Kirby\Data\Data::encode(['page://atelieruuid00001'], 'yaml')), '45.5'],
 				[$child->isDraft(), $child->intendedTemplate()->name(), $child->datum()->value(), $child->version('latest')->read()['ort'] ?? null, $child->preis()->value()],
 				'Draft child with the copied values'
 			);
@@ -240,9 +240,15 @@ final class PagesSectionTest extends TestCase
 			$kirby = $app();
 			$kirby->impersonate('kirby');
 			$kurse = $kirby->page('kurse');
-			same('datum', $kurse->blueprint()->toArray()['tabs']['main']['columns']['main']['sections']['kurse']['fude']['key'] ?? null, 'Marker survives in the section');
-			$section = $kurse->blueprint()->section('kurse');
-			same([7, 1], [$section?->total(), $kurse->blueprint()->section('entwuerfe')?->total()], 'Panel sections list the courses and the draft');
+			// Kirby's own blueprint array: a section in Kirby 5, a pagelist field in Kirby 6.
+			$tab = $kurse->blueprint()->toArray()['tabs']['main'] ?? [];
+			$raw = fude_kirby6() ? ($tab['columns']['main']['fields']['kurse'] ?? []) : ($tab['columns']['main']['sections']['kurse'] ?? []);
+			same(['datum', fude_kirby6() ? 'pagelist' : 'pages'], [$raw['fude']['key'] ?? null, $raw['type'] ?? null], 'Marker survives in the section');
+			// Kirby 5 has sections, Kirby 6 list fields in their place.
+			$listed = static fn (string $name): int|null => method_exists($kurse->blueprint(), 'section')
+				? $kurse->blueprint()->section($name)?->total()
+				: Form::for($kurse)->fields()->get($name)?->models()->count();
+			same([7, 1], [$listed('kurse'), $listed('entwuerfe')], 'Panel sections list the courses and the draft');
 			ok(Form::for($kurse)->fields()->has('einleitung'), 'Panel form loads the parent');
 			ok(Form::for($kurse->children()->first())->fields()->has('datum'), 'Panel form loads a child');
 		} finally {

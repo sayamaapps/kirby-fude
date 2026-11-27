@@ -91,12 +91,12 @@ class Blueprints
 	public static function collections(App $kirby): array
 	{
 		$site = $kirby->site();
-		foreach ($site->blueprint()->fields() as $name => $definition) {
+		foreach (Compat::fields($site) as $name => $definition) {
 			if ((self::marker((array)$definition) ?? false) !== false) {
 				throw self::invalid("site fields are not supported (field \"$name\" in site.txt carries a fude marker)");
 			}
 		}
-		foreach (self::sections($site->blueprint()->toArray()) as $name => $section) {
+		foreach (Compat::sections($site) as $name => $section) {
 			if ((self::marker($section) ?? false) !== false) {
 				throw self::invalid("site sections are not supported (section \"$name\" in site.yml carries a fude marker)");
 			}
@@ -108,7 +108,7 @@ class Blueprints
 		$collections = [];
 		$claimed = [];
 		foreach ($site->index() as $page) {
-			foreach (self::sections($page->blueprint()->toArray()) as $sectionName => $section) {
+			foreach (Compat::sections($page) as $sectionName => $section) {
 				$marker = self::marker($section);
 				if ($marker === null || $marker === false) {
 					continue;
@@ -129,7 +129,7 @@ class Blueprints
 				continue;
 			}
 			$pageFields = [];
-			foreach ($page->blueprint()->fields() as $fieldName => $definition) {
+			foreach (Compat::fields($page) as $fieldName => $definition) {
 				// Kirby keeps the blueprint's spelling ("leitsatzHervor"); content keys are lower case.
 				$fieldName = strtolower((string)$fieldName);
 				$definition = (array)$definition;
@@ -182,7 +182,7 @@ class Blueprints
 		if ($type !== 'image') {
 			$only = array_intersect(self::IMAGE_OPTIONS, array_keys($marker));
 			if ($only !== []) {
-				throw self::invalid("$where: " . implode(', ', $only) . ' is only for files fields');
+				throw self::invalid("$where: " . implode(', ', $only) . ' is only for ' . Compat::typeName('files') . ' fields');
 			}
 		}
 		foreach (self::IMAGE_OPTIONS as $option) {
@@ -199,12 +199,12 @@ class Blueprints
 	 */
 	private static function fudeType(string $where, string $blueprintType, bool $images): string
 	{
-		$type = self::TYPES[$blueprintType] ?? null;
+		$type = self::TYPES[Compat::type($blueprintType)] ?? null;
 		if ($type === null) {
 			throw self::invalid("$where: type \"$blueprintType\" is not supported by fude");
 		}
 		if ($type === 'image' && !$images) {
-			throw self::invalid("$where: files fields are only supported inside a structure or a marked pages section's template");
+			throw self::invalid("$where: $blueprintType fields are only supported inside a structure or a marked pages section's template");
 		}
 		return $type;
 	}
@@ -265,7 +265,7 @@ class Blueprints
 	private static function pages(Page $page, string $section, array $definition, array $marker): array
 	{
 		$where = 'page "' . $page->id() . '", section "' . $section . '"';
-		if (($definition['type'] ?? null) !== 'pages') {
+		if (Compat::type($definition['type'] ?? null) !== 'pages') {
 			throw self::invalid("$where: the fude marker is only for pages sections and fields");
 		}
 		self::checkOptions($marker, self::SECTION_OPTIONS, $where);
@@ -289,7 +289,7 @@ class Blueprints
 		// The child blueprint, read from an unsaved page as Config does it.
 		$probe = Page::factory(['slug' => 'fude-probe', 'template' => $template, 'parent' => $page, 'isDraft' => true]);
 		$fields = ['title' => ['type' => 'text', 'description' => '']];
-		foreach ($probe->blueprint()->fields() as $fieldName => $field) {
+		foreach (Compat::fields($probe) as $fieldName => $field) {
 			$fieldName = strtolower((string)$fieldName);
 			$field = (array)$field;
 			$fieldMarker = self::marker($field);
@@ -323,27 +323,6 @@ class Blueprints
 		return $collection;
 	}
 
-	/**
-	 * The sections of a blueprint (tabs, columns, sections as Kirby
-	 * normalises them), as name => definition.
-	 *
-	 * @return array<string, array>
-	 */
-	private static function sections(array $blueprint): array
-	{
-		$sections = [];
-		foreach ((array)($blueprint['tabs'] ?? []) as $tab) {
-			foreach ((array)(is_array($tab) ? ($tab['columns'] ?? []) : []) as $column) {
-				foreach ((array)(is_array($column) ? ($column['sections'] ?? []) : []) as $name => $section) {
-					if (is_array($section)) {
-						$sections[(string)$name] = $section;
-					}
-				}
-			}
-		}
-		return $sections;
-	}
-
 	/** @return array<string, mixed> one structure collection, its sub-fields mapped */
 	private static function structure(Page $page, string $field, array $definition, array $marker): array
 	{
@@ -360,13 +339,13 @@ class Blueprints
 				continue;
 			}
 			$subType = (string)($sub['type'] ?? '');
-			if (!isset(self::TYPES[$subType])) {
+			if (!isset(self::TYPES[Compat::type($subType)])) {
 				if ($subMarker !== null) {
 					throw self::invalid("$subWhere: type \"$subType\" is not supported by fude");
 				}
 				continue; // unmapped and unmarked: not part of the declaration
 			}
-			if ($subType === 'pages' && $subMarker === null) {
+			if (Compat::type($subType) === 'pages' && $subMarker === null) {
 				// Only when marked: Fude sets one page out of a query, which an
 				// unmarked pages field need not be.
 				continue;

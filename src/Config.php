@@ -118,7 +118,7 @@ class Config
 	{
 		$page = self::model($kirby, $collection);
 		if ($collection['kind'] === 'structure') {
-			$field = $page->blueprint()->field($collection['field']);
+			$field = Compat::field($page, $collection['field']);
 			if (($field['type'] ?? null) !== 'structure') {
 				throw self::invalid("collection \"{$collection['name']}\": \"{$collection['field']}\" is not a structure field of \"{$collection['page']}\"");
 			}
@@ -129,7 +129,7 @@ class Config
 			return $fields;
 		}
 		$fields = [];
-		foreach ($page->blueprint()->fields() as $fieldName => $definition) {
+		foreach (Compat::fields($page) as $fieldName => $definition) {
 			$fields[strtolower((string)$fieldName)] = (array)$definition;
 		}
 		if ($collection['kind'] === 'pages') {
@@ -547,7 +547,7 @@ class Config
 				throw self::invalid("collection \"{$collection['name']}\": field \"$name\" is not in the blueprint");
 			}
 			$blueprintType = (string)($definition['type'] ?? '');
-			if (!in_array($blueprintType, self::COMPATIBLE[$field['type']], true)) {
+			if (!in_array(Compat::type($blueprintType), self::COMPATIBLE[$field['type']], true)) {
 				throw self::invalid("collection \"{$collection['name']}\": field \"$name\" is declared as {$field['type']} but the blueprint says $blueprintType");
 			}
 			$field['label'] = self::label($definition) ?? ucfirst($name);
@@ -1033,7 +1033,7 @@ class Config
 			throw self::invalid("collection \"$name\": touch value must be \"today\"");
 		}
 		$page = $kirby->site()->find($collection['page']);
-		$definition = $page instanceof Page ? ($page->blueprint()->fields()[$field] ?? null) : null;
+		$definition = $page instanceof Page ? (Compat::fields($page)[$field] ?? null) : null;
 		if (!is_array($definition)) {
 			throw self::invalid("collection \"$name\": touch field \"$field\" is not in the blueprint of \"{$collection['page']}\"");
 		}

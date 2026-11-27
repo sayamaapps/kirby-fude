@@ -112,8 +112,10 @@ final class TimeToggleTest extends TestCase
 			$latest = $app()->page('standort')->version('latest')->read();
 			same(['08:30:00', 'true'], [$latest['beginn'], $latest['offen']], 'Published as Kirby stores them', $latest);
 			// Kirby's own form saves the same strings for the same input.
-			$form = Kirby\Form\Form::for($app()->page('standort'), ['values' => ['beginn' => '8:30', 'offen' => true]]);
-			same(['08:30:00', 'true'], [$form->data()['beginn'], $form->data()['offen']], 'Kirby form save agrees');
+			$form = Kirby\Form\Form::for($app()->page('standort'));
+			$form->submit(['beginn' => '8:30', 'offen' => true]);
+			$stored = $form->toStoredValues();
+			same(['08:30:00', 'true'], [$stored['beginn'], $stored['offen']], 'Kirby form save agrees');
 			same(['08:30:00', 'true'], [fude_call($app, 'schema', options: $options)[1]['collections']['zeiten']['entries'][0]['beginn'], fude_call($app, 'schema', options: $options)[1]['collections']['zeiten']['entries'][0]['offen']], 'Schema entry shows the stored values');
 
 			// Structure rows: a time and a toggle, created, updated by name, published.

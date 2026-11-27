@@ -53,6 +53,21 @@ function throws(callable $f, string $pattern, string $what, string $class = Inva
 	Assert::fail($what . ': no exception');
 }
 
+/**
+ * Whether the tests run on Kirby 6 (only Kirby 6 has the blueprint
+ * normalizer). Checked here, not through the plugin's own Compat class.
+ */
+function fude_kirby6(): bool
+{
+	return class_exists('Kirby\\Blueprint\\Normalizer');
+}
+
+/** The name a blueprint uses for the files field: `filepicker` under Kirby 6. */
+function fude_files_type(): string
+{
+	return fude_kirby6() ? 'filepicker' : 'files';
+}
+
 /** Removes a fixture site (symlinks are removed, not followed). */
 function cleanup(string $path): void
 {
